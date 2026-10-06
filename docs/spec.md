@@ -358,8 +358,8 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 | `x` | board | archive card |
 | `t` | global | tag manager |
 | `r` | global | refresh now |
-| `o` | board, modal | link picker |
-| `O` | board, modal | open PR in browser |
+| `o` | board, lists, modal | link picker |
+| `O` | board, lists, modal | open PR in browser |
 | `u` / `U` | board, modal | update branch (merge / rebase) |
 | `M` | board, modal | merge dialog |
 | `d` | board, modal | toggle draft ↔ ready |

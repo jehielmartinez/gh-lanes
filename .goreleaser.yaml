@@ -38,6 +38,9 @@ archives:
 checksum:
   name_template: checksums.txt
 
+release:
+  prerelease: auto
+
 changelog:
   sort: asc
   filters:
@@ -60,6 +63,9 @@ homebrew_casks:
       owner: "{{ .Env.HOMEBREW_TAP_OWNER }}"
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    # A pre-release tag such as v1.0.0-rc.1 still gets a GitHub release, but
+    # Homebrew users only move on a final one.
+    skip_upload: auto
     homepage: "https://github.com/{{ .Env.HOMEBREW_TAP_OWNER }}/gh-lanes"
     description: Terminal kanban board for the open pull requests you authored
     caveats: |

@@ -45,6 +45,9 @@ func (m Model) View() tea.View {
 	if m.picker != nil {
 		screen = m.overlay(screen, m.picker.view(m.theme, m.help))
 	}
+	if m.mergeDialog != nil {
+		screen = m.overlay(screen, m.mergeDialogView())
+	}
 	if m.confirm != nil {
 		screen = m.overlay(screen, m.confirmView())
 	}
@@ -74,14 +77,18 @@ func (m Model) overlay(bg, fg string) string {
 	if termW == 0 || termH == 0 {
 		termW, termH = lipgloss.Width(bg), lipgloss.Height(bg)
 	}
-	x := max(0, (termW-lipgloss.Width(fg))/2)
-	y := max(0, (termH-lipgloss.Height(fg))/2)
+	x, y := centred(termW, termH, lipgloss.Width(fg), lipgloss.Height(fg))
 	canvas := lipgloss.NewCanvas(max(termW, lipgloss.Width(bg)), max(termH, lipgloss.Height(bg)))
 	canvas.Compose(lipgloss.NewCompositor(
 		lipgloss.NewLayer(bg),
 		lipgloss.NewLayer(fg).X(x).Y(y).Z(1),
 	))
 	return canvas.Render()
+}
+
+// centred is the top-left cell of a w by h box centred in an outer one.
+func centred(outerW, outerH, w, h int) (x, y int) {
+	return max(0, (outerW-w)/2), max(0, (outerH-h)/2)
 }
 
 // boardView draws the lanes in view, each scrolled to its own offset.
@@ -246,6 +253,12 @@ func (m Model) statusView() string {
 			updated = m.spinner.View() + " " + updated
 		}
 		parts = append(parts, updated)
+	}
+	if m.loadingLinks() {
+		parts = append(parts, m.spinner.View()+" "+muted.Render("Loading links…"))
+	}
+	if line := m.linkLine(); line != "" {
+		parts = append(parts, line)
 	}
 	changed, added := activity.Tally(m.markers)
 	if changed > 0 {

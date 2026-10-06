@@ -45,6 +45,10 @@ type GitHub interface {
 	UpdateBranch(ctx context.Context, id string, method domain.UpdateMethod) error
 	MarkReadyForReview(ctx context.Context, id string) error
 	ConvertToDraft(ctx context.Context, id string) error
+	Merge(ctx context.Context, id string, method domain.MergeMethod) error
+	DeleteBranch(ctx context.Context, refID string) error
+	EnableAutoMerge(ctx context.Context, id string, method domain.MergeMethod) error
+	DisableAutoMerge(ctx context.Context, id string) error
 }
 
 // Options are the boundaries the root model is given rather than reaching for
@@ -58,6 +62,9 @@ type Options struct {
 	Now func() time.Time
 	// After waits for a duration on the same clock as Now, like time.After.
 	After func(time.Duration) <-chan time.Time
+	// Open opens a URL in the browser. It is only ever given http and https
+	// URLs.
+	Open func(url string) error
 }
 
 // Model is the root model of the app.
@@ -139,8 +146,15 @@ type Model struct {
 	detailSeq int
 	lastClick click
 
+	// linksSeq identifies the fetch in flight for the board's link picker,
+	// zero when there is none.
+	linksSeq int
+	// linkErr is why the last link couldn't be loaded or opened.
+	linkErr *linkFailure
 	// confirm is the open confirmation dialog, nil when none is.
 	confirm *confirmation
+	// mergeDialog is the open merge dialog, nil when none is.
+	mergeDialog *mergeDialog
 	// acting is whether an action is waiting on GitHub; one runs at a time.
 	acting bool
 	toast  toast
@@ -367,6 +381,9 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.confirm != nil {
 			return m.confirmKey(msg)
 		}
+		if m.mergeDialog != nil {
+			return m.mergeDialogKey(msg)
+		}
 		if key.Matches(msg, m.keys.Tags) {
 			return m.openTagManager(), nil
 		}
@@ -377,6 +394,12 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m, board := m.refresh()
 			m, detail := m.fetchDetail()
 			return m, tea.Batch(board, detail)
+		}
+		if key.Matches(msg, m.keys.Links) {
+			return m.openLinks()
+		}
+		if key.Matches(msg, m.keys.Browser) {
+			return m.openPullRequest()
 		}
 		if m.detail != nil {
 			return m.detailKey(msg)
@@ -395,7 +418,11 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
-		if m.detail == nil && m.picker == nil && m.tagManager == nil && m.confirm == nil {
+		switch {
+		case m.dialogOpen():
+		case m.detail != nil:
+			return m.clickDetail(msg)
+		default:
 			return m.click(msg)
 		}
 	case tea.MouseWheelMsg:
@@ -403,7 +430,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			return m.detailScroll(msg), nil
 		}
 		switch {
-		case m.picker != nil || m.tagManager != nil || m.confirm != nil:
+		case m.dialogOpen():
 		case m.tab == tabReview:
 			return m.reviewWheeled(msg), nil
 		default:
@@ -419,7 +446,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		m, board := m.refresh()
 		return m, tea.Batch(next, detail, board)
 	case spinner.TickMsg:
-		if !m.refreshing && !m.acting && (m.detail == nil || !m.detail.fetching) {
+		if !m.refreshing && !m.acting && !m.loadingLinks() && (m.detail == nil || !m.detail.fetching) {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -436,6 +463,14 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.refreshed(msg)
 	case detailMsg:
 		return m.detailFetched(msg), nil
+	case linksMsg:
+		return m.linksFetched(msg), nil
+	case openMsg:
+		return m.open(msg.url)
+	case openedMsg:
+		if msg.err != nil {
+			m.linkErr = &linkFailure{action: openFailed, err: msg.err}
+		}
 	case actionDoneMsg:
 		return m.actionDone(msg)
 	case prRefreshedMsg:
@@ -585,6 +620,12 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.refresh()
 	}
 	return m, nil
+}
+
+// dialogOpen reports whether a picker, the tag manager or a dialog has the
+// keys.
+func (m Model) dialogOpen() bool {
+	return m.picker != nil || m.tagManager != nil || m.confirm != nil || m.mergeDialog != nil
 }
 
 func (m Model) selected() (domain.PullRequest, bool) {

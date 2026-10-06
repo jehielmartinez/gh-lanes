@@ -22,7 +22,13 @@ type picker struct {
 	title  string
 	items  []pickerItem
 	cursor int
+	// rows is how many items are shown at once, 0 for all of them, and
+	// offset the first one shown.
+	rows   int
+	offset int
 	keys   pickerKeys
+	// empty is what the picker says when it has nothing to choose from.
+	empty string
 	// choose turns the chosen index into the message the root model acts on.
 	choose func(index int) tea.Msg
 }
@@ -54,12 +60,20 @@ func (p picker) update(msg tea.KeyPressMsg) (*picker, tea.Cmd) {
 		index, choose := p.cursor, p.choose
 		return nil, func() tea.Msg { return choose(index) }
 	}
+	if p.rows > 0 {
+		p.offset = window(p.offset, p.cursor, p.rows, len(p.items))
+	}
 	return &p, nil
 }
 
 func (p picker) view(t theme, h help.Model) string {
 	rows := []string{lipgloss.NewStyle().Bold(true).Foreground(t.text).Render(p.title), ""}
-	for i, item := range p.items {
+	last := len(p.items)
+	if p.rows > 0 {
+		last = min(last, p.offset+p.rows)
+	}
+	for i := p.offset; i < last; i++ {
+		item := p.items[i]
 		marker, style := "  ", lipgloss.NewStyle().Foreground(t.text)
 		if i == p.cursor {
 			marker, style = "› ", style.Bold(true).Foreground(t.accent)
@@ -69,6 +83,9 @@ func (p picker) view(t theme, h help.Model) string {
 			row += " " + lipgloss.NewStyle().Foreground(t.muted).Render(item.note)
 		}
 		rows = append(rows, row)
+	}
+	if len(p.items) == 0 && p.empty != "" {
+		rows = append(rows, lipgloss.NewStyle().Foreground(t.muted).Render(p.empty))
 	}
 	rows = append(rows, "", h.ShortHelpView(p.keys.ShortHelp()))
 	return modal(t, rows)

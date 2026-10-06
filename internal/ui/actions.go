@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -102,6 +103,11 @@ func (m Model) actionKeys() keyMap {
 	} else {
 		k.Draft.SetHelp("d", "convert to draft")
 	}
+	offer := pr.MergeOffer()
+	k.Merge.SetEnabled(ok && offer != domain.MergeOfferNone)
+	if offer == domain.MergeOfferAutoMerge || offer == domain.MergeOfferDisableAutoMerge {
+		k.Merge.SetHelp("M", "auto-merge…")
+	}
 	return k
 }
 
@@ -132,6 +138,9 @@ func (m Model) actionKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			act:   actionConvertToDraft,
 			pr:    pr,
 		}
+		return m, nil, true
+	case key.Matches(msg, keys.Merge):
+		m.mergeDialog = newMergeDialog(pr)
 		return m, nil, true
 	}
 	return m, nil, false
@@ -172,7 +181,11 @@ func (m Model) act(a action, pr domain.PullRequest) (Model, tea.Cmd) {
 func (m Model) actionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	m.acting = false
 	m.toast = toast{text: ref(msg.pr) + ": " + msg.act.done, until: m.now.Add(toastDuration)}
-	if msg.err != nil {
+	var followUp followUpError
+	switch {
+	case errors.As(msg.err, &followUp):
+		m.toast = toast{text: ref(msg.pr) + ": " + msg.act.done + ", but " + oneLine(followUp.Error()), err: true, until: m.now.Add(toastDuration)}
+	case msg.err != nil:
 		m.toast = toast{text: ref(msg.pr) + ": " + msg.act.failed + ": " + oneLine(msg.err.Error()), err: true, until: m.now.Add(toastDuration)}
 	}
 	cmds := []tea.Cmd{m.fetchPullRequest(msg.pr.ID)}

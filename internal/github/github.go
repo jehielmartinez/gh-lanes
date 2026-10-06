@@ -127,6 +127,13 @@ const pullRequestsByIDQuery = `query PullRequestsByID($ids: [ID!]!) {
   ...RateLimitFields
 }` + pullRequestFragment + checkContextFragment + rateLimitFragment
 
+const pullRequestDetailQuery = `query PullRequestDetail($id: ID!) {
+  node(id: $id) {
+    ... on PullRequest { ...PullRequestFields }
+  }
+  ...RateLimitFields
+}` + pullRequestFragment + checkContextFragment + rateLimitFragment
+
 type nodesResponse struct {
 	Nodes []pullRequestNode
 	rateLimitResponse
@@ -169,15 +176,11 @@ func (c *Client) toDomain(ctx context.Context, nodes []pullRequestNode) ([]domai
 		if n.ID == "" {
 			continue
 		}
-		pr := n.toDomain()
-		if rollup := n.rollup(); rollup != nil && rollup.Contexts.PageInfo.HasNextPage {
-			rest, l, err := c.remainingChecks(ctx, n.headCommitID(), rollup.Contexts.PageInfo.EndCursor)
-			if err != nil {
-				return nil, domain.RateLimit{}, fmt.Errorf("checks for %s#%d: %w", pr.Repository.NameWithOwner, pr.Number, err)
-			}
-			pr.Checks = append(pr.Checks, rest...)
-			limit = l
+		pr, l, err := c.withAllChecks(ctx, n)
+		if err != nil {
+			return nil, domain.RateLimit{}, err
 		}
+		limit = latest(limit, l)
 		prs = append(prs, pr)
 	}
 	return prs, limit, nil
@@ -190,6 +193,52 @@ func latest(prev, next domain.RateLimit) domain.RateLimit {
 		return prev
 	}
 	return next
+}
+
+type pullRequestDetailResponse struct {
+	Node *pullRequestNode
+	rateLimitResponse
+}
+
+// ErrPullRequestNotFound means no pull request has the node ID asked for,
+// usually because it was deleted or its repository became inaccessible.
+var ErrPullRequestNotFound = errors.New("pull request not found")
+
+// PullRequest fetches one pull request by node ID, with all of its checks,
+// along with the rate-limit budget left afterwards.
+func (c *Client) PullRequest(ctx context.Context, id string) (domain.PullRequest, domain.RateLimit, error) {
+	var resp pullRequestDetailResponse
+	if err := c.do(ctx, pullRequestDetailQuery, map[string]any{"id": id}, &resp); err != nil {
+		return domain.PullRequest{}, domain.RateLimit{}, fmt.Errorf("load pull request: %w", err)
+	}
+	limit := resp.toDomain()
+	if resp.Node == nil || resp.Node.ID == "" {
+		return domain.PullRequest{}, limit, ErrPullRequestNotFound
+	}
+	pr, l, err := c.withAllChecks(ctx, *resp.Node)
+	if err != nil {
+		return domain.PullRequest{}, domain.RateLimit{}, err
+	}
+	if l != (domain.RateLimit{}) {
+		limit = l
+	}
+	return pr, limit, nil
+}
+
+// withAllChecks maps a pull request node, fetching whatever checks didn't
+// fit on its first page. The rate limit is zero when nothing more was fetched.
+func (c *Client) withAllChecks(ctx context.Context, n pullRequestNode) (domain.PullRequest, domain.RateLimit, error) {
+	pr := n.toDomain()
+	rollup := n.rollup()
+	if rollup == nil || !rollup.Contexts.PageInfo.HasNextPage {
+		return pr, domain.RateLimit{}, nil
+	}
+	rest, limit, err := c.remainingChecks(ctx, n.headCommitID(), rollup.Contexts.PageInfo.EndCursor)
+	if err != nil {
+		return domain.PullRequest{}, domain.RateLimit{}, fmt.Errorf("checks for %s#%d: %w", pr.Repository.NameWithOwner, pr.Number, err)
+	}
+	pr.Checks = append(pr.Checks, rest...)
+	return pr, limit, nil
 }
 
 const checkContextsQuery = `query CheckContexts($id: ID!, $after: String) {

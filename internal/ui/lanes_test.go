@@ -33,6 +33,12 @@ type configYAML struct {
 type stateJSON struct {
 	Version     int               `json:"version"`
 	Assignments map[string]string `json:"assignments"`
+	Archived    []archivedJSON    `json:"archived"`
+}
+
+type archivedJSON struct {
+	ID   string `json:"id"`
+	Open bool   `json:"open"`
 }
 
 const customConfig = `version: 1

@@ -1,0 +1,109 @@
+{
+  "data": {
+    "nodes": [
+      {
+        "id": "PR_node_merged",
+        "number": 20,
+        "title": "Ship the upload worker",
+        "url": "https://github.com/octo-org/sample-repo/pull/20",
+        "isDraft": false,
+        "state": "MERGED",
+        "createdAt": "2026-02-01T10:00:00Z",
+        "updatedAt": "2026-03-03T10:00:00Z",
+        "mergedAt": "2026-03-03T10:00:00Z",
+        "closedAt": "2026-03-03T10:00:00Z",
+        "author": {
+          "login": "user-a"
+        },
+        "baseRefName": "main",
+        "headRefName": "feature-20",
+        "mergeable": "UNKNOWN",
+        "mergeStateStatus": "UNKNOWN",
+        "reviewDecision": "APPROVED",
+        "viewerCanUpdate": true,
+        "autoMergeRequest": null,
+        "repository": {
+          "nameWithOwner": "octo-org/sample-repo",
+          "mergeCommitAllowed": true,
+          "squashMergeAllowed": true,
+          "rebaseMergeAllowed": false,
+          "autoMergeAllowed": false,
+          "deleteBranchOnMerge": true
+        },
+        "comments": {
+          "totalCount": 0
+        },
+        "reviews": {
+          "totalCount": 1
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "id": "C_node_20",
+                "statusCheckRollup": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "PR_node_closed",
+        "number": 21,
+        "title": "Try a different cache",
+        "url": "https://github.com/user-a/other-repo/pull/21",
+        "isDraft": false,
+        "state": "CLOSED",
+        "createdAt": "2026-02-01T10:00:00Z",
+        "updatedAt": "2026-03-02T10:00:00Z",
+        "mergedAt": null,
+        "closedAt": "2026-03-02T10:00:00Z",
+        "author": {
+          "login": "user-a"
+        },
+        "baseRefName": "main",
+        "headRefName": "feature-21",
+        "mergeable": "UNKNOWN",
+        "mergeStateStatus": "UNKNOWN",
+        "reviewDecision": "APPROVED",
+        "viewerCanUpdate": true,
+        "autoMergeRequest": null,
+        "repository": {
+          "nameWithOwner": "user-a/other-repo",
+          "mergeCommitAllowed": true,
+          "squashMergeAllowed": true,
+          "rebaseMergeAllowed": false,
+          "autoMergeAllowed": false,
+          "deleteBranchOnMerge": true
+        },
+        "comments": {
+          "totalCount": 0
+        },
+        "reviews": {
+          "totalCount": 1
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "id": "C_node_21",
+                "statusCheckRollup": null
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-03-05T13:00:00Z"
+    }
+  }
+}

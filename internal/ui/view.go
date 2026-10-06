@@ -88,12 +88,12 @@ func (m Model) laneHeader(lane board.Lane, focused bool) string {
 func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) string {
 	width := m.laneWidth()
 	rows := []string{m.laneHeader(lane, focused)}
-	if lane.Untagged() && m.loaded && len(m.prs) == 0 {
+	if lane.Untagged() && m.loaded && !board.HasOpen(m.lanes) {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}
 	last := min(len(lane.PullRequests), offset+m.cardsInView())
 	for i := offset; i < last; i++ {
-		rows = append(rows, m.cardView(lane.PullRequests[i], width, focused && i == cursor))
+		rows = append(rows, m.cardView(lane.PullRequests[i], width, focused && i == cursor, lane.Dimmed(lane.PullRequests[i])))
 	}
 	return lipgloss.NewStyle().Width(width).MarginRight(laneGap).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
@@ -105,28 +105,48 @@ func (m Model) laneColor(lane board.Lane) color.Color {
 	return lipgloss.Color(lane.Tag.Color)
 }
 
-func (m Model) cardView(pr domain.PullRequest, width int, selected bool) string {
+func (m Model) cardView(pr domain.PullRequest, width int, selected, dimmed bool) string {
 	inner := width - cardPadding
 	number := fmt.Sprintf("#%d", pr.Number)
 	ref := truncate(pr.Repository.NameWithOwner, inner-lipgloss.Width(number)) + number
-	ref = lipgloss.NewStyle().Foreground(m.theme.muted).Render(ref)
+	ref = lipgloss.NewStyle().Foreground(m.theme.muted).Faint(dimmed).Render(ref)
 	titleColor := m.theme.text
-	if m.err != nil {
+	if m.err != nil || dimmed {
 		titleColor = m.theme.muted
 	}
-	title := lipgloss.NewStyle().Foreground(titleColor).Render(truncate(oneLine(pr.Title), inner))
+	title := lipgloss.NewStyle().Foreground(titleColor).Faint(dimmed).Render(truncate(oneLine(pr.Title), inner))
 	// The selected card gets a heavier border as well as a colour, so the
 	// selection still shows on a terminal without colour.
 	border, borderColor := lipgloss.RoundedBorder(), m.theme.border
 	if selected {
 		border, borderColor = lipgloss.ThickBorder(), m.theme.accent
 	}
+	status := m.cardStatusLine(pr, inner)
+	if pr.Finished() {
+		status = m.cardStateLine(pr, inner, dimmed)
+	}
 	return lipgloss.NewStyle().
 		Width(width).
 		Padding(0, 1).
 		Border(border).
 		BorderForeground(borderColor).
-		Render(ref + "\n" + title + "\n" + m.cardStatusLine(pr, inner))
+		Render(ref + "\n" + title + "\n" + status)
+}
+
+// cardStateLine is the third line of a merged or closed card: its state badge
+// in place of checks, reviews and mergeability, which no longer apply.
+func (m Model) cardStateLine(pr domain.PullRequest, width int, dimmed bool) string {
+	label, c := "Closed", m.theme.failure
+	if pr.State == domain.StateMerged {
+		label, c = "Merged", m.theme.merged
+	}
+	if dimmed {
+		c = m.theme.muted
+	}
+	badge := lipgloss.NewStyle().Foreground(c).Bold(!dimmed).Faint(dimmed).Render(label)
+	age := lipgloss.NewStyle().Foreground(m.theme.muted).Faint(dimmed).Render(shortAge(m.now.Sub(pr.UpdatedAt)))
+	gap := max(width-lipgloss.Width(badge)-lipgloss.Width(age), 1)
+	return badge + strings.Repeat(" ", gap) + age
 }
 
 // cardStatusLine is the card's third line: checks, review decision and

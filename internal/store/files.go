@@ -51,6 +51,8 @@ type State struct {
 	// Assignments maps a pull request node ID to the ID of its tag. A pull
 	// request with no entry is untagged.
 	Assignments map[string]string
+	// Archived lists the pull requests archived off the board.
+	Archived []domain.Archived
 }
 
 type configFile struct {
@@ -69,6 +71,12 @@ type tagEntry struct {
 type stateFile struct {
 	Version     int               `json:"version"`
 	Assignments map[string]string `json:"assignments"`
+	Archived    []archivedEntry   `json:"archived"`
+}
+
+type archivedEntry struct {
+	ID   string `json:"id"`
+	Open bool   `json:"open"`
 }
 
 // LoadConfig reads the config file in dir. On first run, when there is no
@@ -155,7 +163,13 @@ func LoadState(dir string) (State, error) {
 	if file.Assignments == nil {
 		file.Assignments = map[string]string{}
 	}
-	return State{Assignments: file.Assignments}, nil
+	var archived []domain.Archived
+	for _, e := range file.Archived {
+		if e.ID != "" {
+			archived = append(archived, domain.Archived(e))
+		}
+	}
+	return State{Assignments: file.Assignments, Archived: archived}, nil
 }
 
 // SaveState writes the state file in dir atomically.
@@ -164,7 +178,11 @@ func SaveState(dir string, s State) error {
 	if assignments == nil {
 		assignments = map[string]string{}
 	}
-	raw, err := json.MarshalIndent(stateFile{Version: stateVersion, Assignments: assignments}, "", "  ")
+	archived := make([]archivedEntry, 0, len(s.Archived))
+	for _, a := range s.Archived {
+		archived = append(archived, archivedEntry(a))
+	}
+	raw, err := json.MarshalIndent(stateFile{Version: stateVersion, Assignments: assignments, Archived: archived}, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode state: %w", err)
 	}

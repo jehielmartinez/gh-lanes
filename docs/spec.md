@@ -1,463 +1,420 @@
 # lanes — specification
 
-`lanes` is a terminal "control center" for the open pull requests you authored on GitHub. It shows
-every PR across every org and repo, lets you sort them into kanban lanes using your own local tags,
-keeps their status live, and lets you act on them (update branch, merge, draft/ready, open links)
-without leaving the terminal. It never shows file diffs.
+Status: **specified, not built.**
 
-Status: **specified, not built.** Every decision below was settled in a design interview on
-2026-10-06. Where a decision has a reason, the reason is recorded so a later change can weigh what it
-gives up.
+## Problem Statement
 
----
+I author pull requests across several organizations and repositories. To find out where each one
+stands, I have to open many browser tabs and check each PR's checks, reviews, mergeability and
+conflicts. GitHub has no single place that shows all of my open PRs with their live status, and I
+can't group them by where they are in *my* workflow (in progress, in review, being tested, ready to
+demo). Doing routine things like updating a branch, merging, or switching between draft and ready
+means leaving the terminal and clicking through the web UI for each PR.
 
-## 1. Original request
+## Solution
 
-Captured as stated, so the spec can be checked against it:
+`lanes` is a terminal control center for the open pull requests you authored. It runs as `gh lanes`
+(a `gh` extension) or as a standalone `lanes` binary installed from Homebrew, and uses the account
+`gh` is already logged in to.
 
-- A terminal tool, a control center TUI, to visualize important info about open PRs.
-- Requires a `gh`-authenticated user on the machine.
-- Track the status of all of my PRs across different repositories, ideally without having to name
-  the org.
-- Assign tags to PRs that exist only inside the tool: In Progress, Demo, Testing, Review, etc., and
-  the user can define their own.
-- Group PRs by tag in lanes, like GitHub Projects or Jira boards.
-- Keep the information on every PR up to date.
-- No file diffs, but a nicely formatted view of: Actions/check status, PR status, merge status,
-  conflicts.
-- Selecting a PR opens a modal with the above plus comments and reviews, with localized timestamps.
-- Actions from the tool: update branch, merge the PR, open links from comments or the PR body, mark
-  ready for review, convert to draft, etc.
+- It finds every open PR you authored on every org and repo, without you naming any of them.
+- It shows them as a kanban board: each lane is a **tag** you define locally (In Progress, Review,
+  Testing, Demo, Done, or your own). Tags never touch GitHub.
+- The board stays live: checks, review decision, mergeability, conflicts and draft state refresh
+  automatically, and cards with new activity get a marker.
+- Opening a PR shows a detail modal with merge status, checks, the description, and a single
+  conversation timeline of comments, reviews and review threads, all with local timestamps. It never
+  shows file diffs.
+- You can act on a PR without leaving the terminal: update the branch (merge or rebase), merge with
+  any method the repo allows, enable or disable auto-merge, mark ready or convert to draft, open the
+  PR in the browser, and open any link in it.
+- A second tab lists PRs where your review is requested, with the same cards and modal.
 
----
+## User Stories
 
-## 2. Environment facts (verified, not decided)
+### Setup and launch
 
-Checked on the author's machine on 2026-10-06:
+1. As a developer, I want to install the tool with `gh extension install`, so that it fits into my
+   existing `gh` workflow.
+2. As a developer, I want to install it with `brew install`, so that I can run it as a plain `lanes`
+   command.
+3. As a developer, I want the tool to reuse my existing `gh` login, so that I don't manage another
+   token.
+4. As a developer, I want the tool to honor `GH_TOKEN` and `GH_HOST`, so that it behaves like `gh`
+   in scripted or non-default setups.
+5. As a developer who isn't logged in to `gh`, I want a clear message telling me to run
+   `gh auth login`, so that I know how to fix it.
+6. As a developer, I want the tool to start almost instantly, so that I can open it as casually as
+   `git status`.
+7. As a developer, I want `--version` and `--config` flags, so that I can check what I'm running and
+   point it at a different config.
 
-- `gh` is logged in to `github.com` with scopes `gist`, `read:org`, `repo`, `workflow`. That's enough
-  for every read and every action in this spec (merge and update-branch need `repo`; workflow-file
-  changes are never made).
-- Finding PRs across orgs without naming them works: `gh search prs --author=@me --state=open`
-  returned 13 open PRs across 4 owners (two orgs and a personal account). The GraphQL equivalent is
-  `search(query: "is:pr is:open author:@me", type: ISSUE)`.
-- The terminal is **Ghostty running inside the herdr multiplexer**. Whether herdr passes OSC 8
-  hyperlink sequences through is unknown, which drove decision D10.
-- Go and Rust weren't installed (Node 24, Bun and Python 3 were). Building requires
-  `brew install go` first.
-- Name check (Homebrew formulae and GitHub repos): `lanes` has no Homebrew formula and no `gh-lanes`
-  extension.
+### Finding PRs
 
----
+8. As a developer, I want every open PR I authored, across every org and personal repo, to appear
+   without configuration, so that I never miss one.
+9. As a developer, I want PRs in archived repos left out, so that dead work doesn't clutter the
+   board.
+10. As a developer, I want a new PR I just opened to appear in the Untagged lane on the next refresh,
+    so that Untagged works as my inbox.
 
-## 3. Decisions
+### Tags and lanes
 
-### D1. Stack: Go + Bubble Tea
+11. As a developer, I want a set of default tags (In Progress, Review, Testing, Demo, Done) on first
+    run, so that the board is useful immediately.
+12. As a developer, I want to create my own tags, so that the lanes match how I actually work.
+13. As a developer, I want to rename a tag without losing which PRs are in it, so that I can refine
+    names freely.
+14. As a developer, I want to recolor a tag, so that lanes are easy to tell apart.
+15. As a developer, I want to reorder tags, so that lanes appear left to right in my workflow order.
+16. As a developer, I want deleting a tag to move its PRs to Untagged, so that no PR disappears.
+17. As a developer, I want to mark a tag as terminal (like Done), so that finished work is displayed
+    differently.
+18. As a developer, I want an Untagged lane that's always first and can't be deleted, so that new
+    PRs always have somewhere to land.
+19. As a developer, I want tags kept on my machine only, so that teammates never see my private
+    workflow labels.
+20. As a developer, I want the tag config in a readable YAML file, so that I can edit or back it up
+    by hand.
+21. As a developer, I want each PR in exactly one lane, so that its lane is its status with no
+    ambiguity.
 
-- **Libraries:** Bubble Tea (runtime), Bubbles (lists, viewport, text input, spinner, help), Lip Gloss
-  (styling and layout), `github.com/cli/go-gh/v2` (auth, host and GraphQL client reused from `gh`'s
-  own config).
-- **Why:** the deciding factor was publishing. GoReleaser turns a git tag into multi-platform binaries
-  and a Homebrew formula automatically, and GitHub has an official Action for precompiled Go `gh`
-  extensions.
-- **Rejected: Python + Textual.** It has the most built-in UI (modals, scroll containers, CSS
-  layout), but a Homebrew formula for it has to declare and pin every Python dependency, regenerated
-  on every bump. It also starts about 0.5 s slower (Go ~10–20 ms, Textual ~300–600 ms) and uses more
-  memory (~15–30 MB vs ~60–100 MB).
-- **Rejected: TypeScript + Ink.** It's the most familiar, but it has no built-in modal, scrolling or
-  focus management, and Homebrew distribution means either a Node dependency or a 60–90 MB
-  `bun build --compile` binary.
-- **Performance note:** at this scale (tens of PRs) the UI framework doesn't matter. The real latency
-  is the GitHub API (about 0.5–2 s per refresh), and it always runs off the UI thread.
-- **Cost accepted:** the most code of the three options, in the language the author knows least. The
-  modal overlay is the main piece that has to be built by hand.
+### Board
 
-### D2. Distribution: Homebrew tap + `gh` extension
+22. As a developer, I want lanes shown as columns with a name, color and count in the header, so
+    that I can see the shape of my work at a glance.
+23. As a developer, I want each card to show the repo and number, the title, check status, review
+    decision, mergeability and age, so that I can triage without opening it.
+24. As a developer, I want cards sorted by most recently updated within a lane, so that active work
+    is on top.
+25. As a developer, I want the board to scroll horizontally when lanes don't fit, keeping the
+    focused lane visible, so that the tool works in narrow terminals.
+26. As a developer, I want each lane to scroll vertically on its own, so that a long lane doesn't
+    push the others around.
+27. As a developer, I want to move a card one lane left or right with a single key, so that
+    retagging is fast.
+28. As a developer, I want a "move to…" picker, so that I can jump a card to any lane directly.
+29. As a developer, I want to navigate lanes and cards with both vim keys and arrow keys, so that it
+    feels natural either way.
+30. As a developer, I want to click a card to select it and double-click to open it, so that I can
+    use the mouse when it's easier.
+31. As a developer, I want a help footer and a full help screen, so that I can discover keys.
 
-- The repo is named **`gh-lanes`**, which a `gh` extension requires. Users run it as `gh lanes`, or
-  as `lanes` when installed from Homebrew.
-- **Homebrew:** GoReleaser publishes a formula named `lanes` to a tap repo
-  (`jehielmartinez/homebrew-tap`), so users install with `brew install jehielmartinez/tap/lanes`.
-- **gh extension:** `cli/gh-extension-precompile` builds release assets, so users install with
-  `gh extension install jehielmartinez/gh-lanes`.
-- Both channels build from the same tag.
-- The binary must work standalone (from Homebrew) as well as an extension. `go-gh` handles both: it
-  reads `gh`'s stored token and host either way, and honors `GH_TOKEN` and `GH_HOST`.
-- **Not done until asked:** creating the GitHub repo, the tap repo, secrets, or any release. Those
-  steps are public. The GoReleaser config and release workflow files are written as part of the
-  build.
+### Merged and closed PRs
 
-### D3. Scope: your PRs on the board, review requests in a separate tab
+32. As a developer, I want a tagged PR to stay on the board with a Merged or Closed badge after it
+    merges, so that post-merge work (testing, demo) stays visible.
+33. As a developer, I want untagged PRs to drop off once they're no longer open, so that the inbox
+    only holds live work.
+34. As a developer, I want to archive a card with one key, so that I decide when it leaves the
+    board.
+35. As a developer, I want an archived PR to stay gone, so that it doesn't come back on the next
+    refresh.
+36. As a developer, I want an archived PR that is reopened to come back to Untagged, so that I
+    notice it's live again.
+37. As a developer, I want merged and closed PRs in a terminal lane shown dimmed, so that finished
+    work recedes visually.
 
-- **Board tab:** PRs where you're the author.
-  - Search: `is:pr is:open author:@me archived:false`.
-  - Also fetched: tracked PRs that are no longer open (see D6).
-- **Review requests tab:** `is:pr is:open review-requested:@me archived:false`.
-  - It has no tags and no lanes: a single list sorted by last update.
-  - It uses the same card rendering and the same detail modal. Actions that need to be the PR's
-    author (draft/ready, merge) are hidden or disabled when you can't perform them, based on
-    `viewerCanUpdate` and the repo's permissions.
-- **Why:** tags describe *your* workflow, so a teammate's PR has no place in your "Demo" lane. The
-  review queue is the same fetch with a different search, so it's nearly free.
-- **Rejected:** mixing review requests into the board (they don't fit the tags), and arbitrary
-  user-configured search queries (not needed yet, but easy to add later because the search string is
-  the only thing that differs).
+### Keeping data fresh
 
-### D4. Tags are local only
+38. As a developer, I want the board to refresh automatically every 60 seconds, so that statuses
+    stay current without me doing anything.
+39. As a developer, I want to change the refresh interval in the config, so that I can trade
+    freshness for API usage.
+40. As a developer, I want a key to refresh immediately, so that I can check right after pushing.
+41. As a developer, I want the UI to stay responsive during a refresh, so that I can keep working.
+42. As a developer, I want a spinner and an "updated Ns ago" indicator, so that I know how fresh the
+    data is.
+43. As a developer, I want errors (offline, expired login) shown in the status bar while the last
+    good data stays on screen, marked stale, so that a network blip doesn't wipe my board.
+44. As a developer, I want a warning when my API rate-limit budget is low, so that I understand why
+    refreshes might fail.
+45. As a developer, I want "checking…" shown while GitHub is still computing mergeability, so that I
+    don't mistake an unknown state for a conflict.
 
-- Tags and their assignments never touch GitHub. No labels are created and teammates see nothing.
-- Stored under `~/.config/lanes/` (see §6). `$XDG_CONFIG_HOME` is honored if set, and `~/.config` is
-  used even on macOS rather than `~/Library/Application Support`.
-- **In-app tag manager:** create, rename, recolor, reorder and delete tags.
-  - Deleting a tag moves its PRs to Untagged.
-  - Renaming keeps assignments, because tags are referenced by a stable ID, not by name.
-- The config file is plain YAML and may also be edited by hand. The app reloads it on start and after
-  saving from the tag manager.
-- **Default tags on first run:** In Progress, Review, Testing, Demo, Done. All are editable.
+### Change awareness
 
-### D5. One tag per PR, and each tag is a lane
+46. As a developer, I want an activity dot on cards whose comments, reviews, checks, mergeability,
+    review decision, draft state or open/merged/closed state changed since I last opened them, so
+    that I know where to look.
+47. As a developer, I want the status bar to show how many PRs changed, so that I know at a glance
+    whether anything needs me.
+48. As a developer, I want opening a PR to clear its dot, so that the marker means "unseen".
+49. As a developer, I want a "new" marker for PRs that appear after the first run, without every
+    card lighting up on first launch, so that the first run is calm.
 
-- Every PR is in exactly one lane. Moving a card means changing its tag.
-- An **Untagged** lane is always first on the left and acts as the inbox for new PRs. It's built in,
-  so it can't be deleted or renamed.
-- Lane order follows the tag order set in the tag manager.
-- Each tag has a `terminal` boolean, `true` for lanes like Done (see D6).
-- **Rejected:** several tags per PR. Lanes need a single status, and a card showing up in two lanes
-  breaks moving cards around.
-- **Future (not v1):** "flags" (Blocked, Hotfix, and so on) as small badges on cards that don't affect
-  the lane.
+### Detail modal
 
-### D6. What happens after merge or close
+50. As a developer, I want to open a PR in a large overlay that scrolls and closes with Esc, so that
+    I can dig in without losing my place on the board.
+51. As a developer, I want the header to show the repo and number, title, author, `head → base`
+    branches, state badge, and created and updated times, so that I have the context up top.
+52. As a developer, I want mergeability and merge state explained in plain sentences (for example
+    "Behind `main`. Update branch available"), so that I don't have to decode GitHub's enums.
+53. As a developer, I want the review decision and auto-merge status shown, so that I know what's
+    blocking a merge.
+54. As a developer, I want checks grouped by workflow with failures first, status icons and
+    durations, so that I can see what broke right away.
+55. As a developer, I want a summary line like "12 passed · 1 failed · 2 running", so that I get the
+    overall picture in one line.
+56. As a developer, I want each check's details link to be clickable, so that I can jump to the
+    failing log.
+57. As a developer, I want the PR description rendered as readable markdown, so that it's pleasant
+    to read in a terminal.
+58. As a developer, I want comments, reviews and review threads in one timeline sorted by time, so
+    that I can follow the conversation in order.
+59. As a developer, I want review threads to show their `file:line` and resolved or unresolved
+    state, with resolved threads collapsed, so that I can focus on what's open.
+60. As a developer, I want every timestamp in my local timezone, as both an absolute date and a
+    relative age, so that I don't do timezone math.
+61. As a developer, I want the modal's data to refresh while it's open, so that I see new comments
+    and check results live.
+62. As a developer, I never want to see file diffs or file lists, so that the tool stays a status
+    dashboard and not a code-review tool.
 
-- **Tagged PRs stay on the board** after merging or closing, with a `Merged` or `Closed` badge, until
-  you archive them (`x`) or move them to a terminal lane.
-- **Untagged PRs drop off** as soon as they leave the open-PR search.
-- **Why:** labels like Demo and Testing often describe work that continues after the merge (QA on
-  trunk, a demo from staging).
-- **Consequence:** the open-PR search no longer returns tracked closed PRs, so each refresh also
-  fetches them by node ID (`nodes(ids: [...])`).
-- **Archive** removes the PR's assignment and adds its ID to an archived list, so it doesn't come
-  back. An archived PR that is reopened on GitHub comes back to Untagged.
-- A **terminal lane** (for example Done) shows its merged and closed PRs dimmed. Archiving from any
-  lane takes one keypress.
-- **Rejected:** dropping every PR on merge (Testing would vanish mid-QA), and expiring PRs after N
-  days (hides things on a timer you didn't pick).
+### Links
 
-### D7. Refresh
+63. As a developer, I want to click any link in the description, comments, reviews or threads to
+    open it in my browser, so that following references is one click.
+64. As a developer, I want links underlined, so that I can tell what's clickable.
+65. As a developer, I want markdown links to show their text, and bare URLs to be detected, so that
+    both kinds are usable.
+66. As a developer, I want links that wrap onto the next line to still be clickable, so that long
+    URLs work.
+67. As a developer, I want a link picker listing every URL in the PR with its source and author, so
+    that I can open links from the keyboard.
+68. As a developer, I want link clicks handled by the app itself, so that they work inside terminal
+    multiplexers that don't pass terminal hyperlinks through.
+69. As a developer, I want to still select text with Shift+drag, so that I can copy things while
+    mouse support is on.
+70. As a developer, I want a key to open the PR itself in the browser, so that I can go to GitHub
+    when I need the full UI.
 
-- One batched GraphQL request for each list (board search, review search, tracked IDs) covers
-  everything a card needs: checks, reviews, mergeability.
-- **Auto-refresh every 60 s by default**, configurable as `refresh_interval` in the config.
-  - Refresh runs off the UI thread as a Bubble Tea command, so the UI never blocks.
-  - A spinner and a "updated 12s ago" indicator sit in the status bar.
-- **`r`** refreshes immediately.
-- **Opening the modal fetches that PR's full detail** (comments, reviews, threads) fresh. While the
-  modal is open, the detail refreshes at the same interval.
-- **Rate limit:** GitHub's GraphQL limit is 5,000 points per hour, and a refresh of this size costs a
-  few points. The status bar shows the remaining budget when it drops below 10%.
-- **Failure handling:** errors (offline, expired token) show in the status bar and keep the last good
-  data on screen, marked stale. They never clear the board.
+### Actions
 
-### D8. Change awareness: in-app new-activity markers
+71. As a developer, I want to update a PR's branch from its own base branch (whatever it is), so
+    that I don't have to check it out locally.
+72. As a developer, I want a separate rebase update that asks for confirmation, so that I don't
+    rewrite a branch by accident.
+73. As a developer, I want a merge dialog that offers only the merge methods the repo allows, so
+    that I can't pick an invalid one.
+74. As a developer, I want a delete-branch toggle in the merge dialog that defaults to the repo's
+    setting, so that cleanup matches the repo's conventions.
+75. As a developer, I want to enable auto-merge when checks are pending or reviews are missing and
+    the repo allows it, so that the PR merges itself once ready.
+76. As a developer, I want to disable auto-merge, so that I can stop a queued merge.
+77. As a developer, I want to mark a draft ready for review, so that I can hand it off from the
+    terminal.
+78. As a developer, I want to convert a PR back to draft, with a confirmation, so that I know it may
+    dismiss review requests.
+79. As a developer, I want actions offered only when GitHub says they're possible, so that I don't
+    hit avoidable errors.
+80. As a developer, I want the PR to refresh right after an action and a toast showing success or
+    GitHub's error message, so that I know the result.
+81. As a developer, I want merge and rebase-update to always confirm, and the other actions to run
+    immediately, so that only destructive actions slow me down.
+82. As a developer, I want actions available from both the board and the modal, so that I don't
+    have to open a PR to act on it.
 
-- Each PR has a **last-seen snapshot**, recorded when you last opened its modal.
-- A card gets an **activity dot** when the current data differs from that snapshot in a way that
-  matters:
-  - new comments or reviews,
-  - a change in the overall check status,
-  - a change in mergeability or conflict state,
-  - a change in review decision,
-  - a change in draft or open/merged/closed state.
-- The status bar shows the total ("3 PRs changed").
-- Opening the modal clears the dot and updates the snapshot.
-- **Before first view:** a PR you've never opened has no snapshot. It shows a "new" marker the first
-  time it appears in a refresh after the initial run, so first launch doesn't light up every card.
-- **Rejected for v1:** macOS desktop notifications. They only fire while the tool is running, need
-  per-OS code, and complicate the Homebrew release. Candidate for v2.
+### Review requests
 
-### D9. Actions
+83. As a reviewer, I want a separate tab listing open PRs where my review is requested, sorted by
+    last update, so that I see my review queue next to my own work.
+84. As a reviewer, I want those PRs to use the same cards and modal, so that there's nothing new to
+    learn.
+85. As a reviewer, I want actions I can't perform on someone else's PR (merge, draft/ready) hidden
+    or disabled, so that the UI only offers what will work.
+86. As a reviewer, I want review-request PRs kept out of my tagged lanes, so that my workflow lanes
+    only hold my own work.
 
-Every action is a GraphQL mutation through `go-gh`.
+### Local data
 
-- **Gating:** each action is offered only when GitHub says it's possible, using `viewerCanUpdate`, the
-  repo's allowed merge methods, and the PR's state.
-- **Feedback:** after an action, the PR refreshes right away. Success or the GitHub error message
-  shows as a toast in the status bar.
+87. As a developer, I want state saved atomically, so that a crash never corrupts my tags.
+88. As a developer, I want PRs tracked by a stable ID, so that renames, transfers and title changes
+    don't lose their tag.
+89. As a developer, I want the config and state files versioned, so that future releases can
+    migrate them safely.
+90. As a developer, I want `$XDG_CONFIG_HOME` honored, with `~/.config` used on macOS too, so that
+    my config lives where my other CLI configs do.
 
-| Action | Mutation | Notes |
+## Implementation Decisions
+
+### Stack and distribution
+
+- **Go + Bubble Tea**, with Bubbles (lists, viewport, text input, spinner, help), Lip Gloss
+  (styling, adaptive light and dark colors) and `go-gh` (auth, host resolution and GraphQL client
+  reused from `gh`'s config). Chosen mainly for distribution: one static binary, fast startup, and
+  standard tooling for releases.
+  - Rejected: Python + Textual (Homebrew formula has to pin every dependency, slower startup) and
+    TypeScript + Ink (no built-in modal, scrolling or focus, large compiled binary).
+- **Distribution:** the repo is named `gh-lanes` so it works as a `gh` extension. GoReleaser builds
+  darwin and linux binaries for arm64 and amd64, and publishes a Homebrew formula named `lanes` to a
+  tap repo. The official `gh` extension precompile action produces extension assets from the same
+  tag. The formula's caveats say `gh auth login` is required.
+- Creating repos, secrets or releases is a manual, public step and is not part of the build. Release
+  credentials live only in repository secrets, never in files.
+
+### Modules
+
+- **GitHub layer:** the only module that talks to the network. It exposes a small interface:
+  list PRs for a search string, fetch PRs by node ID, fetch one PR's full detail, and one method per
+  mutation. It maps GraphQL responses into domain values. Its HTTP transport is injectable; this is
+  the test seam.
+- **Domain:** PR, check summary, review, thread, comment and merge status types. No I/O and no UI.
+  Includes turning `mergeable` and `mergeStateStatus` into plain sentences, and gating which actions
+  are available.
+- **Store:** loads and saves the config file (YAML, user-editable) and the state file (JSON,
+  machine-written) in the config directory. Writes are atomic (temp file, then rename). Both files
+  carry a schema `version`.
+- **Board assembly:** combines fetched PRs with tags, assignments, the archived list and snapshots
+  to produce lanes. Implements the merged/closed retention rules.
+- **Activity:** compares a PR's current data with its last-seen snapshot and decides whether it
+  changed, or is new.
+- **Links:** extracts URLs (markdown links and bare URLs) from text, and records where they're drawn
+  for click hit-testing.
+- **UI:** a root model (tabs, refresh ticker, toasts, message routing) plus board, review list,
+  detail modal, reusable picker (move to, links, merge method), tag manager, confirmation dialog and
+  theme.
+
+### Data flow
+
+1. A tick, a refresh key or a finished action sends a fetch command that runs off the UI thread.
+2. The GitHub layer returns domain values as a message.
+3. The root model merges them with the store to build lanes.
+4. Views render from that state.
+
+Mutations are commands returning a result message, which triggers a single-PR refresh.
+
+### Searches
+
+- Board: `is:pr is:open author:@me archived:false`.
+- Review requests: `is:pr is:open review-requested:@me archived:false`.
+- Tracked PRs that are no longer open are fetched each refresh by node ID, since the open search no
+  longer returns them.
+
+### List query fields per PR
+
+- Identity and state: id, number, title, url, draft, state, merged, created/updated/merged/closed
+  times, author login.
+- Branches: base and head ref names.
+- Merge and review: `mergeable`, `mergeStateStatus`, `reviewDecision`, auto-merge request,
+  `viewerCanUpdate`.
+- Repository: name with owner, allowed merge methods, auto-merge allowed, delete-branch-on-merge.
+- Checks: the last commit's status check rollup, with check runs (name, status, conclusion, start
+  and end times, details URL, workflow name) and status contexts.
+- Activity counts: comment and review totals and latest reviews, for snapshots.
+
+The detail query (on modal open) adds the body, comments, reviews, and review threads with their
+comments. Any connection reporting more pages is paged through. `UNKNOWN` mergeability is shown as
+"checking…" and never treated as a conflict.
+
+### Mutations
+
+| Action | Mutation | Rules |
 |---|---|---|
-| **Update branch (merge)** | `updatePullRequestBranch(updateMethod: MERGE)` | Brings in the PR's **own base branch**, whatever it is (not hard-coded to trunk or main). Offered when `mergeStateStatus == BEHIND`, or always with a "may be up to date" note. |
-| **Update branch (rebase)** | `updatePullRequestBranch(updateMethod: REBASE)` | Separate key. Confirmation required, because a rebase rewrites the branch. |
-| **Merge** | `mergePullRequest(mergeMethod: …)` | A confirmation dialog lists **only the methods the repo allows** (`mergeCommitAllowed`, `squashMergeAllowed`, `rebaseMergeAllowed`) and has a **delete branch** toggle, defaulting to the repo's `deleteBranchOnMerge`. Branch deletion uses `deleteRef` after a successful merge, unless the repo already deletes branches itself. |
-| **Enable auto-merge** | `enablePullRequestAutoMerge` | Offered inside the merge dialog instead of a direct merge when checks are pending or required reviews are missing, and the repo has `autoMergeAllowed`. Disabling it is also available (`disablePullRequestAutoMerge`). |
-| **Mark ready for review** | `markPullRequestReadyForReview` | Only for drafts. |
-| **Convert to draft** | `convertPullRequestToDraft` | Only for non-drafts. Confirmation, because it may dismiss review requests depending on repo settings. |
-| **Open PR in browser** | — | Opens `url` with the OS opener (`open` on macOS, `xdg-open` on Linux). |
-| **Open a link** | — | See D10. |
+| Update branch (merge) | `updatePullRequestBranch` with MERGE | Uses the PR's own base branch. |
+| Update branch (rebase) | `updatePullRequestBranch` with REBASE | Separate key, always confirms. |
+| Merge | `mergePullRequest` | Dialog lists only allowed methods. Delete-branch toggle defaults to the repo setting; branch deleted with `deleteRef` after success unless the repo does it itself. Always confirms. |
+| Enable/disable auto-merge | `enablePullRequestAutoMerge` / `disablePullRequestAutoMerge` | Offered in the merge dialog when checks are pending or reviews are missing and the repo allows it. |
+| Ready for review | `markPullRequestReadyForReview` | Drafts only. |
+| Convert to draft | `convertPullRequestToDraft` | Non-drafts only, confirms. |
+| Open in browser / open link | none | OS opener (`open` on macOS, `xdg-open` on Linux). |
 
-Merge and rebase-update always ask for confirmation, and Enter confirms. The other actions run
-immediately.
+Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 
-### D10. Links: the app handles clicks itself
+### Local files
 
-- Mouse reporting is turned on with Bubble Tea's cell-motion mouse mode.
-- When the modal renders the body, comments, reviews and threads, it **records where each URL is
-  drawn** (row and column ranges, including links that wrap onto the next line). A left click on one
-  of those regions opens the URL with the OS opener.
-- **Underline links** so you can tell what's clickable. Markdown links (`[text](url)`) show their
-  text and are clickable. Bare URLs are detected and clickable too.
-- **Keyboard fallback:** `o` in the modal opens a **link picker** listing every URL in the PR (body,
-  comments, reviews, threads), labeled with its source and author. Enter opens the selected one.
-- **Selecting text:** Shift+drag (or the terminal's modifier key) selects text natively while mouse
-  reporting is on. The author accepted this.
-- The mouse also selects cards, opens the modal (double-click or click on a selected card), and
-  scrolls lanes and the modal.
-- **Why:** this is the only approach guaranteed to work through herdr. Terminal-native links (OSC 8)
-  depend on every layer passing the sequence through, and they can break when Bubble Tea redraws or
-  wraps text.
-- **Rejected:** OSC 8 alone (may silently do nothing), and OSC 8 combined with app-handled clicks (one
-  click could open the link twice).
+- **Config file** (user-editable YAML): `version`, `refresh_interval` (default 60s), and an ordered
+  list of tags, each with a stable `id`, `name`, `color` and optional `terminal` flag. Assignments
+  reference the tag ID, so renames are safe. The app reloads it on start and after saving from the
+  tag manager.
+- **State file** (machine-written JSON): `version`, assignments (PR node ID → tag ID), the archived
+  PR node IDs, and per-PR snapshots (seen-at time, overall check state, mergeability, review
+  decision, comment and review counts, draft flag, state).
+- Neither file ever contains a token or credential. Auth stays in `gh`'s own storage.
 
-### D11. Detail modal content
+### Links and mouse
 
-The modal is an overlay centered over the board that takes about 90% of the screen, scrolls as one
-viewport, and closes with `Esc`. Sections from top to bottom:
+- Mouse reporting uses Bubble Tea's cell-motion mode.
+- The modal records the screen region of every rendered URL, including wrapped ones, and opens the
+  URL on a left click. Links are underlined.
+- Terminal-native hyperlinks (OSC 8) are not used: they may be dropped by multiplexers, and using
+  them alongside app-handled clicks could open a link twice.
+- The markdown renderer must keep link positions trackable. If an off-the-shelf renderer can't,
+  use a lightweight custom one.
+- Before opening, a URL is checked to have an `http` or `https` scheme, and is passed to the OS
+  opener as one argument, never through a shell. PR content is untrusted input.
 
-1. **Header:**
-   - `owner/repo#123`, title, author, and branches as `head → base`.
-   - State badge: Open, Draft, Merged or Closed.
-   - Created and updated times, in local time.
-2. **Merge status:**
-   - **Mergeability:** `mergeable` (MERGEABLE / CONFLICTING / UNKNOWN) and `mergeStateStatus`
-     (CLEAN, BEHIND, BLOCKED, DIRTY, UNSTABLE, DRAFT, HAS_HOOKS, UNKNOWN), each turned into a plain
-     sentence, for example "Conflicts with `trunk`. Resolve locally" or "Behind `trunk`. Update branch
-     available".
-   - **Reviews and auto-merge:** review decision (Approved, Changes requested, Review required) and
-     auto-merge status.
-3. **Checks:**
-   - **Grouping:** check runs grouped by workflow name, with commit status contexts in their own
-     group.
-   - **Each line:** a status icon (✓ success, ✗ failure, ● running, ○ queued, – skipped or neutral),
-     the name, and the duration or how long ago it finished.
-   - **Failures first:** failed checks sort to the top of each group.
-   - **Links:** each check's `detailsUrl` is clickable.
-   - **Summary:** a line like "12 passed · 1 failed · 2 running".
-4. **Description:** the PR body, rendered as readable markdown (headings, lists, code blocks, links).
-   Glamour or an equivalent renderer goes here if it keeps link positions trackable for D10.
-   Otherwise, a lightweight renderer.
-5. **Conversation:** a single timeline sorted by time, made of:
-   - issue comments,
-   - reviews (state badge: Approved, Changes requested or Commented, plus the review body),
-   - review threads:
-     - Each thread shows its `file:line` label and a **Resolved** or **Unresolved** marker. No code or
-       diff hunk is shown.
-     - The comments inside a thread are nested under it.
-     - Resolved threads are collapsed by default.
-   - **Every timestamp is in local time** (system timezone), as both an absolute date ("Oct 6, 2:14
-     PM") and a relative age ("3h ago").
-
-**Diffs and file lists are never shown.**
-
-### D12. Board interaction
-
-- **Layout:**
-  - Tabs at the top (Board, Review requests).
-  - Lanes as columns, each with a header showing the lane name, tag color and count.
-  - A status bar at the bottom (last refresh, changed count, errors, rate limit).
-  - A help footer (`?` toggles the full help).
-- **Lane width and scrolling:** lanes have a minimum width (~32 columns). When they don't all fit,
-  the board scrolls horizontally and keeps the focused lane on screen. Each lane scrolls vertically on
-  its own.
-- **Card contents** (compact, 3–4 rows):
-  - **Line 1:** `repo#123`, the activity dot, and a Draft/Merged/Closed badge.
-  - **Line 2:** the title, truncated.
-  - **Line 3:** status icons for checks (✓/✗/●), review decision, mergeability (⚠ conflict,
-    ↓ behind), and the age since last update.
-- **Sorting:** cards sort within a lane by most recently updated. Manual ordering inside a lane is
-  out of scope.
-- **Moving cards:** see the keys in §5. Drag-and-drop is rejected as fragile in a terminal and slower
-  than a single keypress.
-
----
-
-## 4. Architecture
-
-```
-cmd/lanes/main.go        entry point; flags (--version, --config)
-internal/github/         go-gh GraphQL client, queries, mutations, response → domain mapping
-internal/domain/         PR, CheckSummary, Review, Thread, Comment, MergeStatus (no UI, no I/O)
-internal/store/          config.yaml + state.json load/save, atomic writes, schema version
-internal/activity/       snapshot diff → "changed?" decision (pure, unit-tested)
-internal/links/          URL extraction from markdown/plain text
-internal/ui/             Bubble Tea models
-    app.go               root model: tabs, refresh ticker, toasts, routing of messages
-    board.go             lanes + cards, horizontal scroll
-    reviews.go           review requests list
-    modal.go             detail overlay, viewport, link hit-map
-    picker.go            reusable list picker (move-to, link picker, merge method)
-    tags.go              tag manager screen
-    confirm.go           confirmation dialog
-    theme.go             Lip Gloss styles, adaptive light/dark colors
-```
-
-- **Data flow:**
-  1. A tick, an `r` press or a finished action sends a fetch command.
-  2. The GitHub layer returns domain values as a message.
-  3. The root model merges them with the store (tags, archived, snapshots) to build the lanes.
-  4. Views render from that state.
-- **Mutations** are commands that return a result message, which then triggers a single-PR refresh.
-- **Pure logic** (activity diff, link extraction, lane assembly, merge-status sentences) lives
-  outside `ui/` so it can be unit-tested without a terminal.
-- **Tests:** `go test ./...` covering domain mapping (from recorded GraphQL fixtures), activity
-  diffs, link extraction, lane assembly and store round-trips. UI models get Bubble Tea `teatest`
-  smoke tests for key flows (move card, open modal, confirm merge with a fake client).
-
-### GraphQL sketch
-
-**List query.** One query per search: the board search, the review search, plus `nodes(ids:)` for
-tracked closed PRs. Fields per PR:
-
-- **Identity and state:** `id`, `number`, `title`, `url`, `isDraft`, `state`, `merged`, `closedAt`,
-  `mergedAt`, `createdAt`, `updatedAt`, `author { login }`.
-- **Branches:** `baseRefName`, `headRefName`.
-- **Merge and review status:** `mergeable`, `mergeStateStatus`, `reviewDecision`,
-  `autoMergeRequest { enabledAt mergeMethod }`, `viewerCanUpdate`.
-- **Repository:** `nameWithOwner`, `mergeCommitAllowed`, `squashMergeAllowed`,
-  `rebaseMergeAllowed`, `autoMergeAllowed`, `deleteBranchOnMerge`.
-- **Checks:** `commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) {
-  nodes { ... on CheckRun { name status conclusion startedAt completedAt detailsUrl
-  checkSuite { workflowRun { workflow { name } } } } ... on StatusContext { context state targetUrl
-  createdAt } } } } } } }`.
-- **Activity counts:** `comments { totalCount }`, `reviews { totalCount }`, and
-  `latestReviews(first: 20)` for the activity snapshot.
-
-**Detail query** (one PR, when the modal opens): `body`,
-`comments(first: 100) { author, body, createdAt, url }`,
-`reviews(first: 100) { author, state, body, submittedAt }`, and
-`reviewThreads(first: 100) { isResolved, path, line, comments(first: 50) { author, body, createdAt, url } }`.
-Page through any connection that reports `hasNextPage`.
-
-`mergeable` and `mergeStateStatus` can return UNKNOWN while GitHub computes them. Show "checking…"
-and let the next refresh fill them in. Never treat UNKNOWN as a conflict.
-
----
-
-## 5. Keybindings (v1)
+### Keybindings
 
 | Key | Where | Action |
 |---|---|---|
 | `tab` / `shift+tab` | global | switch Board ↔ Review requests |
 | `h` `l` / `←` `→` | board | focus previous/next lane |
 | `j` `k` / `↓` `↑` | board, lists | select card |
-| `H` `L` / `<` `>` | board | move card one lane left/right (retag) |
-| `m` | board | "move to…" tag picker |
+| `H` `L` / `<` `>` | board | move card one lane left/right |
+| `m` | board | "move to…" picker |
 | `enter` | board, lists | open detail modal |
-| `x` | board | archive card (merged/closed/any) |
+| `x` | board | archive card |
 | `t` | global | tag manager |
 | `r` | global | refresh now |
 | `o` | board, modal | link picker |
 | `O` | board, modal | open PR in browser |
-| `u` / `U` | board, modal | update branch (merge / rebase, rebase confirms) |
-| `M` | board, modal | merge dialog (methods, delete-branch toggle, auto-merge) |
-| `d` | board, modal | toggle draft ↔ ready for review |
+| `u` / `U` | board, modal | update branch (merge / rebase) |
+| `M` | board, modal | merge dialog |
+| `d` | board, modal | toggle draft ↔ ready |
 | `esc` | modal, pickers | close |
 | `?` | global | full help |
 | `q` / `ctrl+c` | global | quit |
 
-**Mouse:**
-- Click a card to select it, and double-click to open it.
-- Click a link in the modal to open it.
-- Scroll the wheel over a lane or the modal to scroll it.
-- Shift+drag to select text.
+## Testing Decisions
 
----
+- **Good tests check external behavior only:** what the user sees on screen, which GraphQL requests
+  went out, and what ended up in the config and state files. They don't reach into model internals
+  or private helpers, so a refactor that keeps behavior intact keeps tests green.
+- **One seam.** Tests drive the real root app model through `teatest` with:
+  - a **fake GraphQL HTTP transport** injected into the GitHub layer. It replays recorded response
+    fixtures per query and records every request, so tests can assert which mutation was sent with
+    which arguments, and can simulate errors, rate limits, `UNKNOWN` mergeability and paging;
+  - a **temporary config directory**, so tests can seed config and state files and assert on what
+    was written;
+  - a **controllable clock**, so refresh ticks, relative ages and local-time formatting are
+    deterministic (with a fixed timezone).
+- Everything is covered through that seam: response mapping, lane assembly, retention after
+  merge/close, archive behavior, activity markers, tag manager CRUD, action gating, confirmations,
+  merge dialog options, link picker, and error and stale-data handling.
+- **Fixtures** are recorded GraphQL responses scrubbed of real data: placeholder owners, repos,
+  logins, URLs and IDs only. No real org, company or person names, and no tokens, in fixtures or
+  test output.
+- Mouse link clicks are tested by sending mouse events at the recorded coordinates of a rendered
+  link and asserting the fake opener received the URL.
+- **Prior art:** none in this repo yet; this spec establishes the pattern. CI runs `go test ./...`
+  and `go vet` on every push.
 
-## 6. Files on disk
-
-`~/.config/lanes/config.yaml` holds settings you edit, either in the app's tag manager or by hand:
-
-```yaml
-version: 1
-refresh_interval: 60s
-tags:
-  - id: t_inprogress     # stable; assignments reference this, so renames are safe
-    name: In Progress
-    color: "#5B9CF6"
-  - id: t_review
-    name: Review
-    color: "#C792EA"
-  - id: t_testing
-    name: Testing
-    color: "#F5A623"
-  - id: t_demo
-    name: Demo
-    color: "#3FB950"
-  - id: t_done
-    name: Done
-    color: "#8B949E"
-    terminal: true
-```
-
-`~/.config/lanes/state.json` is machine-written state that you shouldn't edit by hand:
-
-```json
-{
-  "version": 1,
-  "assignments": { "<PR node id>": "t_testing" },
-  "archived": ["<PR node id>"],
-  "snapshots": { "<PR node id>": { "seenAt": "…", "checks": "SUCCESS", "mergeable": "MERGEABLE",
-                 "reviewDecision": "APPROVED", "comments": 4, "reviews": 2, "isDraft": false, "state": "OPEN" } }
-}
-```
-
-- PRs are keyed by their **GraphQL node ID**, which stays stable through renames, transfers and
-  title changes.
-- Writes are atomic (write to a temp file, then rename).
-- A `version` field allows future migrations.
-
----
-
-## 7. Packaging files (written during the build, not published)
-
-- `.goreleaser.yaml`:
-  - builds `darwin/arm64`, `darwin/amd64`, `linux/arm64` and `linux/amd64`,
-  - creates archives,
-  - publishes a `brews` formula named `lanes` to `jehielmartinez/homebrew-tap`,
-  - sets the formula's `dependencies`/`caveats` to say `gh auth login` is required.
-- `.github/workflows/release.yml` runs GoReleaser on `v*` tags. It needs a `HOMEBREW_TAP_TOKEN`
-  secret.
-- `cli/gh-extension-precompile` produces the `gh` extension assets on the same tag, either in the
-  same workflow or a second job.
-- `README.md` covers install (both channels), first run, keys, and config.
-- **License:** to be chosen at publish time (MIT is the default suggestion).
-
----
-
-## 8. Out of scope for v1
+## Out of Scope
 
 - File diffs or file lists of any kind.
-- Desktop notifications.
-- Flags or extra tags beyond the single lane tag.
+- Desktop notifications (v2 candidate).
+- Flags or extra tags beyond the single lane tag (v2 candidate: badges like Blocked that don't
+  change the lane).
 - Manual card ordering inside a lane.
 - Drag-and-drop.
 - Custom search queries or extra tabs.
-- Writing comments, approving PRs or requesting reviewers from the tool.
+- Writing comments, approving PRs or requesting reviewers.
 - Syncing tags across machines.
-- Re-running failed checks. This is a cheap candidate for v2 via `rerequestCheckSuite` or the REST
-  re-run endpoint.
+- Re-running failed checks (cheap v2 candidate).
+- Creating the GitHub repo, tap repo, secrets or releases.
 
----
+## Further Notes
 
-## 9. Build order (proposed)
-
-1. `brew install go`, `go mod init github.com/jehielmartinez/gh-lanes`, skeleton, and a CI workflow
-   running `go test ./...` and `go vet`.
-2. GitHub layer: list query, domain mapping, and fixtures with tests.
-3. Store: config and state load/save, tag CRUD, assignments, archive, and the snapshot diff with
-   tests.
-4. Board view: lanes, cards, focus and scroll, moving and retagging, refresh ticker, status bar.
-5. Detail modal: sections, local time, markdown, link hit-map with mouse clicks, link picker.
-6. Actions: update branch, merge dialog, auto-merge, draft/ready, open in browser.
-7. Review requests tab.
-8. Tag manager screen.
-9. Packaging: GoReleaser, release workflow, README.
+- **Performance:** the dataset is tens of PRs, so UI cost is negligible. Latency is the GitHub API
+  (about 0.5–2 s per refresh), which always runs off the UI thread. A refresh costs a few points of
+  the 5,000-point hourly GraphQL budget.
+- **Permissions:** reads and actions need the `repo` scope that `gh auth login` grants by default.
+  The tool never modifies workflow files.
+- **Security:** the tool stores no credentials, opens only `http`/`https` URLs, never runs PR
+  content through a shell, and treats all PR text as untrusted when rendering (terminal escape
+  sequences in bodies and comments are stripped before display).
+- **Build order:** project skeleton and CI → GitHub layer with fixtures → store → board → modal and
+  links → actions → review requests tab → tag manager → packaging and README.
+- **License:** to be chosen at publish time (MIT suggested).

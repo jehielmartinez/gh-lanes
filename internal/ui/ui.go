@@ -381,7 +381,16 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.detail != nil {
 			return m.detailKey(msg)
 		}
-		if m.tab == tabReview {
+		switch {
+		case key.Matches(msg, m.keys.NextTab):
+			return m.switchTab(1), nil
+		case key.Matches(msg, m.keys.PrevTab):
+			return m.switchTab(-1), nil
+		case key.Matches(msg, m.keys.Help):
+			m.help.ShowAll = !m.help.ShowAll
+			m.keys = m.keys.withFullHelp(m.help.ShowAll)
+			return m, nil
+		case m.tab == tabReview:
 			return m.reviewKey(msg)
 		}
 		return m.boardKey(msg)
@@ -393,10 +402,11 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.detail != nil {
 			return m.detailScroll(msg), nil
 		}
-		if m.picker == nil && m.tagManager == nil && m.confirm == nil && m.tab == tabReview {
+		switch {
+		case m.picker != nil || m.tagManager != nil || m.confirm != nil:
+		case m.tab == tabReview:
 			return m.reviewWheeled(msg), nil
-		}
-		if m.picker == nil && m.tagManager == nil && m.confirm == nil {
+		default:
 			return m.wheeled(msg), nil
 		}
 	case tickMsg:
@@ -551,10 +561,6 @@ func (m Model) quit() (Model, tea.Cmd) {
 
 func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, m.keys.NextTab):
-		return m.switchTab(1), nil
-	case key.Matches(msg, m.keys.PrevTab):
-		return m.switchTab(-1), nil
 	case key.Matches(msg, m.keys.LaneLeft):
 		m.focus = max(0, m.focus-1)
 	case key.Matches(msg, m.keys.LaneRight):
@@ -577,9 +583,6 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 	case key.Matches(msg, m.keys.Refresh):
 		return m.refresh()
-	case key.Matches(msg, m.keys.Help):
-		m.help.ShowAll = !m.help.ShowAll
-		m.keys = m.keys.withFullHelp(m.help.ShowAll)
 	}
 	return m, nil
 }

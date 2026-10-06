@@ -118,10 +118,6 @@ func (m Model) withReviews(prs []domain.PullRequest) Model {
 
 func (m Model) reviewKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, m.keys.NextTab):
-		return m.switchTab(1), nil
-	case key.Matches(msg, m.keys.PrevTab):
-		return m.switchTab(-1), nil
 	case key.Matches(msg, m.keys.CardUp):
 		return m.withReviewCursor(m.reviewCursor - 1), nil
 	case key.Matches(msg, m.keys.CardDown):
@@ -130,9 +126,6 @@ func (m Model) reviewKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if pr, ok := m.selectedReview(); ok {
 			return m.openDetail(pr)
 		}
-	case key.Matches(msg, m.keys.Help):
-		m.help.ShowAll = !m.help.ShowAll
-		m.keys = m.keys.withFullHelp(m.help.ShowAll)
 	}
 	return m, nil
 }

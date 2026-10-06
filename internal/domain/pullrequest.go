@@ -2,7 +2,10 @@
 // I/O and imports nothing from this module.
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // PullRequest is one pull request as the board sees it.
 type PullRequest struct {
@@ -70,6 +73,20 @@ type Repository struct {
 	MergeMethods        []MergeMethod
 	AutoMergeAllowed    bool
 	DeleteBranchOnMerge bool
+}
+
+// Owner is the organisation or user the repository belongs to.
+func (r Repository) Owner() string {
+	owner, _, _ := strings.Cut(r.NameWithOwner, "/")
+	return owner
+}
+
+// Name is the repository's name without its owner.
+func (r Repository) Name() string {
+	if _, name, ok := strings.Cut(r.NameWithOwner, "/"); ok {
+		return name
+	}
+	return r.NameWithOwner
 }
 
 // MergeMethod is one way GitHub can merge a pull request.

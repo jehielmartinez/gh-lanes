@@ -110,7 +110,7 @@ func TestUpdateBranchMergesTheBaseInRightAway(t *testing.T) {
 		return len(reqs) == 1 && reflect.DeepEqual(reqs[0].Variables["ids"], []any{"PR_node_ready"})
 	})
 	h.waitForScreen("the refreshed card", func(s string) bool {
-		return strings.Contains(s, readyRef) && !strings.Contains(cardStatus(t, s, readyRef), "behind")
+		return onScreen(s, readyRef) && !strings.Contains(cardStatus(t, s, readyRef), "behind")
 	})
 }
 

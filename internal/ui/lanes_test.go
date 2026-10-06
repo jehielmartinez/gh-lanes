@@ -66,7 +66,7 @@ func startBoard(t *testing.T, opts ...harnessOption) *harness {
 	t.Helper()
 	h := newHarness(t, boardTransport(t), opts...)
 	h.waitForScreen("the board with its tag lanes", func(s string) bool {
-		return strings.Contains(s, "octo-org/sample-repo#7") && hasTagLanes(s)
+		return onScreen(s, "octo-org/sample-repo#7") && hasTagLanes(s)
 	})
 	return h
 }
@@ -431,7 +431,7 @@ func TestUnreadableConfigIsReportedAndNothingIsWritten(t *testing.T) {
 			if !strings.Contains(screen, "Couldn't load tags") {
 				t.Errorf("status bar should say the tags couldn't load:\n%s", screen)
 			}
-			if !strings.Contains(screen, "octo-org/sample-repo#7") {
+			if !onScreen(screen, "octo-org/sample-repo#7") {
 				t.Errorf("the pull requests should still be shown:\n%s", screen)
 			}
 			h.press("L")

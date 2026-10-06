@@ -211,14 +211,89 @@ func (h *harness) wheel(x, y int, down bool) {
 	h.tm.Send(tea.MouseWheelMsg{X: x, Y: y, Button: button})
 }
 
-// locate finds text on the plain screen and returns its column and row.
+// locate finds text on the plain screen and returns its column and row. A
+// pull request reference like "owner/repo#12" is looked for first on a card,
+// which draws it across two lines, and then as written, as in a toast or the
+// detail modal.
 func locate(screen, text string) (x, y int, ok bool) {
+	if x, y, ok := locateCard(screen, text); ok {
+		return x, y, true
+	}
 	for row, line := range strings.Split(screen, "\n") {
 		if i := strings.Index(line, text); i >= 0 {
 			return utf8.RuneCountInString(line[:i]), row, true
 		}
 	}
 	return 0, 0, false
+}
+
+// onScreen reports whether text is on the plain screen, as locate finds it.
+func onScreen(screen, text string) bool {
+	_, _, ok := locate(screen, text)
+	return ok
+}
+
+var cardRef = regexp.MustCompile(`^([^/\s]+)/([^#\s]+)(#[0-9]+)$`)
+
+// locateCard finds the card for a reference like "owner/repo#12": the owner
+// with the number at the end of its cell on one line, and the repository,
+// perhaps truncated, starting in the same column on the next. It returns
+// where the owner starts.
+func locateCard(screen, ref string) (x, y int, ok bool) {
+	parts := cardRef.FindStringSubmatch(ref)
+	if parts == nil {
+		return 0, 0, false
+	}
+	owner, repo, number := []rune(parts[1]), parts[2], parts[3]
+	lines := strings.Split(screen, "\n")
+	for row := 0; row+1 < len(lines); row++ {
+		line, next := []rune(lines[row]), []rune(lines[row+1])
+		for col := 0; col+len(owner) <= len(line); col++ {
+			if string(line[col:col+len(owner)]) != string(owner) || (col > 0 && !cardEdge(line[col-1])) {
+				continue
+			}
+			cell := string(line[col:cellEnd(line, col)])
+			if !strings.HasSuffix(strings.TrimSpace(cell), number) || col >= len(next) {
+				continue
+			}
+			below := strings.Fields(string(next[col:cellEnd(next, col)]))
+			if len(below) > 0 && strings.HasPrefix(repo, strings.TrimSuffix(below[0], "…")) {
+				return col, row, true
+			}
+		}
+	}
+	return 0, 0, false
+}
+
+// cardLine is line n of the card for ref, counting its owner line as 0,
+// cut to the card's cell.
+func cardLine(t *testing.T, screen, ref string, n int) string {
+	t.Helper()
+	col, row, ok := locateCard(screen, ref)
+	lines := strings.Split(screen, "\n")
+	if !ok || row+n >= len(lines) {
+		t.Fatalf("no card for %s:\n%s", ref, screen)
+	}
+	line := []rune(lines[row+n])
+	if col >= len(line) {
+		return ""
+	}
+	return string(line[col:cellEnd(line, col)])
+}
+
+// cardEdge is whether r can sit just left of a card's text: padding or a
+// border.
+func cardEdge(r rune) bool { return r == ' ' || strings.ContainsRune("│┃", r) }
+
+// cellEnd is where the card cell starting at col ends: its right border, or
+// the end of the line.
+func cellEnd(line []rune, col int) int {
+	for i := col; i < len(line); i++ {
+		if strings.ContainsRune("│┃", line[i]) {
+			return i
+		}
+	}
+	return len(line)
 }
 
 // resize tells the app the terminal changed size.
@@ -246,7 +321,7 @@ func (h *harness) waitForScreen(desc string, cond func(screen string) bool) stri
 
 func (h *harness) waitForText(text string) string {
 	h.t.Helper()
-	return h.waitForScreen(text, func(s string) bool { return strings.Contains(s, text) })
+	return h.waitForScreen(text, func(s string) bool { return onScreen(s, text) })
 }
 
 // waitFor polls cond until it holds, failing the test with desc on timeout.

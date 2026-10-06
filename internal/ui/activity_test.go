@@ -19,30 +19,20 @@ var statusRefs = map[string]string{
 	"PR_node_paged":    "user-a/other-repo#14",
 }
 
-// cardMarker returns what the card whose first line holds ref shows after
-// its reference: "dot", "new" or "".
+// cardMarker returns the activity marker on the card for ref: "dot", "new"
+// or "".
 func cardMarker(t *testing.T, screen, ref string) string {
 	t.Helper()
-	for _, l := range strings.Split(screen, "\n") {
-		at := strings.Index(l, ref)
-		if at < 0 {
-			continue
-		}
-		rest := l[at+len(ref):]
-		if end := strings.IndexAny(rest, "│┃"); end >= 0 {
-			rest = rest[:end]
-		}
-		switch strings.TrimSpace(rest) {
-		case "●":
-			return "dot"
-		case "new":
-			return "new"
-		case "":
-			return ""
-		}
-		t.Fatalf("unexpected text after %s: %q", ref, rest)
+	// The marker sits between the owner and the number.
+	fields := strings.Fields(cardLine(t, screen, ref, 0))
+	switch marker := strings.Join(fields[1:len(fields)-1], " "); marker {
+	case "●":
+		return "dot"
+	case "new", "":
+		return marker
+	default:
+		t.Fatalf("unexpected text on %s's first line: %q", ref, marker)
 	}
-	t.Fatalf("no card for %s:\n%s", ref, screen)
 	return ""
 }
 
@@ -340,7 +330,7 @@ func TestArchivedPullRequestsAreNotCounted(t *testing.T) {
 	transport.ReplyFixture(t, "SearchPullRequests", fixture("search_board_added.json"))
 	h := newHarness(t, transport, withConfigDir(first.configDir))
 	screen := h.waitForText("octo-org/sample-repo#7")
-	if strings.Contains(screen, "octo-org/sample-repo#8") || strings.Contains(screen, "new PR") {
+	if onScreen(screen, "octo-org/sample-repo#8") || strings.Contains(screen, "new PR") {
 		t.Errorf("an archived pull request is off the board and out of the count:\n%s", screen)
 	}
 }

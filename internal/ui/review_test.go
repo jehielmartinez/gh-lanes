@@ -73,7 +73,7 @@ func TestTabsSwitchBetweenTheBoardAndReviewRequests(t *testing.T) {
 
 	h.press("shift+tab")
 	screen = h.waitForText("Untagged 3")
-	if strings.Contains(screen, lockedReviewRef) {
+	if onScreen(screen, lockedReviewRef) {
 		t.Errorf("review requests should leave the board's lanes:\n%s", screen)
 	}
 }
@@ -82,7 +82,7 @@ func TestReviewRequestsNeverJoinTheBoardsLanes(t *testing.T) {
 	h := newReviewHarness(t, nil)
 
 	screen := h.screen.plain()
-	if strings.Contains(screen, lockedReviewRef) || strings.Contains(screen, openReviewRef) {
+	if onScreen(screen, lockedReviewRef) || onScreen(screen, openReviewRef) {
 		t.Errorf("review requests are not mine and must stay off the board:\n%s", screen)
 	}
 	assertContains(t, headerLine(screen), "Untagged 3")
@@ -116,7 +116,7 @@ func TestReviewRequestsOpenInTheDetailModal(t *testing.T) {
 
 	h.press("esc")
 	h.waitForScreen("the review requests again", func(s string) bool {
-		return !strings.Contains(s, "▾ Status") && strings.Contains(s, openReviewRef)
+		return !strings.Contains(s, "▾ Status") && onScreen(s, openReviewRef)
 	})
 }
 

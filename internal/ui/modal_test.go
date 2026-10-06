@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"charm.land/lipgloss/v2"
-
 	"github.com/jehielmartinez/gh-lanes/internal/github/githubtest"
 )
 
@@ -29,10 +27,8 @@ func newModalHarness(t *testing.T, details ...string) *harness {
 // cardAt returns a screen cell inside the card whose first line holds ref.
 func cardAt(t *testing.T, screen, ref string) (x, y int) {
 	t.Helper()
-	for i, l := range strings.Split(screen, "\n") {
-		if at := strings.Index(l, ref); at >= 0 {
-			return lipgloss.Width(l[:at]), i
-		}
+	if x, y, ok := locateCard(screen, ref); ok {
+		return x, y
 	}
 	t.Fatalf("no card for %s:\n%s", ref, screen)
 	return 0, 0
@@ -64,22 +60,28 @@ func (h *harness) waitForDetailRequests(n int) []githubtest.Request {
 func assertContains(t *testing.T, screen string, want ...string) {
 	t.Helper()
 	for _, w := range want {
-		if !strings.Contains(screen, w) {
+		if !onScreen(screen, w) {
 			t.Errorf("screen is missing %q:\n%s", w, screen)
 		}
 	}
 }
 
-// assertOrder checks that each string appears, in order, on the screen.
+// assertOrder checks that each string appears, in reading order, on the
+// screen.
 func assertOrder(t *testing.T, screen string, order ...string) {
 	t.Helper()
+	width := 0
+	for _, l := range strings.Split(screen, "\n") {
+		width = max(width, len([]rune(l)))
+	}
 	last := -1
 	for _, s := range order {
-		i := strings.Index(screen, s)
-		if i < 0 || i < last {
+		x, y, ok := locate(screen, s)
+		if at := y*(width+1) + x; !ok || at < last {
 			t.Fatalf("want %v in that order:\n%s", order, screen)
+		} else {
+			last = at
 		}
-		last = i
 	}
 }
 
@@ -236,7 +238,7 @@ func TestEscClosesTheModal(t *testing.T) {
 	h.waitForText("Behind main. Update branch available.")
 	h.press("esc")
 	h.waitForScreen("the modal to close", func(s string) bool {
-		return !strings.Contains(s, "Behind main") && strings.Contains(s, "octo-org/sample-repo#12")
+		return !strings.Contains(s, "Behind main") && onScreen(s, "octo-org/sample-repo#12")
 	})
 }
 

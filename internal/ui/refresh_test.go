@@ -58,7 +58,7 @@ func TestBoardRefreshesEveryMinuteByDefault(t *testing.T) {
 
 	h.advance(time.Second)
 	screen := h.waitForText("octo-org/sample-repo#12")
-	if strings.Contains(screen, "octo-org/sample-repo#7") {
+	if onScreen(screen, "octo-org/sample-repo#7") {
 		t.Errorf("refreshed board should replace the old one:\n%s", screen)
 	}
 }
@@ -144,11 +144,7 @@ func TestFailedRefreshKeepsLastGoodBoardMarkedStale(t *testing.T) {
 
 			h.press("r")
 			screen := h.waitForText("stale")
-			for _, want := range []string{"Couldn't refresh", reply.want, "octo-org/sample-repo#7", "Untagged 3"} {
-				if !strings.Contains(screen, want) {
-					t.Errorf("screen is missing %q:\n%s", want, screen)
-				}
-			}
+			assertContains(t, screen, "Couldn't refresh", reply.want, "octo-org/sample-repo#7", "Untagged 3")
 		})
 	}
 }
@@ -165,7 +161,7 @@ func TestSuccessfulRefreshClearsStale(t *testing.T) {
 	h.waitForText("stale")
 	h.press("r")
 	h.waitForScreen("stale marker to clear", func(s string) bool {
-		return !strings.Contains(s, "stale") && strings.Contains(s, "octo-org/sample-repo#7")
+		return !strings.Contains(s, "stale") && onScreen(s, "octo-org/sample-repo#7")
 	})
 }
 

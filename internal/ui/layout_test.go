@@ -8,12 +8,12 @@ import (
 	"github.com/charmbracelet/x/exp/teatest/v2"
 )
 
-// Cards are three lines inside a border, so a terminal 8 rows tall, plus the
+// Cards are four lines inside a border, so a terminal 9 rows tall, plus the
 // tab bar's rows beyond the first, leaves room for the lane header and a
-// single card above the two footer lines, and 14 for two cards.
+// single card above the two footer lines, and 16 for two cards.
 const (
-	oneCardHeight  = 8 + tabBarRows - 1
-	twoCardsHeight = 14 + tabBarRows - 1
+	oneCardHeight  = 9 + tabBarRows - 1
+	twoCardsHeight = 16 + tabBarRows - 1
 	narrowWidth    = 70
 )
 

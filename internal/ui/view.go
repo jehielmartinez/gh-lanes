@@ -139,17 +139,17 @@ func laneColor(t theme, lane board.Lane) color.Color {
 
 func (m Model) cardView(pr domain.PullRequest, width int, selected, dimmed bool) string {
 	inner := width - cardPadding
-	number := fmt.Sprintf("#%d", pr.Number)
-	marker := m.markerView(m.markers[pr.ID])
-	room := inner - lipgloss.Width(number)
-	if marker != "" {
-		room -= lipgloss.Width(marker) + 1
+	muted := lipgloss.NewStyle().Foreground(m.theme.muted).Faint(dimmed)
+	// The owner and the number share the first line, the number at the
+	// right edge with the activity marker before it; the repository has the
+	// second line to itself, so a long name loses less.
+	right := muted.Render(fmt.Sprintf("#%d", pr.Number))
+	if marker := m.markerView(m.markers[pr.ID]); marker != "" {
+		right = marker + " " + right
 	}
-	ref := truncate(pr.Repository.NameWithOwner, room) + number
-	ref = lipgloss.NewStyle().Foreground(m.theme.muted).Faint(dimmed).Render(ref)
-	if marker != "" {
-		ref += strings.Repeat(" ", max(inner-lipgloss.Width(ref)-lipgloss.Width(marker), 1)) + marker
-	}
+	owner := muted.Render(truncate(oneLine(pr.Repository.Owner()), max(inner-lipgloss.Width(right)-1, 1)))
+	ownerLine := owner + strings.Repeat(" ", max(inner-lipgloss.Width(owner)-lipgloss.Width(right), 1)) + right
+	repo := muted.Bold(!dimmed).Render(truncate(oneLine(pr.Repository.Name()), inner))
 	titleColor := m.theme.text
 	if m.err != nil || dimmed {
 		titleColor = m.theme.muted
@@ -170,10 +170,10 @@ func (m Model) cardView(pr domain.PullRequest, width int, selected, dimmed bool)
 		Padding(0, 1).
 		Border(border).
 		BorderForeground(borderColor).
-		Render(ref + "\n" + title + "\n" + status)
+		Render(ownerLine + "\n" + repo + "\n" + title + "\n" + status)
 }
 
-// cardStateLine is the third line of a merged or closed card: its state badge
+// cardStateLine is the last line of a merged or closed card: its state badge
 // in place of checks, reviews and mergeability, which no longer apply.
 func (m Model) cardStateLine(pr domain.PullRequest, width int, dimmed bool) string {
 	label, c := "Closed", m.theme.failure
@@ -189,7 +189,8 @@ func (m Model) cardStateLine(pr domain.PullRequest, width int, dimmed bool) stri
 	return badge + strings.Repeat(" ", gap) + age
 }
 
-// markerView is the activity marker drawn at the end of a card's first line.
+// markerView is the activity marker drawn on a card's first line, before its
+// number.
 func (m Model) markerView(marker activity.Marker) string {
 	style := lipgloss.NewStyle().Bold(true).Foreground(m.theme.accent)
 	switch marker {
@@ -201,7 +202,7 @@ func (m Model) markerView(marker activity.Marker) string {
 	return ""
 }
 
-// cardStatusLine is the card's third line: checks, review decision and
+// cardStatusLine is the card's last line: checks, review decision and
 // mergeability on the left, age on the right.
 func (m Model) cardStatusLine(pr domain.PullRequest, width int) string {
 	var parts []string

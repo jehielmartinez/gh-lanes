@@ -16,17 +16,11 @@ func newStatusHarness(t *testing.T) (*harness, string) {
 	return h, h.waitForText("octo-org/sample-repo#12")
 }
 
-// cardStatus returns the third line of the card whose first line holds ref.
+// cardStatus returns the status line of the card for ref: its last line,
+// under the owner, repository and title.
 func cardStatus(t *testing.T, screen, ref string) string {
 	t.Helper()
-	lines := strings.Split(screen, "\n")
-	for i, l := range lines {
-		if strings.Contains(l, ref) && i+2 < len(lines) {
-			return lines[i+2]
-		}
-	}
-	t.Fatalf("no card for %s:\n%s", ref, screen)
-	return ""
+	return cardLine(t, screen, ref, 3)
 }
 
 func TestCardShowsChecksReviewDecisionMergeabilityAndAge(t *testing.T) {

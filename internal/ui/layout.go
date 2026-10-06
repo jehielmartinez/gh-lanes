@@ -18,7 +18,7 @@ const (
 
 const (
 	laneHeaderLines = 1
-	cardLines       = 3
+	cardLines       = 4
 	// cardHeight is a card's lines plus its top and bottom border.
 	cardHeight = cardLines + 2
 )

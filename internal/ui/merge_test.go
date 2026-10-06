@@ -51,7 +51,7 @@ func newMergeHarness(t *testing.T, reply func(*githubtest.Transport)) *harness {
 		reply(transport)
 	}
 	// Tall enough for all six cards in one lane.
-	h := newHarness(t, transport, withTermSize(defaultTermWidth, 40))
+	h := newHarness(t, transport, withTermSize(defaultTermWidth, 46))
 	h.waitForText(blockedRef)
 	return h
 }

@@ -15,17 +15,22 @@ func TestBoardShowsMyOpenPRsAsCardsInUntaggedLane(t *testing.T) {
 
 	screen := h.waitForText("octo-org/sample-repo#7")
 
-	for _, want := range []string{
+	assertContains(t, screen,
 		"Untagged 3",
 		"user-a/other-repo#42",
 		"Add retry with exponential back…",
 		"octo-org/sample-repo#7",
 		"Fix typo in README",
-		"octo-org/a-very-long-sampl…#1234",
-	} {
-		if !strings.Contains(screen, want) {
-			t.Errorf("screen is missing %q:\n%s", want, screen)
-		}
+		"octo-org/a-very-long-sample-repository-name#1234",
+	)
+	// The owner and number share the first line, the number at the right
+	// edge; the repository has the second line, truncated when it is long.
+	long := "octo-org/a-very-long-sample-repository-name#1234"
+	if first := cardLine(t, screen, long, 0); !strings.HasPrefix(first, "octo-org ") || !strings.HasSuffix(strings.TrimRight(first, " "), "#1234") {
+		t.Errorf("first line = %q, want the owner and then the number at the right", first)
+	}
+	if second := strings.TrimSpace(cardLine(t, screen, long, 1)); second != "a-very-long-sample-repository-n…" {
+		t.Errorf("second line = %q, want the repository truncated to fit", second)
 	}
 	if strings.Contains(screen, "upload worker queue") {
 		t.Errorf("long title was not truncated:\n%s", screen)
@@ -60,7 +65,7 @@ func TestBoardPagesThroughEverySearchResult(t *testing.T) {
 	h := newHarness(t, transport)
 
 	screen := h.waitForText("octo-org/sample-repo#2")
-	if !strings.Contains(screen, "octo-org/sample-repo#1") || !strings.Contains(screen, "Untagged 2") {
+	if !onScreen(screen, "octo-org/sample-repo#1") || !strings.Contains(screen, "Untagged 2") {
 		t.Errorf("both pages should be on the board:\n%s", screen)
 	}
 

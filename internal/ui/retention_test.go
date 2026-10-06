@@ -179,7 +179,7 @@ func TestArchiveTakesTheSelectedCardOffTheBoard(t *testing.T) {
 	h.press("x")
 	h.waitForArchived([]archivedJSON{{ID: newestPR, Open: true}})
 	screen := h.waitForText("Untagged 2")
-	if strings.Contains(screen, "user-a/other-repo#42") {
+	if onScreen(screen, "user-a/other-repo#42") {
 		t.Errorf("archived card is still on the board:\n%s", screen)
 	}
 }
@@ -218,7 +218,7 @@ func TestArchivedPRsDoNotComeBackOnRefresh(t *testing.T) {
 	h.refreshUntil(2)
 	h.settle(time.Second)
 	screen := h.waitForText("Untagged 2")
-	if strings.Contains(screen, "user-a/other-repo#42") {
+	if onScreen(screen, "user-a/other-repo#42") {
 		t.Errorf("archived card came back on refresh:\n%s", screen)
 	}
 	h.waitForArchived([]archivedJSON{{ID: newestPR, Open: true}})
@@ -239,14 +239,14 @@ func TestAPRArchivedWhileOpenReturnsOnlyOnceClosedAndReopened(t *testing.T) {
 	transport.ReplyFixture(t, "SearchPullRequests", fixture("search_board.json"))
 	h := newHarness(t, transport)
 	h.waitForScreen("the board with its tag lanes", func(s string) bool {
-		return strings.Contains(s, "user-a/other-repo#42") && hasTagLanes(s)
+		return onScreen(s, "user-a/other-repo#42") && hasTagLanes(s)
 	})
 	h.press("x")
 	h.waitForArchived([]archivedJSON{{ID: newestPR, Open: true}})
 
 	h.refreshUntil(2)
 	h.settle(time.Second)
-	if strings.Contains(h.screen.plain(), "user-a/other-repo#42") {
+	if onScreen(h.screen.plain(), "user-a/other-repo#42") {
 		t.Fatalf("still open, so still archived:\n%s", h.screen.plain())
 	}
 

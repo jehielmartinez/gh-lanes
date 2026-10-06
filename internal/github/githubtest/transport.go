@@ -24,10 +24,9 @@ type Request struct {
 	Variables map[string]any
 }
 
-// Response is a canned reply for an operation.
+// Response is a canned reply for an operation. A zero Status means 200.
 type Response struct {
 	Status int
-	Header http.Header
 	Body   []byte
 	// Release, when set, holds the response back until it is closed, so a
 	// test can see what the app shows while a request is in flight.
@@ -62,7 +61,7 @@ func (t *Transport) ReplyFixture(tb testing.TB, operation, path string) {
 	if err != nil {
 		tb.Fatalf("read fixture: %v", err)
 	}
-	t.Reply(operation, Response{Status: http.StatusOK, Body: body})
+	t.Reply(operation, Response{Body: body})
 }
 
 // Requests returns every request received so far, oldest first.
@@ -113,20 +112,16 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	if !ok {
 		reply = Response{
-			Status: http.StatusOK,
-			Body:   fmt.Appendf(nil, `{"errors":[{"message":"githubtest: no reply queued for %s"}]}`, op),
+			Body: fmt.Appendf(nil, `{"errors":[{"message":"githubtest: no reply queued for %s"}]}`, op),
 		}
 	}
-	header := reply.Header.Clone()
-	if header == nil {
-		header = http.Header{}
-	}
-	if header.Get("Content-Type") == "" {
-		header.Set("Content-Type", "application/json")
+	status := reply.Status
+	if status == 0 {
+		status = http.StatusOK
 	}
 	return &http.Response{
-		StatusCode: reply.Status,
-		Header:     header,
+		StatusCode: status,
+		Header:     http.Header{"Content-Type": {"application/json"}},
 		Body:       io.NopCloser(bytes.NewReader(reply.Body)),
 		Request:    req,
 	}, nil

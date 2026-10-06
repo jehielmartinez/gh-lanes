@@ -38,7 +38,6 @@ func New(transport http.RoundTripper) (*Client, error) {
 		Host:      host,
 		AuthToken: token,
 		Transport: stripTransport{next: transport},
-		Timeout:   30 * time.Second,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create GraphQL client for %s: %w", host, err)

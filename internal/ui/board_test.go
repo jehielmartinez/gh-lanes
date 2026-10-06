@@ -1,7 +1,6 @@
 package ui_test
 
 import (
-	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -105,7 +104,7 @@ func TestBoardStripsEscapeSequencesFromTitles(t *testing.T) {
 func TestBoardShowsLoadErrorInStatusBar(t *testing.T) {
 	transport := githubtest.New()
 	transport.Reply("SearchPullRequests", githubtest.Response{
-		Status: http.StatusBadGateway,
+		Status: 502,
 		Body:   []byte(`{"message":"Server Error"}`),
 	})
 	h := newHarness(t, transport)
@@ -123,7 +122,7 @@ func TestBoardShowsLoadingUntilTheSearchAnswers(t *testing.T) {
 	}
 	release := make(chan struct{})
 	transport := githubtest.New()
-	transport.Reply("SearchPullRequests", githubtest.Response{Status: http.StatusOK, Body: body, Release: release})
+	transport.Reply("SearchPullRequests", githubtest.Response{Body: body, Release: release})
 	h := newHarness(t, transport)
 
 	h.waitForText("Loading pull requests…")

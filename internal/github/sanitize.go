@@ -15,9 +15,13 @@ const (
 	bel = 0x07
 	del = 0x7f
 
+	c1DCS = 0x90
+	c1SOS = 0x98
+	c1ST  = 0x9c
 	c1CSI = 0x9b
 	c1OSC = 0x9d
-	c1ST  = 0x9c
+	c1PM  = 0x9e
+	c1APC = 0x9f
 )
 
 // sanitize strips terminal escape sequences and control characters from PR
@@ -35,7 +39,7 @@ func sanitize(s string) string {
 			i = skipEscape(runes, i+1)
 		case r == c1CSI:
 			i = skipCSI(runes, i+1)
-		case r == c1OSC || r == 0x90 || r == 0x98 || r == 0x9e || r == 0x9f:
+		case r == c1OSC || r == c1DCS || r == c1SOS || r == c1PM || r == c1APC:
 			i = skipString(runes, i+1)
 		case r == '\n' || r == '\t':
 			b.WriteRune(r)

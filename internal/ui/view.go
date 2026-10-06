@@ -17,8 +17,7 @@ import (
 const (
 	laneWidth = 36
 	// laneGap is the margin to the right of each lane.
-	laneGap         = 1
-	laneHeaderLines = 1
+	laneGap = 1
 	// cardPadding is the border plus one column of padding on each side.
 	cardPadding = 4
 	footerLines = 2
@@ -66,7 +65,7 @@ func (m Model) cardAt(x, y int) (domain.PullRequest, bool) {
 	if x < 0 || lane >= len(m.lanes) || x%(laneWidth+laneGap) >= laneWidth {
 		return domain.PullRequest{}, false
 	}
-	top := laneHeaderLines
+	top := lipgloss.Height(m.laneHeader(m.lanes[lane]))
 	for _, pr := range m.lanes[lane].PullRequests {
 		bottom := top + lipgloss.Height(m.cardView(pr))
 		if y >= top && y < bottom {
@@ -85,10 +84,13 @@ func (m Model) boardView() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, cols...)
 }
 
-func (m Model) laneView(lane board.Lane) string {
-	header := lipgloss.NewStyle().Bold(true).Foreground(m.theme.untagged).Render(lane.Name) +
+func (m Model) laneHeader(lane board.Lane) string {
+	return lipgloss.NewStyle().Bold(true).Foreground(m.theme.untagged).Render(lane.Name) +
 		" " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
-	rows := []string{header}
+}
+
+func (m Model) laneView(lane board.Lane) string {
+	rows := []string{m.laneHeader(lane)}
 	if m.loaded && len(lane.PullRequests) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}

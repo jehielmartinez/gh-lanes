@@ -17,12 +17,10 @@ It runs as `gh lanes` (a `gh` extension) or as a standalone `lanes` binary.
 
 Both channels need the [GitHub CLI](https://cli.github.com/), because `lanes` uses its login.
 
-In the commands below, `OWNER` is the account that publishes `lanes` releases.
-
 ### As a `gh` extension
 
 ```sh
-gh extension install OWNER/gh-lanes
+gh extension install jehielmartinez/gh-lanes
 gh lanes
 ```
 
@@ -31,7 +29,7 @@ Upgrade with `gh extension upgrade lanes`.
 ### With Homebrew
 
 ```sh
-brew install OWNER/tap/lanes
+brew install jehielmartinez/tap/lanes
 lanes
 ```
 

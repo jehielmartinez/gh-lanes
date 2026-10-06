@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
+	"github.com/jehielmartinez/gh-lanes/internal/links"
 	"github.com/jehielmartinez/gh-lanes/internal/markdown"
 )
 
@@ -15,53 +16,51 @@ import (
 const indentStep = 2
 
 // descriptionLines is the modal's Description section.
-func (m Model) descriptionLines(conv domain.Conversation, width int) []string {
-	lines := []string{m.sectionHeading("Description")}
+func (m Model) descriptionLines(conv domain.Conversation, width int) page {
+	heading := text(m.sectionHeading("Description"))
 	if strings.TrimSpace(conv.Body) == "" {
-		return append(lines, indented(1, m.muted("No description provided.")))
+		return heading.then(text(indented(1, m.muted("No description provided."))))
 	}
-	return append(lines, m.markdownLines(conv.Body, 1, width)...)
+	return heading.then(m.markdownLines(conv.Body, 1, width))
 }
 
 // conversationLines is the modal's Conversation section: one timeline of
 // comments, reviews and review threads, oldest first.
-func (m Model) conversationLines(conv domain.Conversation, expandResolved bool, width int) []string {
+func (m Model) conversationLines(conv domain.Conversation, expandResolved bool, width int) page {
 	timeline := conv.Timeline()
-	lines := []string{m.sectionHeading("Conversation") + "  " + m.muted(strconv.Itoa(len(timeline)))}
+	p := text(m.sectionHeading("Conversation") + "  " + m.muted(strconv.Itoa(len(timeline))))
 	if len(timeline) == 0 {
-		return append(lines, indented(1, m.muted("No comments yet.")))
+		return p.then(text(indented(1, m.muted("No comments yet."))))
 	}
 	for i, e := range timeline {
 		if i > 0 {
-			lines = append(lines, "")
+			p = p.then(text(""))
 		}
 		switch {
 		case e.Comment != nil:
-			lines = append(lines, m.commentLines(*e.Comment, "commented", 1, width)...)
+			p = p.then(m.commentLines(*e.Comment, "commented", 1, width))
 		case e.Review != nil:
-			lines = append(lines, m.reviewLines(*e.Review, width)...)
+			p = p.then(m.reviewLines(*e.Review, width))
 		case e.Thread != nil:
-			lines = append(lines, m.threadLines(*e.Thread, expandResolved, width)...)
+			p = p.then(m.threadLines(*e.Thread, expandResolved, width))
 		}
 	}
-	return lines
+	return p
 }
 
-func (m Model) commentLines(c domain.Comment, verb string, depth, width int) []string {
+func (m Model) commentLines(c domain.Comment, verb string, depth, width int) page {
 	header := m.bold(authorName(c.Author))
 	if verb != "" {
 		header += " " + verb
 	}
 	header += m.muted(statusSeparator + m.timestamp(c.CreatedAt))
-	lines := []string{indentedWrap(depth, header, width)}
-	return append(lines, m.markdownLines(c.Body, depth+1, width)...)
+	return text(indentedWrap(depth, header, width)).then(m.markdownLines(c.Body, depth+1, width))
 }
 
-func (m Model) reviewLines(r domain.Review, width int) []string {
+func (m Model) reviewLines(r domain.Review, width int) page {
 	header := m.bold(authorName(r.Author)) + " " + m.reviewBadge(r.State) +
 		m.muted(statusSeparator+m.timestamp(r.SubmittedAt))
-	lines := []string{indentedWrap(1, header, width)}
-	return append(lines, m.markdownLines(r.Body, 2, width)...)
+	return text(indentedWrap(1, header, width)).then(m.markdownLines(r.Body, 2, width))
 }
 
 func (m Model) reviewBadge(state string) string {
@@ -80,7 +79,7 @@ func (m Model) reviewBadge(state string) string {
 // threadLines draws a review thread: where it is, whether it is resolved, and
 // its comments beneath, unless it is resolved and resolved threads are
 // collapsed.
-func (m Model) threadLines(t domain.Thread, expandResolved bool, width int) []string {
+func (m Model) threadLines(t domain.Thread, expandResolved bool, width int) page {
 	collapsed := t.Resolved && !expandResolved
 	marker, state := "▾", lipgloss.NewStyle().Foreground(m.theme.pending).Render("Unresolved")
 	if t.Resolved {
@@ -89,46 +88,59 @@ func (m Model) threadLines(t domain.Thread, expandResolved bool, width int) []st
 	if collapsed {
 		marker = "▸"
 	}
-	header := m.muted(marker) + " " + m.bold(threadLocation(t)) + m.muted(statusSeparator) + state
+	header := m.muted(marker) + " " + m.bold(oneLine(t.Location())) + m.muted(statusSeparator) + state
 	if collapsed {
 		header += m.muted(statusSeparator + plural(len(t.Comments), "comment"))
 	} else {
 		header += m.muted(statusSeparator + m.timestamp(t.StartedAt()))
 	}
-	lines := []string{indentedWrap(1, header, width)}
+	p := text(indentedWrap(1, header, width))
 	if collapsed {
-		return lines
+		return p
 	}
 	for _, c := range t.Comments {
-		lines = append(lines, m.commentLines(c, "", 2, width)...)
+		p = p.then(m.commentLines(c, "", 2, width))
 	}
-	return lines
+	return p
 }
 
-// threadLocation is a thread's file:line, or just the file for a comment on
-// the whole file.
-func threadLocation(t domain.Thread) string {
-	path := oneLine(t.Path)
-	if t.Line == 0 {
-		return path
-	}
-	return fmt.Sprintf("%s:%d", path, t.Line)
-}
-
-// markdownLines renders markdown at an indent depth, with links drawn
-// underlined in the accent colour.
-func (m Model) markdownLines(src string, depth, width int) []string {
+// markdownLines renders markdown at an indent depth, recording where each
+// link lands. Only http and https links are drawn as links; anything else is
+// plain text, since it will never be opened.
+func (m Model) markdownLines(src string, depth, width int) page {
 	indent := strings.Repeat(" ", depth*indentStep)
-	var lines []string
-	for _, l := range markdown.Render(src, width-len(indent)) {
+	var p page
+	for row, l := range markdown.Render(src, width-len(indent)) {
 		var b strings.Builder
 		b.WriteString(indent)
+		col := len(indent)
 		for _, sp := range l {
+			w := lipgloss.Width(sp.Text)
+			if !links.Openable(sp.URL) {
+				sp.URL = ""
+			}
+			if sp.URL != "" {
+				p.links = addRegion(p.links, links.Region{Line: row, Start: col, End: col + w, URL: sp.URL})
+			}
 			b.WriteString(m.spanStyle(sp).Render(sp.Text))
+			col += w
 		}
-		lines = append(lines, b.String())
+		p.lines = append(p.lines, b.String())
 	}
-	return lines
+	return p
+}
+
+// addRegion adds r, joining it to the last region when it continues the same
+// link on the same line, as a link with bold text in it does.
+func addRegion(regions links.Map, r links.Region) links.Map {
+	if n := len(regions); n > 0 {
+		last := regions[n-1]
+		if last.Line == r.Line && last.End == r.Start && last.URL == r.URL {
+			last.End = r.End
+			return append(regions[:n-1:n-1], last)
+		}
+	}
+	return append(regions, r)
 }
 
 func (m Model) spanStyle(sp markdown.Span) lipgloss.Style {
@@ -149,9 +161,14 @@ func (m Model) spanStyle(sp markdown.Span) lipgloss.Style {
 		s = s.Foreground(m.theme.muted)
 	}
 	if sp.URL != "" {
-		s = s.Underline(true).Foreground(m.theme.accent)
+		s = m.asLink(s)
 	}
 	return s
+}
+
+// asLink draws s the way anything clickable is drawn.
+func (m Model) asLink(s lipgloss.Style) lipgloss.Style {
+	return s.Underline(true).Foreground(m.theme.accent)
 }
 
 func (m Model) sectionHeading(s string) string {

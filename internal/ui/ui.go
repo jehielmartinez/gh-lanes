@@ -52,6 +52,9 @@ type Options struct {
 	Now func() time.Time
 	// After waits for a duration on the same clock as Now, like time.After.
 	After func(time.Duration) <-chan time.Time
+	// Open opens a URL in the browser. It is only ever given http and https
+	// URLs.
+	Open func(url string) error
 }
 
 // Model is the root model of the app.
@@ -124,6 +127,11 @@ type Model struct {
 	detailSeq int
 	lastClick click
 
+	// linksSeq identifies the fetch in flight for the board's link picker,
+	// zero when there is none.
+	linksSeq int
+	// linkErr is why the last link couldn't be loaded or opened.
+	linkErr *linkFailure
 	// confirm is the open confirmation dialog, nil when none is.
 	confirm *confirmation
 	// acting is whether an action is waiting on GitHub; one runs at a time.
@@ -336,12 +344,22 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m, detail := m.fetchDetail()
 			return m, tea.Batch(board, detail)
 		}
+		if key.Matches(msg, m.keys.Links) {
+			return m.openLinks()
+		}
+		if key.Matches(msg, m.keys.Browser) {
+			return m.openPullRequest()
+		}
 		if m.detail != nil {
 			return m.detailKey(msg)
 		}
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
-		if m.detail == nil && m.picker == nil && m.tagManager == nil && m.confirm == nil {
+		switch {
+		case m.picker != nil || m.tagManager != nil || m.confirm != nil:
+		case m.detail != nil:
+			return m.clickDetail(msg)
+		default:
 			return m.clickBoard(msg)
 		}
 	case tea.MouseWheelMsg:
@@ -361,7 +379,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		m, board := m.refresh()
 		return m, tea.Batch(next, detail, board)
 	case spinner.TickMsg:
-		if !m.refreshing && !m.acting && (m.detail == nil || !m.detail.fetching) {
+		if !m.refreshing && !m.acting && !m.loadingLinks() && (m.detail == nil || !m.detail.fetching) {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -378,6 +396,14 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.refreshed(msg)
 	case detailMsg:
 		return m.detailFetched(msg), nil
+	case linksMsg:
+		return m.linksFetched(msg), nil
+	case openMsg:
+		return m.open(msg.url)
+	case openedMsg:
+		if msg.err != nil {
+			m.linkErr = &linkFailure{action: openFailed, err: msg.err}
+		}
 	case actionDoneMsg:
 		return m.actionDone(msg)
 	case prRefreshedMsg:

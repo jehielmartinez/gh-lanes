@@ -78,7 +78,7 @@ func (m Model) archivedView() string {
 	}
 	switch {
 	case m.storeReady && len(m.archived) == 0:
-		return muted.Render("Nothing archived. Press " + m.keys.Archive.Help().Key + " on a board card to archive it.")
+		return muted.Render("Nothing archived. Press " + m.keys.Archive.Help().Key + " on a card on the board or in review requests to archive it.")
 	case !m.archiveLoaded && errLine != "":
 		return errLine
 	case !m.archiveLoaded:
@@ -89,12 +89,36 @@ func (m Model) archivedView() string {
 	return m.listView(m.archive, "")
 }
 
-// unarchiveSelected puts the selected archived pull request back on the
-// board, in the lane it was archived from, and saves that.
+// archiveReviewRequest takes the selected review request out of the review
+// requests until it is requested again, and saves that.
+func (m Model) archiveReviewRequest() (Model, tea.Cmd) {
+	pr, ok := m.reviews.selected()
+	if !ok || !m.storeReady {
+		return m, nil
+	}
+	m.archived = board.ArchiveReviewRequest(m.archived, pr)
+	return m.withArchivedCard(pr).rebuild().saveState()
+}
+
+// withArchivedCard adds a just-archived pull request to the archived tab's
+// list, if that list has been loaded; otherwise its next fetch brings it.
+func (m Model) withArchivedCard(pr domain.PullRequest) Model {
+	if m.archiveLoaded {
+		others := slices.DeleteFunc(slices.Clone(m.archive.prs), func(p domain.PullRequest) bool { return p.ID == pr.ID })
+		m.archive = m.archive.withPRs(append(others, pr))
+	}
+	return m
+}
+
+// unarchiveSelected puts the selected archived pull request back where it was
+// archived from, and saves that.
 func (m Model) unarchiveSelected() (Model, tea.Cmd) {
 	pr, ok := m.archive.selected()
 	if !ok || !m.storeReady {
 		return m, nil
+	}
+	if board.OriginOf(m.archived, pr.ID) == domain.OriginReviewRequests {
+		return m.unarchiveReviewRequest(pr)
 	}
 	var tagID string
 	m.assignments, m.archived, tagID = board.Unarchive(m.assignments, m.archived, m.tags, pr.ID)
@@ -108,6 +132,22 @@ func (m Model) unarchiveSelected() (Model, tea.Cmd) {
 	text := ref(pr) + ": restored to " + m.laneName(tagID)
 	if !onBoard {
 		text = ref(pr) + ": unarchived, but it is " + finishedWord(pr) + " and untagged, so it stays off the board"
+	}
+	m.toast = toast{text: text, until: m.now.Add(toastDuration)}
+	return m.rebuild().saveState()
+}
+
+// unarchiveReviewRequest puts an archived review request back in the review
+// requests, or, when the last search no longer holds it, lets it go.
+func (m Model) unarchiveReviewRequest(pr domain.PullRequest) (Model, tea.Cmd) {
+	m.archived = slices.DeleteFunc(slices.Clone(m.archived), func(a domain.Archived) bool { return a.ID == pr.ID })
+	m.archive = m.archive.withPRs(slices.DeleteFunc(slices.Clone(m.archive.prs), func(p domain.PullRequest) bool { return p.ID == pr.ID }))
+	text := ref(pr) + ": restored to Review requests"
+	switch {
+	case pr.Finished():
+		text = ref(pr) + ": unarchived, but it is " + finishedWord(pr) + ", so it stays off Review requests"
+	case !slices.ContainsFunc(m.requested, func(p domain.PullRequest) bool { return p.ID == pr.ID }):
+		text = ref(pr) + ": unarchived, but your review is no longer requested, so it stays off Review requests"
 	}
 	m.toast = toast{text: text, until: m.now.Add(toastDuration)}
 	return m.rebuild().saveState()

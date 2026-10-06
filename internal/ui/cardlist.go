@@ -89,6 +89,7 @@ func (m Model) withList(t tab, l cardList) Model {
 // withListCopies hands a fresher copy of a pull request to every card list
 // that shows it.
 func (m Model) withListCopies(pr domain.PullRequest) Model {
+	m.requested = replaced(m.requested, pr)
 	m.reviews = m.reviews.withCopy(pr)
 	m.archive = m.archive.withCopy(pr)
 	return m
@@ -107,6 +108,8 @@ func (m Model) listKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 	case m.tab == tabArchived && key.Matches(msg, m.keys.Unarchive):
 		return m.unarchiveSelected()
+	case m.tab == tabReview && key.Matches(msg, m.keys.Archive):
+		return m.archiveReviewRequest()
 	}
 	return m, nil
 }

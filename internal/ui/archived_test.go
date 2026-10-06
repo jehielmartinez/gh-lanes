@@ -84,7 +84,7 @@ func TestEmptyArchiveSaysHowToArchive(t *testing.T) {
 	h := startBoard(t)
 
 	h.clickText("Archived 0")
-	h.waitForText("Nothing archived. Press x on a board card to archive it.")
+	h.waitForText("Nothing archived. Press x on a card on the board or in review requests to archive it.")
 	if got := byIDRequests(h); len(got) != 0 {
 		t.Errorf("nothing is archived, yet fetched by ID: %v", got)
 	}

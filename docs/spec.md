@@ -226,6 +226,10 @@ means leaving the terminal and clicking through the web UI for each PR.
     or disabled, so that the UI only offers what will work.
 86. As a reviewer, I want review-request PRs kept out of my tagged lanes, so that my workflow lanes
     only hold my own work.
+86a. As a reviewer, I want to archive a review request with one key, so that a PR I've dealt with
+    leaves my review queue without ever joining my lanes.
+86b. As a reviewer, I want an archived review request to come back to Review requests when my
+    review is requested again, so that a re-request doesn't go unnoticed.
 
 ### Local data
 
@@ -329,8 +333,10 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
   reference the tag ID, so renames are safe. The app reloads it on start and after saving from the
   tag manager.
 - **State file** (machine-written JSON): `version`, assignments (PR node ID → tag ID), the archived
-  PR node IDs, and per-PR snapshots (seen-at time, overall check state, mergeability, review
-  decision, comment and review counts, draft flag, state).
+  PRs (node ID, whether it was in its origin's search when last seen, the tag it was archived
+  from, and its origin: the board or review requests), and per-PR snapshots (seen-at time,
+  overall check state, mergeability, review decision, comment and review counts, draft flag,
+  state).
 - Neither file ever contains a token or credential. Auth stays in `gh`'s own storage.
 
 ### Links and mouse
@@ -355,7 +361,8 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 | `H` `L` / `<` `>` | board | move card one lane left/right |
 | `m` | board | "move to…" picker |
 | `enter` | board, lists | open detail modal |
-| `x` | board | archive card |
+| `x` | board, review requests | archive card |
+| `x` | archived | unarchive card, back to the tab it was archived from |
 | `t` | global | tag manager |
 | `r` | global | refresh now |
 | `o` | board, lists, modal | link picker |

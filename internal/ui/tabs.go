@@ -135,7 +135,7 @@ func (h listHelp) ShortHelp() []key.Binding {
 	if h.archived {
 		return []key.Binding{k.CardUp, k.CardDown, k.Open, k.Unarchive, k.NextTab, k.Help, k.Quit}
 	}
-	return []key.Binding{k.CardUp, k.CardDown, k.Open, k.NextTab, k.UpdateBranch, k.Draft, k.Help, k.Quit}
+	return []key.Binding{k.CardUp, k.CardDown, k.Open, k.Archive, k.NextTab, k.UpdateBranch, k.Draft, k.Help, k.Quit}
 }
 
 func (h listHelp) FullHelp() [][]key.Binding {
@@ -143,6 +143,8 @@ func (h listHelp) FullHelp() [][]key.Binding {
 	move := []key.Binding{k.CardUp, k.CardDown, k.Open, k.NextTab, k.PrevTab}
 	if h.archived {
 		move = append(move, k.Unarchive)
+	} else {
+		move = append(move, k.Archive)
 	}
 	return [][]key.Binding{
 		move,

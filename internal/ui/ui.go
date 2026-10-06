@@ -123,8 +123,11 @@ type Model struct {
 
 	// tab is the view in the tab bar that has the screen.
 	tab tab
-	// reviews are the open pull requests whose review is requested of the
-	// login. They are kept apart from prs so they never join a lane.
+	// requested is the last review requests search: the open pull requests
+	// whose review is requested of the login. They are kept apart from prs so
+	// they never join a lane.
+	requested []domain.PullRequest
+	// reviews is the review requests tab: requested, less the archived.
 	reviews cardList
 	// archive is the archived pull requests, fetched while the archived tab
 	// is in view.
@@ -583,13 +586,13 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 	m.loaded = true
 	m.updatedAt = msg.at
 	m.prs = board.Retain(msg.open, msg.tracked, board.Tagged(m.assignments, m.tags))
-	m.reviews = m.reviews.withPRs(msg.reviews)
+	m.requested = msg.reviews
 	m.rateLimit = msg.rateLimit
 	var archive tea.Cmd
 	if m.tab == tabArchived {
 		m, archive = m.fetchArchived()
 	}
-	archived, changed := board.Reconcile(m.archived, msg.open)
+	archived, changed := board.Reconcile(m.archived, msg.open, msg.reviews)
 	if !changed || !m.storeReady {
 		return m.rebuild(), archive
 	}
@@ -707,11 +710,7 @@ func (m Model) archiveSelected() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.assignments, m.archived = board.Archive(m.assignments, m.archived, pr)
-	if m.archiveLoaded {
-		others := slices.DeleteFunc(slices.Clone(m.archive.prs), func(p domain.PullRequest) bool { return p.ID == pr.ID })
-		m.archive = m.archive.withPRs(append(others, pr))
-	}
-	return m.rebuild().saveState()
+	return m.withArchivedCard(pr).rebuild().saveState()
 }
 
 // withCursor selects card index in lane, kept inside the lane.
@@ -722,10 +721,11 @@ func (m Model) withCursor(lane, index int) Model {
 	return m
 }
 
-// rebuild reassembles the lanes. The focus and each lane's cursor and scroll
-// offset stay with their tag when tags are reordered, and the cursors are kept
-// inside the lanes.
+// rebuild reassembles the lanes and the review requests. The focus and each
+// lane's cursor and scroll offset stay with their tag when tags are
+// reordered, and the cursors are kept inside the lanes.
 func (m Model) rebuild() Model {
+	m.reviews = m.reviews.withPRs(board.Unarchived(m.requested, m.archived))
 	cursorOf, offsetOf := map[string]int{}, map[string]int{}
 	for i, lane := range m.lanes {
 		if i < len(m.cursors) {

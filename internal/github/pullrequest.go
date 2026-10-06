@@ -30,6 +30,7 @@ fragment PullRequestFields on PullRequest {
   mergeStateStatus
   reviewDecision
   viewerCanUpdate
+  viewerCanUpdateBranch
   autoMergeRequest { mergeMethod enabledAt enabledBy { login } }
   repository {
     nameWithOwner
@@ -96,24 +97,25 @@ type totalCount struct {
 }
 
 type pullRequestNode struct {
-	ID               string
-	Number           int
-	Title            string
-	URL              string
-	IsDraft          bool
-	State            string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	MergedAt         time.Time
-	ClosedAt         time.Time
-	Author           *login
-	BaseRefName      string
-	HeadRefName      string
-	Mergeable        string
-	MergeStateStatus string
-	ReviewDecision   string
-	ViewerCanUpdate  bool
-	AutoMergeRequest *struct {
+	ID                    string
+	Number                int
+	Title                 string
+	URL                   string
+	IsDraft               bool
+	State                 string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	MergedAt              time.Time
+	ClosedAt              time.Time
+	Author                *login
+	BaseRefName           string
+	HeadRefName           string
+	Mergeable             string
+	MergeStateStatus      string
+	ReviewDecision        string
+	ViewerCanUpdate       bool
+	ViewerCanUpdateBranch bool
+	AutoMergeRequest      *struct {
 		MergeMethod string
 		EnabledAt   time.Time
 		EnabledBy   *login
@@ -221,18 +223,19 @@ func (n pullRequestNode) toDomain() domain.PullRequest {
 			AutoMergeAllowed:    n.Repository.AutoMergeAllowed,
 			DeleteBranchOnMerge: n.Repository.DeleteBranchOnMerge,
 		},
-		CreatedAt:        n.CreatedAt,
-		UpdatedAt:        n.UpdatedAt,
-		MergedAt:         n.MergedAt,
-		ClosedAt:         n.ClosedAt,
-		BaseRef:          n.BaseRefName,
-		HeadRef:          n.HeadRefName,
-		Mergeable:        domain.Mergeable(n.Mergeable),
-		MergeStateStatus: domain.MergeStateStatus(n.MergeStateStatus),
-		ReviewDecision:   domain.ReviewDecision(n.ReviewDecision),
-		ViewerCanUpdate:  n.ViewerCanUpdate,
-		CommentCount:     n.Comments.TotalCount,
-		ReviewCount:      n.Reviews.TotalCount,
+		CreatedAt:             n.CreatedAt,
+		UpdatedAt:             n.UpdatedAt,
+		MergedAt:              n.MergedAt,
+		ClosedAt:              n.ClosedAt,
+		BaseRef:               n.BaseRefName,
+		HeadRef:               n.HeadRefName,
+		Mergeable:             domain.Mergeable(n.Mergeable),
+		MergeStateStatus:      domain.MergeStateStatus(n.MergeStateStatus),
+		ReviewDecision:        domain.ReviewDecision(n.ReviewDecision),
+		ViewerCanUpdate:       n.ViewerCanUpdate,
+		ViewerCanUpdateBranch: n.ViewerCanUpdateBranch,
+		CommentCount:          n.Comments.TotalCount,
+		ReviewCount:           n.Reviews.TotalCount,
 	}
 	if am := n.AutoMergeRequest; am != nil {
 		pr.AutoMerge = &domain.AutoMerge{

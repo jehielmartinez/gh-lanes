@@ -81,6 +81,18 @@ func (m Model) fetchDetail() (Model, tea.Cmd) {
 	return m, tea.Batch(fetch, m.spinner.Tick)
 }
 
+// refetchDetail fetches the open pull request again even if a fetch is in
+// flight, dropping that fetch's reply, which may predate a change just made.
+func (m Model) refetchDetail() (Model, tea.Cmd) {
+	if m.detail == nil {
+		return m, nil
+	}
+	d := *m.detail
+	d.fetching = false
+	m.detail = &d
+	return m.fetchDetail()
+}
+
 func (m Model) detailFetched(msg detailMsg) Model {
 	if m.detail == nil || msg.seq != m.detail.seq {
 		return m
@@ -195,10 +207,9 @@ func (m Model) detailContent(width int) string {
 	muted := lipgloss.NewStyle().Foreground(m.theme.muted)
 	wrap := lipgloss.NewStyle().Width(width)
 
-	ref := fmt.Sprintf("%s#%d", pr.Repository.NameWithOwner, pr.Number)
 	author := authorName(pr.Author)
 	lines := []string{
-		muted.Render(ref) + "  " + m.stateBadge(pr),
+		muted.Render(ref(pr)) + "  " + m.stateBadge(pr),
 		wrap.Bold(true).Foreground(m.theme.text).Render(oneLine(pr.Title)),
 		wrap.Render(muted.Render(author + statusSeparator + pr.HeadRef + " → " + pr.BaseRef)),
 		wrap.Render(muted.Render("Created " + m.timestamp(pr.CreatedAt) + statusSeparator + "Updated " + m.timestamp(pr.UpdatedAt))),

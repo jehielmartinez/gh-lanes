@@ -35,6 +35,9 @@ type GitHub interface {
 	SearchPullRequests(ctx context.Context, query string) ([]domain.PullRequest, domain.RateLimit, error)
 	PullRequestsByID(ctx context.Context, ids []string) ([]domain.PullRequest, domain.RateLimit, error)
 	PullRequest(ctx context.Context, id string) (domain.PullRequest, domain.RateLimit, error)
+	UpdateBranch(ctx context.Context, id string, method domain.UpdateMethod) error
+	MarkReadyForReview(ctx context.Context, id string) error
+	ConvertToDraft(ctx context.Context, id string) error
 }
 
 // Options are the boundaries the root model is given rather than reaching for
@@ -115,6 +118,12 @@ type Model struct {
 	detail    *detail
 	detailSeq int
 	lastClick click
+
+	// confirm is the open confirmation dialog, nil when none is.
+	confirm *confirmation
+	// acting is whether an action is waiting on GitHub; one runs at a time.
+	acting bool
+	toast  toast
 }
 
 // click is a left click that landed on a card.
@@ -307,8 +316,14 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.tagManager != nil {
 			return m.tagManagerUpdate(msg)
 		}
+		if m.confirm != nil {
+			return m.confirmKey(msg)
+		}
 		if key.Matches(msg, m.keys.Tags) {
 			return m.openTagManager(), nil
+		}
+		if next, cmd, ok := m.actionKey(msg); ok {
+			return next, cmd
 		}
 		if key.Matches(msg, m.keys.Refresh) {
 			m, board := m.refresh()
@@ -320,14 +335,14 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
-		if m.detail == nil && m.picker == nil && m.tagManager == nil {
+		if m.detail == nil && m.picker == nil && m.tagManager == nil && m.confirm == nil {
 			return m.clickBoard(msg)
 		}
 	case tea.MouseWheelMsg:
 		if m.detail != nil {
 			return m.detailScroll(msg), nil
 		}
-		if m.picker == nil && m.tagManager == nil {
+		if m.picker == nil && m.tagManager == nil && m.confirm == nil {
 			return m.wheeled(msg), nil
 		}
 	case tickMsg:
@@ -340,7 +355,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		m, board := m.refresh()
 		return m, tea.Batch(next, detail, board)
 	case spinner.TickMsg:
-		if !m.refreshing && (m.detail == nil || !m.detail.fetching) {
+		if !m.refreshing && !m.acting && (m.detail == nil || !m.detail.fetching) {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -357,6 +372,10 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.refreshed(msg)
 	case detailMsg:
 		return m.detailFetched(msg), nil
+	case actionDoneMsg:
+		return m.actionDone(msg)
+	case prRefreshedMsg:
+		return m.prRefreshed(msg), nil
 	case storeLoadedMsg:
 		m.refreshInterval = msg.config.RefreshInterval
 		var intervalErr *store.RefreshIntervalError

@@ -57,6 +57,14 @@ means leaving the terminal and clicking through the web UI for each PR.
    board.
 10. As a developer, I want a new PR I just opened to appear in the Untagged lane on the next refresh,
     so that Untagged works as my inbox.
+10a. As a developer, I want to exclude an owner (an org, my own account or someone else's), so that
+    PRs from accounts I don't care about stay off every tab.
+10b. As a developer, I want to exclude or re-include single repositories, including one repo under
+    an excluded owner, so that I see exactly the repos I want.
+10c. As a developer, I want new repos from an excluded owner hidden too, so that excluding an owner
+    keeps working as the owner grows.
+10d. As a developer, I want excluding to only hide PRs, so that re-including a repo brings its PRs
+    back with their tags, archive state and activity markers intact.
 
 ### Tags and lanes
 
@@ -261,9 +269,9 @@ means leaving the terminal and clicking through the web UI for each PR.
 ### Modules
 
 - **GitHub layer:** the only module that talks to the network. It exposes a small interface:
-  list PRs for a search string, fetch PRs by node ID, fetch one PR's full detail, and one method per
-  mutation. It maps GraphQL responses into domain values. Its HTTP transport is injectable; this is
-  the test seam.
+  list PRs for a search string, fetch PRs by node ID, fetch one PR's full detail, list the viewer's
+  orgs, list an owner's repositories, and one method per mutation. It maps GraphQL responses into
+  domain values. Its HTTP transport is injectable; this is the test seam.
 - **Domain:** PR, check summary, review, thread, comment and merge status types. No I/O and no UI.
   Includes turning `mergeable` and `mergeStateStatus` into plain sentences, and gating which actions
   are available.
@@ -271,7 +279,7 @@ means leaving the terminal and clicking through the web UI for each PR.
   machine-written) in the config directory. Writes are atomic (temp file, then rename). Both files
   carry a schema `version`.
 - **Board assembly:** combines fetched PRs with tags, assignments, the archived list and snapshots
-  to produce lanes. Implements the merged/closed retention rules.
+  to produce lanes. Drops PRs from excluded repositories (see Filter) before building any tab. Implements the merged/closed retention rules.
 - **Activity:** compares a PR's current data with its last-seen snapshot and decides whether it
   changed, or is new.
 - **Links:** extracts URLs (markdown links and bare URLs) from text, and records where they're drawn
@@ -295,6 +303,33 @@ Mutations are commands returning a result message, which triggers a single-PR re
 - Review requests: `is:pr is:open review-requested:@me archived:false`.
 - Tracked PRs that are no longer open are fetched each refresh by node ID, since the open search no
   longer returns them.
+
+### Filter
+
+- One global filter applies to Board, Review requests and Archived. It has two levels: the **owner**
+  (any account type) and the **repository**.
+- An owner's check is its **owner default**: it decides for that owner's repositories you have never
+  chosen for, including ones not seen yet. A repository's own check always wins. A PR is hidden
+  when its repository is excluded.
+- Toggling an owner sets every known repository of that owner to match, clearing their own choices.
+  An owner with mixed repositories shows as partial (`[~]`).
+- The searches stay unfiltered; excluded PRs are dropped locally. Search negation is not used
+  because GitHub caps a query at 256 characters and 5 boolean operators.
+- Excluding only hides. Assignments, archive state and snapshots are kept; snapshots stay frozen
+  while hidden, so markers on return show what changed meanwhile. Lane and tab counts cover
+  visible PRs only. No hidden-count notice is shown.
+- The filter screen lists: your own account, the orgs you belong to (`viewer.organizations`, fetched
+  when the screen opens), every owner and repository with an open PR on Board or Review requests,
+  and every owner and repository with a stored choice. `a` on an owner loads all its repositories
+  from GitHub, paged. If either fetch fails, the error shows in the screen's footer and the list
+  built from seen PRs stays.
+- Each row shows its count of open PRs on Board and Review requests, before filtering. Owners sort
+  by count with your own account first; repositories sort by name. Owners start collapsed, except
+  partial ones.
+- Every toggle applies immediately and saves the config atomically.
+- Owners and repositories are stored by name, compared case-insensitively, not by node ID (see
+  [ADR 0001](adr/0001-filter-keyed-by-name.md)). A renamed repository falls back to its owner
+  default.
 
 ### List query fields per PR
 
@@ -330,8 +365,9 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 
 - **Config file** (user-editable YAML): `version`, `refresh_interval` (default 60s), and an ordered
   list of tags, each with a stable `id`, `name`, `color` and optional `terminal` flag. Assignments
-  reference the tag ID, so renames are safe. The app reloads it on start and after saving from the
-  tag manager.
+  reference the tag ID, so renames are safe. It also holds the `filter`: the excluded owners, and
+  per-repository choices (`included` or `excluded`) stored only where they differ from the owner
+  default. The app reloads it on start and after saving from the tag manager or the filter screen.
 - **State file** (machine-written JSON): `version`, assignments (PR node ID → tag ID), the archived
   PRs (node ID, whether it was in its origin's search when last seen, the tag it was archived
   from, and its origin: the board or review requests), and per-PR snapshots (seen-at time,
@@ -364,6 +400,7 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 | `x` | board, review requests | archive card |
 | `x` | archived | unarchive card, back to the tab it was archived from |
 | `t` | global | tag manager |
+| `f` | global | filter screen (`space` toggle, `enter`/`l`/`h` expand or collapse, `a` load all repos of an owner) |
 | `r` | global | refresh now |
 | `o` | board, lists, modal | link picker |
 | `O` | board, lists, modal | open PR in browser |

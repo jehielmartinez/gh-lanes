@@ -25,3 +25,16 @@ _Avoid_: Dismiss, hide, delete
 
 **Origin**:
 The tab an archived pull request was archived from (Board or Review requests). Unarchiving returns it there, never anywhere else.
+
+### Filtering
+
+**Owner**:
+The account that owns a pull request's repository: an organization, your own account, or someone else's personal account.
+_Avoid_: Organization, org (when any account type is meant)
+
+**Excluded**:
+A repository whose pull requests are hidden from every tab. A repository is excluded if you unchecked it, or if you never chose for it and its owner is excluded.
+_Avoid_: Disabled, muted, hidden
+
+**Owner default**:
+Whether an owner is excluded. It decides only for that owner's repositories you have never chosen for, including ones lanes has not seen yet. Your choice for a repository always overrides it.

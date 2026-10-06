@@ -14,7 +14,7 @@ The dev loop (areas, gates, stop rules, seams) is in [docs/agents/dev-loop.md](d
   - Open only `http` and `https` URLs.
   - Pass a URL to the OS opener (`open` on macOS, `xdg-open` on Linux) as a single argument. Never pass it through a shell.
 - **Tags are local.** Tags, lane assignments, archive state and snapshots never reach GitHub. No label, project or comment is written to represent them.
-- **PRs are keyed by node ID.** Assignments, the archived list and snapshots are keyed by node ID, never by `owner/repo#number`, so renames and transfers keep their tag. Assignments reference the tag ID, never the tag name.
+- **PRs are keyed by node ID.** Assignments, the archived list and snapshots are keyed by node ID, never by `owner/repo#number`, so renames and transfers keep their tag. Assignments reference the tag ID, never the tag name. The owner and repository filter is the one exception: it is keyed by name ([ADR 0001](docs/adr/0001-filter-keyed-by-name.md)).
 - **Each PR is in exactly one lane.** Untagged is always first, and it can't be renamed or deleted. Deleting a tag moves its PRs to Untagged.
 - **Local writes are atomic.** Write a temp file in the same directory, then rename it. Both files carry a schema `version`.
 - **Config location.** Use `$XDG_CONFIG_HOME/lanes`, falling back to `~/.config/lanes` on every OS, macOS included. `--config` overrides it.

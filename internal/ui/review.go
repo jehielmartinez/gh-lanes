@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -21,10 +22,9 @@ const (
 	tabCount
 )
 
-// tabBarLines is the height of the tab bar at the top of the screen.
-const tabBarLines = 1
-
-const tabGap = "   "
+// tabBarLines is the height of the tab bar at the top of the screen: each
+// tab's box, and the line the boxes stand on.
+const tabBarLines = 3
 
 // reviewListWidth is the widest the review requests list grows; one column of
 // cards wider than this is harder to read, not easier.
@@ -39,34 +39,69 @@ func (m Model) tabLabels() []string {
 	return []string{"Board", review}
 }
 
-func (m Model) tabsView() string {
-	labels := m.tabLabels()
-	var out string
-	for i, label := range labels {
-		style := lipgloss.NewStyle().Foreground(m.theme.muted)
-		if tab(i) == m.tab {
-			style = lipgloss.NewStyle().Bold(true).Underline(true).Foreground(m.theme.accent)
-		}
-		if i > 0 {
-			out += tabGap
-		}
-		out += style.Render(label)
+// tabBorder is a tab's box. The tab in view is open at the bottom, so it
+// joins the content beneath; the others close onto the shared line.
+func tabBorder(active, first bool) lipgloss.Border {
+	b := lipgloss.RoundedBorder()
+	b.BottomLeft, b.Bottom, b.BottomRight = "┴", "─", "┴"
+	if active {
+		b.BottomLeft, b.Bottom, b.BottomRight = "┘", " ", "└"
 	}
-	return out
+	if first {
+		b.BottomLeft = "├"
+		if active {
+			b.BottomLeft = "│"
+		}
+	}
+	return b
 }
 
-// tabAt is the tab whose label is drawn at screen cell x, y.
+func (m Model) tabBoxes() []string {
+	labels := m.tabLabels()
+	boxes := make([]string, len(labels))
+	for i, label := range labels {
+		active := tab(i) == m.tab
+		border, text := m.theme.border, lipgloss.NewStyle().Foreground(m.theme.muted)
+		if active {
+			border, text = m.theme.accent, lipgloss.NewStyle().Bold(true).Foreground(m.theme.accent)
+		}
+		boxes[i] = lipgloss.NewStyle().
+			Border(tabBorder(active, i == 0)).
+			BorderForeground(border).
+			Padding(0, 1).
+			Render(text.Render(label))
+	}
+	return boxes
+}
+
+func (m Model) tabsView() string {
+	row := lipgloss.JoinHorizontal(lipgloss.Bottom, m.tabBoxes()...)
+	rest := m.width - lipgloss.Width(row)
+	if rest <= 0 {
+		return row
+	}
+	// The line the tabs stand on runs on to the edge of the screen.
+	lines := strings.Split(row, "\n")
+	pad := strings.Repeat(" ", rest)
+	for i := range lines[:len(lines)-1] {
+		lines[i] += pad
+	}
+	lines[len(lines)-1] += lipgloss.NewStyle().Foreground(m.theme.border).Render(strings.Repeat("─", rest))
+	return strings.Join(lines, "\n")
+}
+
+// tabAt is the tab whose box is drawn at screen cell x, y.
 func (m Model) tabAt(x, y int) (tab, bool) {
-	if y >= tabBarLines {
+	if y < 0 || y >= tabBarLines {
 		return 0, false
 	}
 	start := 0
-	for i, label := range m.tabLabels() {
-		end := start + lipgloss.Width(label)
+	for i, box := range m.tabBoxes() {
+		end := start + lipgloss.Width(box)
 		if x >= start && x < end {
 			return tab(i), true
 		}
-		start = end + len(tabGap)
+		start = end
 	}
 	return 0, false
 }

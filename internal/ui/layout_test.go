@@ -8,12 +8,12 @@ import (
 	"github.com/charmbracelet/x/exp/teatest/v2"
 )
 
-// Cards are three lines inside a border, so one terminal row of 8 leaves room
-// for the lane header and a single card above the two footer lines, and 14
-// for two cards.
+// Cards are three lines inside a border, so a terminal 8 rows tall, plus the
+// tab bar's rows beyond the first, leaves room for the lane header and a
+// single card above the two footer lines, and 14 for two cards.
 const (
-	oneCardHeight  = 8
-	twoCardsHeight = 14
+	oneCardHeight  = 8 + tabBarRows - 1
+	twoCardsHeight = 14 + tabBarRows - 1
 	narrowWidth    = 70
 )
 
@@ -50,7 +50,7 @@ func TestLanesKeepTheirMinimumWidthInANarrowTerminal(t *testing.T) {
 	h := startBoard(t, withTermSize(narrowWidth, 30))
 
 	// Under the tab bar and the lane headers.
-	border := strings.Split(h.screen.plain(), "\n")[2]
+	border := strings.Split(h.screen.plain(), "\n")[tabBarRows+1]
 	first := strings.Fields(border)[0]
 	if got := len([]rune(first)); got != 32 {
 		t.Errorf("card is %d columns wide, want 32:\n%s", got, h.screen.plain())

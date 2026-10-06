@@ -31,6 +31,8 @@ const (
 const (
 	defaultTermWidth  = 240
 	defaultTermHeight = 30
+	// tabBarRows is how many rows the tab bar takes at the top of the screen.
+	tabBarRows = 3
 )
 
 // reviewSearch is the search behind the Review requests tab.

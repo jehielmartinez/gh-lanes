@@ -55,7 +55,8 @@ func TestTabsSwitchBetweenTheBoardAndReviewRequests(t *testing.T) {
 	h := newReviewHarness(t, nil)
 
 	screen := h.screen.plain()
-	if tabs := strings.Split(screen, "\n")[0]; !strings.Contains(tabs, "Board") || !strings.Contains(tabs, "Review requests 2") {
+	// The labels sit in the middle row of the tab bar's boxes.
+	if tabs := strings.Split(screen, "\n")[1]; !strings.Contains(tabs, "Board") || !strings.Contains(tabs, "Review requests 2") {
 		t.Errorf("the tabs should be the top line:\n%s", screen)
 	}
 	assertContains(t, screen, "Untagged 3", "octo-org/sample-repo#7")

@@ -224,7 +224,7 @@ func (m Model) prRefreshed(msg prRefreshedMsg) Model {
 	selected, wasSelected := m.selected()
 	wasSelected = wasSelected && selected.ID == msg.id
 	m.prs = replaced(m.prs, msg.prs[0])
-	m = m.withReviews(replaced(m.reviews, msg.prs[0])).rebuild()
+	m = m.withListCopies(msg.prs[0]).rebuild()
 	if lane, card, ok := board.Locate(m.lanes, msg.id); ok && wasSelected {
 		m.focus = lane
 		m = m.withCursor(lane, card)

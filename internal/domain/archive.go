@@ -9,4 +9,7 @@ type Archived struct {
 	// archived while open stays archived while it remains open; one that was
 	// closed and shows up open again has been reopened.
 	Open bool
+	// Tag is the ID of the tag the pull request was archived from, so
+	// unarchiving can put it back; empty for Untagged.
+	Tag string
 }

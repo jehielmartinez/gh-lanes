@@ -52,11 +52,30 @@ func Retain(open, tracked []domain.PullRequest, assignments map[string]string) [
 }
 
 // Archive returns copies of assignments and archived with the pull request
-// taken off the board: untagged, and recorded as archived.
+// taken off the board: untagged, and recorded as archived along with the tag
+// it had.
 func Archive(assignments map[string]string, archived []domain.Archived, pr domain.PullRequest) (map[string]string, []domain.Archived) {
 	next := slices.DeleteFunc(slices.Clone(archived), func(a domain.Archived) bool { return a.ID == pr.ID })
-	next = append(next, domain.Archived{ID: pr.ID, Open: !pr.Finished()})
+	next = append(next, domain.Archived{ID: pr.ID, Open: !pr.Finished(), Tag: assignments[pr.ID]})
 	return Assign(assignments, pr.ID, ""), next
+}
+
+// Unarchive returns copies of assignments and archived with the pull request
+// back on the board, in the tag it was archived from if that tag still
+// exists, and Untagged otherwise. tagID is where it went; empty is Untagged.
+func Unarchive(assignments map[string]string, archived []domain.Archived, tags []domain.Tag, prID string) (next map[string]string, rest []domain.Archived, tagID string) {
+	for _, a := range archived {
+		if a.ID == prID && slices.ContainsFunc(tags, func(t domain.Tag) bool { return t.ID == a.Tag }) {
+			tagID = a.Tag
+		}
+	}
+	rest = slices.DeleteFunc(slices.Clone(archived), func(a domain.Archived) bool { return a.ID == prID })
+	return Assign(assignments, prID, tagID), rest, tagID
+}
+
+// IsArchived reports whether the pull request is on the archived list.
+func IsArchived(archived []domain.Archived, prID string) bool {
+	return slices.ContainsFunc(archived, func(a domain.Archived) bool { return a.ID == prID })
 }
 
 // Reconcile updates the archived list against a fresh open search. A pull
@@ -71,7 +90,8 @@ func Reconcile(archived []domain.Archived, open []domain.PullRequest) (next []do
 			changed = true
 		case !isOpen && a.Open:
 			changed = true
-			next = append(next, domain.Archived{ID: a.ID})
+			a.Open = false
+			next = append(next, a)
 		default:
 			next = append(next, a)
 		}

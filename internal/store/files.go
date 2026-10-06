@@ -82,6 +82,7 @@ type stateFile struct {
 type archivedEntry struct {
 	ID   string `json:"id"`
 	Open bool   `json:"open"`
+	Tag  string `json:"tag,omitempty"`
 }
 
 type snapshotEntry struct {

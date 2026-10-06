@@ -39,6 +39,7 @@ type stateJSON struct {
 type archivedJSON struct {
 	ID   string `json:"id"`
 	Open bool   `json:"open"`
+	Tag  string `json:"tag,omitempty"`
 }
 
 const customConfig = `version: 1

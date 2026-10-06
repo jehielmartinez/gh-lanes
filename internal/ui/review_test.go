@@ -201,7 +201,7 @@ func TestAFailedReviewSearchKeepsBothTabsMarkedStale(t *testing.T) {
 	screen := h.waitForText("stale")
 	assertContains(t, screen, "Couldn't refresh: review requests:", "HTTP 502", lockedReviewRef, openReviewRef, "Review requests 2")
 
-	h.press("tab")
+	h.press("shift+tab")
 	screen = h.waitForText("Untagged 3")
 	assertContains(t, screen, "stale", "octo-org/sample-repo#7")
 }

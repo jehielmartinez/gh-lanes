@@ -349,7 +349,7 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 
 | Key | Where | Action |
 |---|---|---|
-| `tab` / `shift+tab` | global | switch Board ↔ Review requests |
+| `tab` / `shift+tab` | global | switch Board → Review requests → Archived |
 | `h` `l` / `←` `→` | board | focus previous/next lane |
 | `j` `k` / `↓` `↑` | board, lists | select card |
 | `H` `L` / `<` `>` | board | move card one lane left/right |
@@ -399,7 +399,7 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
   change the lane).
 - Manual card ordering inside a lane.
 - Drag-and-drop.
-- Custom search queries or extra tabs.
+- Custom search queries or extra tabs beyond Board, Review requests and Archived.
 - Writing comments, approving PRs or requesting reviewers.
 - Syncing tags across machines.
 - Re-running failed checks (cheap v2 candidate).

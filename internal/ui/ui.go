@@ -124,11 +124,15 @@ type Model struct {
 	// tab is the view in the tab bar that has the screen.
 	tab tab
 	// reviews are the open pull requests whose review is requested of the
-	// login, most recently updated first. They are kept apart from prs so
-	// they never join a lane.
-	reviews      []domain.PullRequest
-	reviewCursor int
-	reviewOffset int
+	// login. They are kept apart from prs so they never join a lane.
+	reviews cardList
+	// archive is the archived pull requests, fetched while the archived tab
+	// is in view.
+	archive         cardList
+	archiveSeq      int
+	archiveFetching bool
+	archiveLoaded   bool
+	archiveErr      error
 
 	lanes      []board.Lane
 	focus      int
@@ -406,15 +410,15 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		switch {
 		case key.Matches(msg, m.keys.NextTab):
-			return m.switchTab(1), nil
+			return m.switchTab(1)
 		case key.Matches(msg, m.keys.PrevTab):
-			return m.switchTab(-1), nil
+			return m.switchTab(-1)
 		case key.Matches(msg, m.keys.Help):
 			m.help.ShowAll = !m.help.ShowAll
 			m.keys = m.keys.withFullHelp(m.help.ShowAll)
 			return m, nil
-		case m.tab == tabReview:
-			return m.reviewKey(msg)
+		case m.tab != tabBoard:
+			return m.listKey(msg)
 		}
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
@@ -431,8 +435,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		switch {
 		case m.dialogOpen():
-		case m.tab == tabReview:
-			return m.reviewWheeled(msg), nil
+		case m.tab != tabBoard:
+			return m.listWheeled(msg), nil
 		default:
 			return m.wheeled(msg), nil
 		}
@@ -463,6 +467,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.refreshed(msg)
 	case detailMsg:
 		return m.detailFetched(msg), nil
+	case archivedMsg:
+		return m.archivedFetched(msg), nil
 	case linksMsg:
 		return m.linksFetched(msg), nil
 	case openMsg:
@@ -489,6 +495,9 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.assignments = msg.state.Assignments
 			m.archived = msg.state.Archived
 			m.snapshots = msg.state.Snapshots
+		}
+		if m.tab == tabArchived {
+			return m.rebuild().fetchArchived()
 		}
 		return m.rebuild(), nil
 	case moveMsg:
@@ -574,14 +583,19 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 	m.loaded = true
 	m.updatedAt = msg.at
 	m.prs = board.Retain(msg.open, msg.tracked, board.Tagged(m.assignments, m.tags))
-	m = m.withReviews(msg.reviews)
+	m.reviews = m.reviews.withPRs(msg.reviews)
 	m.rateLimit = msg.rateLimit
+	var archive tea.Cmd
+	if m.tab == tabArchived {
+		m, archive = m.fetchArchived()
+	}
 	archived, changed := board.Reconcile(m.archived, msg.open)
 	if !changed || !m.storeReady {
-		return m.rebuild(), nil
+		return m.rebuild(), archive
 	}
 	m.archived = archived
-	return m.rebuild().saveState()
+	m, save := m.rebuild().saveState()
+	return m, tea.Batch(archive, save)
 }
 
 // quit waits for in-flight writes so the last change isn't lost; asking a
@@ -693,6 +707,10 @@ func (m Model) archiveSelected() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.assignments, m.archived = board.Archive(m.assignments, m.archived, pr)
+	if m.archiveLoaded {
+		others := slices.DeleteFunc(slices.Clone(m.archive.prs), func(p domain.PullRequest) bool { return p.ID == pr.ID })
+		m.archive = m.archive.withPRs(append(others, pr))
+	}
 	return m.rebuild().saveState()
 }
 
@@ -739,10 +757,10 @@ func (m Model) rebuild() Model {
 // to the tab in view.
 func (m Model) click(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	if t, ok := m.tabAt(msg.X, msg.Y); ok && msg.Button == tea.MouseLeft {
-		return m.switchTab(int(t - m.tab)), nil
+		return m.switchTab(int(t - m.tab))
 	}
-	if m.tab == tabReview {
-		return m.clickReview(msg)
+	if m.tab != tabBoard {
+		return m.clickList(msg)
 	}
 	return m.clickBoard(msg)
 }

@@ -20,6 +20,7 @@ type keyMap struct {
 	Tags      key.Binding
 	Open      key.Binding
 	Archive   key.Binding
+	Unarchive key.Binding
 	Links     key.Binding
 	Browser   key.Binding
 	// UpdateBranch, RebaseBranch, Draft and Merge act on the selected card,
@@ -66,6 +67,7 @@ func newKeyMap() keyMap {
 		Tags:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tags")),
 		Open:         key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Archive:      key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "archive")),
+		Unarchive:    key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "unarchive")),
 		Links:        key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "links")),
 		Browser:      key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "open in browser")),
 		UpdateBranch: key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "update branch")),

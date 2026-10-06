@@ -70,7 +70,7 @@ func (m Model) boardIndex(id string) int {
 // pull request with a fresher one, keeping each selection on the card it was
 // on.
 func (m Model) withFresherCopy(pr domain.PullRequest) Model {
-	m = m.withReviews(replaced(m.reviews, pr))
+	m = m.withListCopies(pr)
 	if m.boardIndex(pr.ID) < 0 {
 		return m
 	}

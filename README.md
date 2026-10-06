@@ -6,7 +6,7 @@ A terminal kanban board for the open pull requests you authored.
 define yourself: In Progress, Review, Testing, Demo, Done, or your own. Checks, reviews,
 mergeability and draft state refresh on their own. You can update a branch, merge, or switch
 between draft and ready without leaving the terminal. A second tab lists the PRs where your review
-is requested.
+is requested, and a third lists the PRs you archived off the board.
 
 Your tags stay on your machine. `lanes` never writes labels, projects or comments to GitHub to
 represent them.
@@ -76,13 +76,14 @@ always current.
 
 | Key | Where | Action |
 |---|---|---|
-| `tab` / `shift+tab` | everywhere | switch between Board and Review requests |
+| `tab` / `shift+tab` | everywhere | switch between Board, Review requests and Archived |
 | `h` `l` / `←` `→` | board | focus the previous or next lane |
 | `j` `k` / `↓` `↑` | board, lists | select a card |
 | `H` `L` / `<` `>` | board | move the card one lane left or right |
 | `m` | board | move the card to any lane |
 | `enter` | board, lists | open the PR's detail view |
 | `x` | board | archive the card |
+| `x` | archived | unarchive: put the card back in the lane it was archived from |
 | `t` | everywhere | manage tags |
 | `r` | everywhere | refresh now |
 | `o` | board, detail | pick a link to open |

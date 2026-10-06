@@ -195,7 +195,7 @@ func TestArchiveFromATagLaneRemovesTheAssignment(t *testing.T) {
 		h.press("l")
 	}
 	h.press("x")
-	h.waitForArchived([]archivedJSON{{ID: closedPR, Open: false}})
+	h.waitForArchived([]archivedJSON{{ID: closedPR, Open: false, Tag: "done"}})
 	h.waitForAssignments(map[string]string{olderPR: "review"})
 	h.waitForText("Done 0")
 

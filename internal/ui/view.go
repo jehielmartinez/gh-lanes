@@ -20,7 +20,7 @@ const cardPadding = 4
 
 const statusSeparator = " · "
 
-// View draws the tab bar, the board or the review requests, the status bar
+// View draws the tab bar, the board or one of the card lists, the status bar
 // and the help footer, with the detail modal, the tag manager or any open
 // picker over them.
 func (m Model) View() tea.View {
@@ -31,9 +31,18 @@ func (m Model) View() tea.View {
 	if m.width > 0 {
 		body = body.MaxWidth(m.width)
 	}
-	content := m.boardView()
-	if m.tab == tabReview {
-		content = m.reviewView()
+	var content string
+	switch m.tab {
+	case tabReview:
+		note := ""
+		if m.loaded && len(m.reviews.prs) == 0 {
+			note = "No review requests."
+		}
+		content = m.listView(m.reviews, note)
+	case tabArchived:
+		content = m.archivedView()
+	default:
+		content = m.boardView()
 	}
 	screen := lipgloss.JoinVertical(lipgloss.Left, m.tabsView(), body.Render(content), m.footerView())
 	if m.detail != nil {
@@ -65,8 +74,8 @@ func (m Model) footerView() string {
 	switch {
 	case m.detail != nil:
 		keys = modalHelp{keys: actionKeys}
-	case m.tab == tabReview:
-		keys = reviewHelp{keys: actionKeys}
+	case m.tab != tabBoard:
+		keys = listHelp{keys: actionKeys, archived: m.tab == tabArchived}
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, m.statusView(), m.help.View(keys))
 }

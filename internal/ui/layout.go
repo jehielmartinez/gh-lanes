@@ -67,7 +67,8 @@ func (m Model) scrolled() Model {
 		offsets[i] = window(m.offsets[i], m.cursors[i], size, len(lane.PullRequests))
 	}
 	m.offsets = offsets
-	m.reviewOffset = window(m.reviewOffset, m.reviewCursor, m.reviewCardsInView(), len(m.reviews))
+	m.reviews = m.reviews.scrolled(m.listCardsInView())
+	m.archive = m.archive.scrolled(m.listCardsInView())
 	return m
 }
 

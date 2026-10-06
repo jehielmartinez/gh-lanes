@@ -53,7 +53,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	app := ui.New(ui.Options{GitHub: client, ConfigDir: dir, Now: time.Now})
+	app := ui.New(ui.Options{GitHub: client, ConfigDir: dir, Now: time.Now, After: time.After})
 	if _, err := tea.NewProgram(app).Run(); err != nil {
 		fmt.Fprintf(stderr, "lanes: %v\n", err)
 		return 1

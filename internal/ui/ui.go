@@ -93,12 +93,18 @@ type Model struct {
 	saving     bool
 	saveQueued bool
 	saveErr    error
-	quitting   bool
+	// Config writes are serialised the same way; each one writes the tags as
+	// they stand when it starts.
+	savingConfig bool
+	configQueued bool
+	tagSaveErr   error
+	quitting     bool
 
-	lanes   []board.Lane
-	focus   int
-	cursors []int
-	picker  *picker
+	lanes      []board.Lane
+	focus      int
+	cursors    []int
+	picker     *picker
+	tagManager *tagManager
 
 	// firstLane is the leftmost lane in view, and offsets the first card in
 	// view in each lane.
@@ -160,6 +166,14 @@ type storeLoadedMsg struct {
 }
 
 type stateSavedMsg struct{ err error }
+
+// configSavedMsg is the result of writing the tags: the config as read back
+// after the write, or why the write or the read failed.
+type configSavedMsg struct {
+	config  store.Config
+	err     error
+	loadErr error
+}
 
 // moveMsg asks for a pull request to be put in the lane of a tag; an empty
 // tag ID is Untagged.
@@ -232,6 +246,22 @@ func (m Model) saveState() (Model, tea.Cmd) {
 	return m, func() tea.Msg { return stateSavedMsg{err: store.SaveState(dir, state)} }
 }
 
+func (m Model) saveConfig() (Model, tea.Cmd) {
+	if m.savingConfig {
+		m.configQueued = true
+		return m, nil
+	}
+	m.savingConfig = true
+	dir, tags := m.opts.ConfigDir, m.tags
+	return m, func() tea.Msg {
+		if err := store.SaveTags(dir, tags); err != nil {
+			return configSavedMsg{err: err}
+		}
+		cfg, err := store.LoadConfig(dir)
+		return configSavedMsg{config: cfg, loadErr: err}
+	}
+}
+
 // Init reads the local files, then starts the first board load and the
 // clock. The config comes first so no tick can be measured against the
 // default interval once the file has set another.
@@ -258,7 +288,14 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.BackgroundColorMsg:
 		m.theme = newTheme(msg.IsDark())
 		m.help.Styles = help.DefaultStyles(msg.IsDark())
+	case tea.PasteMsg:
+		if m.tagManager != nil {
+			return m.tagManagerUpdate(msg)
+		}
 	case tea.KeyPressMsg:
+		if m.tagManager != nil && m.tagManager.typing() && !key.Matches(msg, m.keys.Interrupt) {
+			return m.tagManagerUpdate(msg)
+		}
 		if key.Matches(msg, m.keys.Quit) {
 			return m.quit()
 		}
@@ -266,6 +303,12 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.picker, cmd = m.picker.update(msg)
 			return m, cmd
+		}
+		if m.tagManager != nil {
+			return m.tagManagerUpdate(msg)
+		}
+		if key.Matches(msg, m.keys.Tags) {
+			return m.openTagManager(), nil
 		}
 		if key.Matches(msg, m.keys.Refresh) {
 			m, board := m.refresh()
@@ -277,14 +320,14 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
-		if m.detail == nil && m.picker == nil {
+		if m.detail == nil && m.picker == nil && m.tagManager == nil {
 			return m.clickBoard(msg)
 		}
 	case tea.MouseWheelMsg:
 		if m.detail != nil {
 			return m.detailScroll(msg), nil
 		}
-		if m.picker == nil {
+		if m.picker == nil && m.tagManager == nil {
 			return m.wheeled(msg), nil
 		}
 	case tickMsg:
@@ -338,11 +381,65 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.saveQueued = false
 			return m.saveState()
 		}
-		if m.quitting {
+		if m.quitting && !m.savingConfig {
+			return m, tea.Quit
+		}
+	case configSavedMsg:
+		m.savingConfig = false
+		if m.configQueued {
+			m.configQueued = false
+			return m.saveConfig()
+		}
+		m = m.configSaved(msg)
+		if m.quitting && !m.saving {
 			return m, tea.Quit
 		}
 	}
 	return m, nil
+}
+
+// configSaved takes up the config as it was read back after a write, which
+// also picks up any setting edited by hand since the app started.
+func (m Model) configSaved(msg configSavedMsg) Model {
+	m.tagSaveErr = msg.err
+	if msg.err != nil {
+		return m
+	}
+	var intervalErr *store.RefreshIntervalError
+	if msg.loadErr != nil && !errors.As(msg.loadErr, &intervalErr) {
+		m.tagSaveErr = msg.loadErr
+		return m
+	}
+	m.configErr = msg.loadErr
+	m.tags = msg.config.Tags
+	m.refreshInterval = msg.config.RefreshInterval
+	return m.rebuild()
+}
+
+// openTagManager opens the tag manager on the focused lane's tag. It stays
+// shut while the config couldn't be read, since saving would overwrite it.
+func (m Model) openTagManager() Model {
+	if m.storeReady {
+		m.tagManager = newTagManager(m.focus)
+	}
+	return m
+}
+
+func (m Model) tagManagerUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var edit *tagEdit
+	m.tagManager, edit = m.tagManager.update(msg, m.tags, m.assignments)
+	if edit == nil {
+		return m, nil
+	}
+	m.tags = edit.tags
+	var saveState tea.Cmd
+	if edit.assignments != nil {
+		m.assignments = edit.assignments
+		m, saveState = m.saveState()
+	}
+	m = m.rebuild()
+	m, saveConfig := m.saveConfig()
+	return m, tea.Batch(saveState, saveConfig)
 }
 
 // refreshed takes in a finished refresh. A failed one keeps the board it had;
@@ -367,10 +464,10 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 	return m.rebuild().saveState()
 }
 
-// quit waits for an in-flight state write so the last move isn't lost; asking
-// a second time quits regardless.
+// quit waits for in-flight writes so the last change isn't lost; asking a
+// second time quits regardless.
 func (m Model) quit() (Model, tea.Cmd) {
-	if m.saving && !m.quitting {
+	if (m.saving || m.savingConfig) && !m.quitting {
 		m.quitting = true
 		return m, nil
 	}
@@ -479,16 +576,30 @@ func (m Model) withCursor(lane, index int) Model {
 	return m
 }
 
-// rebuild reassembles the lanes and keeps the focus and every lane's cursor
-// inside them.
+// rebuild reassembles the lanes. The focus and each lane's cursor and scroll
+// offset stay with their tag when tags are reordered, and the cursors are kept
+// inside the lanes.
 func (m Model) rebuild() Model {
+	cursorOf, offsetOf := map[string]int{}, map[string]int{}
+	for i, lane := range m.lanes {
+		if i < len(m.cursors) {
+			cursorOf[lane.Tag.ID] = m.cursors[i]
+			offsetOf[lane.Tag.ID] = m.offsets[i]
+		}
+	}
+	focused, hadFocus := "", m.focus < len(m.lanes)
+	if hadFocus {
+		focused = m.lanes[m.focus].Tag.ID
+	}
+
 	m.lanes = board.Assemble(m.prs, m.tags, m.assignments, m.archived)
 	cursors := make([]int, len(m.lanes))
 	offsets := make([]int, len(m.lanes))
 	for i, lane := range m.lanes {
-		if i < len(m.cursors) {
-			cursors[i] = max(0, min(m.cursors[i], len(lane.PullRequests)-1))
-			offsets[i] = m.offsets[i]
+		cursors[i] = max(0, min(cursorOf[lane.Tag.ID], len(lane.PullRequests)-1))
+		offsets[i] = offsetOf[lane.Tag.ID]
+		if hadFocus && lane.Tag.ID == focused {
+			m.focus = i
 		}
 	}
 	m.cursors, m.offsets = cursors, offsets

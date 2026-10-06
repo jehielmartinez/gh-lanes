@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/help"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -15,6 +16,9 @@ import (
 
 const (
 	laneWidth = 36
+	// laneGap is the margin to the right of each lane.
+	laneGap         = 1
+	laneHeaderLines = 1
 	// cardPadding is the border plus one column of padding on each side.
 	cardPadding = 4
 	footerLines = 2
@@ -22,15 +26,55 @@ const (
 
 const statusSeparator = " · "
 
-// View draws the board, the status bar and the help footer.
+// View draws the board, the status bar and the help footer, with the detail
+// modal over them when it is open.
 func (m Model) View() tea.View {
 	body := m.boardView()
 	if m.height > footerLines {
 		body = lipgloss.NewStyle().Height(m.height - footerLines).MaxHeight(m.height - footerLines).Render(body)
 	}
-	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, body, m.statusView(), m.help.View(m.keys)))
+	var keys help.KeyMap = m.keys
+	if m.detail != nil {
+		keys = modalHelp{keys: m.keys}
+	}
+	screen := lipgloss.JoinVertical(lipgloss.Left, body, m.statusView(), m.help.View(keys))
+	if m.detail != nil {
+		screen = m.overlay(screen, m.detailView())
+	}
+	v := tea.NewView(screen)
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
+}
+
+// overlay draws box centred over screen.
+func (m Model) overlay(screen, box string) string {
+	width, height := max(m.width, lipgloss.Width(screen)), max(m.height, lipgloss.Height(screen))
+	x := max((width-lipgloss.Width(box))/2, 0)
+	y := max((height-lipgloss.Height(box))/2, 0)
+	layers := lipgloss.NewCompositor(lipgloss.NewLayer(screen), lipgloss.NewLayer(box).X(x).Y(y).Z(1))
+	return lipgloss.NewCanvas(width, height).Compose(layers).Render()
+}
+
+// cardAt finds the card drawn at a screen cell, measuring the cards as
+// boardView lays them out.
+func (m Model) cardAt(x, y int) (domain.PullRequest, bool) {
+	if m.height > footerLines && y >= m.height-footerLines {
+		return domain.PullRequest{}, false
+	}
+	lane := x / (laneWidth + laneGap)
+	if x < 0 || lane >= len(m.lanes) || x%(laneWidth+laneGap) >= laneWidth {
+		return domain.PullRequest{}, false
+	}
+	top := laneHeaderLines
+	for _, pr := range m.lanes[lane].PullRequests {
+		bottom := top + lipgloss.Height(m.cardView(pr))
+		if y >= top && y < bottom {
+			return pr, true
+		}
+		top = bottom
+	}
+	return domain.PullRequest{}, false
 }
 
 func (m Model) boardView() string {
@@ -51,7 +95,7 @@ func (m Model) laneView(lane board.Lane) string {
 	for _, pr := range lane.PullRequests {
 		rows = append(rows, m.cardView(pr))
 	}
-	return lipgloss.NewStyle().Width(laneWidth).MarginRight(1).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+	return lipgloss.NewStyle().Width(laneWidth).MarginRight(laneGap).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
 
 func (m Model) cardView(pr domain.PullRequest) string {

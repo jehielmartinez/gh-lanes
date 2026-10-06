@@ -88,11 +88,16 @@ const (
 // MergeStateStatus is GitHub's mergeStateStatus enum, kept as reported.
 type MergeStateStatus string
 
-// The merge state statuses the board reads.
+// The merge state statuses GitHub reports.
 const (
-	MergeStateBehind  MergeStateStatus = "BEHIND"
-	MergeStateDirty   MergeStateStatus = "DIRTY"
-	MergeStateUnknown MergeStateStatus = "UNKNOWN"
+	MergeStateBehind   MergeStateStatus = "BEHIND"
+	MergeStateBlocked  MergeStateStatus = "BLOCKED"
+	MergeStateClean    MergeStateStatus = "CLEAN"
+	MergeStateDirty    MergeStateStatus = "DIRTY"
+	MergeStateDraft    MergeStateStatus = "DRAFT"
+	MergeStateHasHooks MergeStateStatus = "HAS_HOOKS"
+	MergeStateUnknown  MergeStateStatus = "UNKNOWN"
+	MergeStateUnstable MergeStateStatus = "UNSTABLE"
 )
 
 // ReviewDecision is the review outcome required by the base branch's rules.
@@ -140,4 +145,40 @@ func (pr PullRequest) MergeStatus() MergeStatus {
 		return MergeStatusBehind
 	}
 	return MergeStatusClear
+}
+
+// MergeSentence explains in plain words whether the pull request can merge
+// into its base branch, and if not, why.
+func (pr PullRequest) MergeSentence() string {
+	base := pr.BaseRef
+	switch pr.State {
+	case StateMerged:
+		return "Merged into " + base + "."
+	case StateClosed:
+		return "Closed without merging into " + base + "."
+	}
+	switch pr.MergeStatus() {
+	case MergeStatusChecking:
+		return "Checking whether this can merge into " + base + "…"
+	case MergeStatusConflict:
+		return "Conflicts with " + base + ". Resolve them before merging."
+	case MergeStatusBehind:
+		if pr.ViewerCanUpdate {
+			return "Behind " + base + ". Update branch available."
+		}
+		return "Behind " + base + ". The branch needs updating before it can merge."
+	}
+	switch pr.MergeStateStatus {
+	case MergeStateBlocked:
+		return "Blocked from merging into " + base + " until required reviews or checks pass."
+	case MergeStateDraft:
+		return "Draft. Mark it ready for review before merging into " + base + "."
+	case MergeStateUnstable:
+		return "Can merge into " + base + ", though some checks haven't passed."
+	case MergeStateHasHooks:
+		return "Ready to merge into " + base + ". Its pre-receive hooks will run."
+	case MergeStateClean:
+		return "Ready to merge into " + base + "."
+	}
+	return "No conflicts with " + base + "."
 }

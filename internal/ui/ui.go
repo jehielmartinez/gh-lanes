@@ -20,6 +20,10 @@ const boardSearch = "is:pr is:open author:@me archived:false"
 
 const fetchTimeout = 30 * time.Second
 
+// doubleClick is the longest gap between two clicks on a card that still
+// counts as a double click.
+const doubleClick = 500 * time.Millisecond
+
 // clockTick is how often the clock is sampled, which is what keeps
 // "updated Ns ago" and card ages current and fires refreshes when due.
 const clockTick = time.Second
@@ -27,6 +31,7 @@ const clockTick = time.Second
 // GitHub is what the UI needs from the GitHub layer.
 type GitHub interface {
 	SearchPullRequests(ctx context.Context, query string) ([]domain.PullRequest, domain.RateLimit, error)
+	PullRequest(ctx context.Context, id string) (domain.PullRequest, domain.RateLimit, error)
 }
 
 // Options are the boundaries the root model is given rather than reaching for
@@ -68,6 +73,17 @@ type Model struct {
 	// err is the last refresh's error. With loaded set, the board on screen
 	// is stale.
 	err error
+
+	// detail is the open detail modal, nil while the board has the keys.
+	detail    *detail
+	detailSeq int
+	lastClick click
+}
+
+// click is a left click that landed on a card.
+type click struct {
+	prID string
+	at   time.Time
 }
 
 // New returns the root model, ready to load the board when started.
@@ -148,6 +164,11 @@ func (m Model) Init() tea.Cmd {
 
 // Update routes messages to the state they change.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	return next.syncDetail(), cmd
+}
+
+func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -160,7 +181,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
 		case key.Matches(msg, m.keys.Refresh):
-			return m.refresh()
+			m, board := m.refresh()
+			m, detail := m.fetchDetail()
+			return m, tea.Batch(board, detail)
+		case m.detail != nil:
+			return m.detailKey(msg)
+		case key.Matches(msg, m.keys.Open):
+			if pr, ok := m.selected(); ok {
+				return m.openDetail(pr)
+			}
+		}
+	case tea.MouseClickMsg:
+		if m.detail == nil && msg.Button == tea.MouseLeft {
+			return m.clickBoard(msg.X, msg.Y)
+		}
+	case tea.MouseWheelMsg:
+		if m.detail != nil {
+			return m.detailScroll(msg), nil
 		}
 	case configMsg:
 		m.refreshInterval = msg.cfg.RefreshInterval
@@ -168,13 +205,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		m.now = msg.now
 		next := m.tick()
+		m, detail := m.detailDue()
 		if m.now.Sub(m.lastRefresh) < m.refreshInterval {
-			return m, next
+			return m, tea.Batch(next, detail)
 		}
-		m, cmd := m.refresh()
-		return m, tea.Batch(next, cmd)
+		m, board := m.refresh()
+		return m, tea.Batch(next, detail, board)
 	case spinner.TickMsg:
-		if !m.refreshing {
+		if !m.refreshing && (m.detail == nil || !m.detail.fetching) {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -190,6 +228,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lanes = board.Assemble(msg.prs)
 			m.rateLimit = msg.rateLimit
 		}
+	case detailMsg:
+		return m.detailFetched(msg), nil
 	}
+	return m, nil
+}
+
+// selected is the card enter opens. Until lanes can be navigated it is the
+// first card of the first lane.
+func (m Model) selected() (domain.PullRequest, bool) {
+	for _, lane := range m.lanes {
+		if len(lane.PullRequests) > 0 {
+			return lane.PullRequests[0], true
+		}
+	}
+	return domain.PullRequest{}, false
+}
+
+// clickBoard opens the card under a click that follows another on the same
+// card quickly enough to make a double click.
+func (m Model) clickBoard(x, y int) (Model, tea.Cmd) {
+	pr, ok := m.cardAt(x, y)
+	if !ok {
+		m.lastClick = click{}
+		return m, nil
+	}
+	now := m.opts.Now()
+	if m.lastClick.prID == pr.ID && now.Sub(m.lastClick.at) <= doubleClick {
+		m.lastClick = click{}
+		return m.openDetail(pr)
+	}
+	m.lastClick = click{prID: pr.ID, at: now}
 	return m, nil
 }

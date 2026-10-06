@@ -111,9 +111,27 @@ func (h *harness) press(key string) {
 	switch key {
 	case "ctrl+c":
 		h.tm.Send(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	case "enter":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEnter})
+	case "esc":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEscape})
+	case "end":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEnd})
 	default:
 		h.tm.Type(key)
 	}
+}
+
+// click sends a left click at a screen cell.
+func (h *harness) click(x, y int) {
+	h.t.Helper()
+	h.tm.Send(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+}
+
+// resize tells the app the terminal changed size.
+func (h *harness) resize(width, height int) {
+	h.t.Helper()
+	h.tm.Send(tea.WindowSizeMsg{Width: width, Height: height})
 }
 
 // waitForScreen waits until the rendered screen, with styling removed,
@@ -136,6 +154,18 @@ func (h *harness) waitForScreen(desc string, cond func(screen string) bool) stri
 func (h *harness) waitForText(text string) string {
 	h.t.Helper()
 	return h.waitForScreen(text, func(s string) bool { return strings.Contains(s, text) })
+}
+
+// waitFor polls cond until it holds, failing the test with desc on timeout.
+func (h *harness) waitFor(desc string, cond func() bool) {
+	h.t.Helper()
+	deadline := time.Now().Add(waitTimeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			h.t.Fatalf("timed out waiting for %s; screen:\n%s", desc, h.screen.plain())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 func (h *harness) waitFinished() {

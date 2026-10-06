@@ -17,6 +17,7 @@ type theme struct {
 	success  color.Color
 	failure  color.Color
 	pending  color.Color
+	merged   color.Color
 }
 
 func newTheme(dark bool) theme {
@@ -30,5 +31,6 @@ func newTheme(dark bool) theme {
 		success:  pick(lipgloss.Color("#15803D"), lipgloss.Color("#4ADE80")),
 		failure:  pick(lipgloss.Color("#B91C1C"), lipgloss.Color("#F87171")),
 		pending:  pick(lipgloss.Color("#B45309"), lipgloss.Color("#FBBF24")),
+		merged:   pick(lipgloss.Color("#7E22CE"), lipgloss.Color("#C084FC")),
 	}
 }

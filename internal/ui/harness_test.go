@@ -14,6 +14,7 @@ import (
 
 	"github.com/jehielmartinez/gh-lanes/internal/github"
 	"github.com/jehielmartinez/gh-lanes/internal/github/githubtest"
+	"github.com/jehielmartinez/gh-lanes/internal/store"
 	"github.com/jehielmartinez/gh-lanes/internal/ui"
 )
 
@@ -73,7 +74,7 @@ func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOp
 	}
 	configDir := t.TempDir()
 	if cfg.config != "" {
-		if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(cfg.config), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(configDir, store.ConfigFile), []byte(cfg.config), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -7,11 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
+
 	"github.com/jehielmartinez/gh-lanes/internal/github/githubtest"
 )
 
 // spinnerFrames are the frames of the status bar's refresh spinner.
-const spinnerFrames = "⣾⣽⣻⢿⡿⣟⣯⣷"
+var spinnerFrames = strings.ReplaceAll(strings.Join(spinner.Dot.Frames, ""), " ", "")
 
 func searches(h *harness) int {
 	n := 0

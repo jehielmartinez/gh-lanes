@@ -161,6 +161,7 @@ func TestClickingACardSelectsIt(t *testing.T) {
 	h.press("L")
 	h.waitForAssignments(map[string]string{olderPR: "in-progress"})
 
+	h.waitForText("In Progress 1")
 	h.clickText("#1234")
 	h.press("L")
 	h.waitForAssignments(map[string]string{olderPR: "in-progress", oldestPR: "in-progress"})

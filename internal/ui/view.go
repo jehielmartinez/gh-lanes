@@ -13,29 +13,34 @@ import (
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 )
 
-const (
-	laneWidth = 36
-	// cardPadding is the border plus one column of padding on each side.
-	cardPadding = 4
-	footerLines = 2
-)
+// cardPadding is the border plus one column of padding on each side.
+const cardPadding = 4
 
 const statusSeparator = " · "
 
 // View draws the board, the status bar and the help footer, with any open
 // picker over them.
 func (m Model) View() tea.View {
-	body := m.boardView()
-	if m.height > footerLines {
-		body = lipgloss.NewStyle().Height(m.height - footerLines).MaxHeight(m.height - footerLines).Render(body)
+	body := lipgloss.NewStyle()
+	if height := m.boardHeight(); height > 0 {
+		body = body.Height(height).MaxHeight(height)
 	}
-	content := lipgloss.JoinVertical(lipgloss.Left, body, m.statusView(), m.help.View(m.keys))
+	if m.width > 0 {
+		body = body.MaxWidth(m.width)
+	}
+	content := lipgloss.JoinVertical(lipgloss.Left, body.Render(m.boardView()), m.footerView())
 	if m.picker != nil {
 		content = m.overlay(content, m.picker.view(m.theme, m.help))
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
+}
+
+// footerView is the status bar over the help footer.
+func (m Model) footerView() string {
+	return lipgloss.JoinVertical(lipgloss.Left, m.statusView(), m.help.View(m.keys))
 }
 
 // overlay draws fg centred on the terminal over bg.
@@ -54,25 +59,29 @@ func (m Model) overlay(bg, fg string) string {
 	return canvas.Render()
 }
 
+// boardView draws the lanes in view, each scrolled to its own offset.
 func (m Model) boardView() string {
-	cols := make([]string, 0, len(m.lanes))
-	for i, lane := range m.lanes {
-		cols = append(cols, m.laneView(lane, i == m.focus, m.cursors[i]))
+	last := min(len(m.lanes), m.firstLane+m.lanesInView())
+	cols := make([]string, 0, last-m.firstLane)
+	for i := m.firstLane; i < last; i++ {
+		cols = append(cols, m.laneView(m.lanes[i], i == m.focus, m.cursors[i], m.offsets[i]))
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, cols...)
 }
 
-func (m Model) laneView(lane board.Lane, focused bool, cursor int) string {
+func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) string {
+	width := m.laneWidth()
 	name := lipgloss.NewStyle().Bold(true).Underline(focused).Foreground(m.laneColor(lane)).Render(lane.Tag.Name)
 	header := name + " " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
 	rows := []string{header}
 	if lane.Untagged() && m.loaded && len(m.prs) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}
-	for i, pr := range lane.PullRequests {
-		rows = append(rows, m.cardView(pr, focused && i == cursor))
+	last := min(len(lane.PullRequests), offset+m.cardsInView())
+	for i := offset; i < last; i++ {
+		rows = append(rows, m.cardView(lane.PullRequests[i], width, focused && i == cursor))
 	}
-	return lipgloss.NewStyle().Width(laneWidth).MarginRight(1).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+	return lipgloss.NewStyle().Width(width).MarginRight(laneGap).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
 
 func (m Model) laneColor(lane board.Lane) color.Color {
@@ -82,8 +91,8 @@ func (m Model) laneColor(lane board.Lane) color.Color {
 	return lipgloss.Color(lane.Tag.Color)
 }
 
-func (m Model) cardView(pr domain.PullRequest, selected bool) string {
-	inner := laneWidth - cardPadding
+func (m Model) cardView(pr domain.PullRequest, width int, selected bool) string {
+	inner := width - cardPadding
 	number := fmt.Sprintf("#%d", pr.Number)
 	ref := truncate(pr.Repository.NameWithOwner, inner-lipgloss.Width(number)) + number
 	ref = lipgloss.NewStyle().Foreground(m.theme.muted).Render(ref)
@@ -99,7 +108,7 @@ func (m Model) cardView(pr domain.PullRequest, selected bool) string {
 		border, borderColor = lipgloss.ThickBorder(), m.theme.accent
 	}
 	return lipgloss.NewStyle().
-		Width(laneWidth).
+		Width(width).
 		Padding(0, 1).
 		Border(border).
 		BorderForeground(borderColor).

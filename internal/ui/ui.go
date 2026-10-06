@@ -90,6 +90,11 @@ type Model struct {
 	focus   int
 	cursors []int
 	picker  *picker
+
+	// firstLane is the leftmost lane in view, and offsets the first card in
+	// view in each lane.
+	firstLane int
+	offsets   []int
 }
 
 // New returns the root model, ready to load the board when started.
@@ -193,8 +198,14 @@ func (m Model) Init() tea.Cmd {
 	)
 }
 
-// Update routes messages to the state they change.
+// Update routes messages to the state they change, then scrolls whatever
+// that moved back into view.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	return next.scrolled(), cmd
+}
+
+func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -212,6 +223,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m.boardKey(msg)
+	case tea.MouseClickMsg:
+		if m.picker == nil {
+			return m.clicked(msg), nil
+		}
+	case tea.MouseWheelMsg:
+		if m.picker == nil {
+			return m.wheeled(msg), nil
+		}
 	case tickMsg:
 		m.now = msg.now
 		next := m.tick()
@@ -296,6 +315,9 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.openMovePicker(), nil
 	case key.Matches(msg, m.keys.Refresh):
 		return m.refresh()
+	case key.Matches(msg, m.keys.Help):
+		m.help.ShowAll = !m.help.ShowAll
+		m.keys = m.keys.withFullHelp(m.help.ShowAll)
 	}
 	return m, nil
 }
@@ -365,12 +387,14 @@ func (m Model) withCursor(lane, index int) Model {
 func (m Model) rebuild() Model {
 	m.lanes = board.Assemble(m.prs, m.tags, m.assignments)
 	cursors := make([]int, len(m.lanes))
+	offsets := make([]int, len(m.lanes))
 	for i, lane := range m.lanes {
 		if i < len(m.cursors) {
 			cursors[i] = max(0, min(m.cursors[i], len(lane.PullRequests)-1))
+			offsets[i] = m.offsets[i]
 		}
 	}
-	m.cursors = cursors
+	m.cursors, m.offsets = cursors, offsets
 	m.focus = max(0, min(m.focus, len(m.lanes)-1))
 	return m
 }

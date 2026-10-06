@@ -13,6 +13,7 @@ type keyMap struct {
 	MoveRight key.Binding
 	MoveTo    key.Binding
 	Refresh   key.Binding
+	Help      key.Binding
 	Quit      key.Binding
 }
 
@@ -26,16 +27,33 @@ func newKeyMap() keyMap {
 		MoveRight: key.NewBinding(key.WithKeys("L", ">"), key.WithHelp("L/>", "move right")),
 		MoveTo:    key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "move to…")),
 		Refresh:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
+		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:      key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	}
 }
 
-func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.MoveLeft, k.MoveRight, k.MoveTo, k.Refresh, k.Quit}
+// withFullHelp returns the keymap with the help binding describing what
+// pressing it will now do.
+func (k keyMap) withFullHelp(showAll bool) keyMap {
+	desc := "help"
+	if showAll {
+		desc = "close help"
+	}
+	k.Help.SetHelp("?", desc)
+	return k
 }
 
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.MoveTo, k.Help, k.Quit}
+}
+
+// FullHelp lists every binding on the board.
 func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{k.ShortHelp()}
+	return [][]key.Binding{
+		{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown},
+		{k.MoveLeft, k.MoveRight, k.MoveTo},
+		{k.Refresh, k.Help, k.Quit},
+	}
 }
 
 // pickerKeys are the bindings inside a picker.

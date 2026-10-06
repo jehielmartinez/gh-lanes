@@ -1,0 +1,60 @@
+{
+  "data": {
+    "nodes": [
+      {
+        "id": "PR_node_newer",
+        "number": 42,
+        "title": "Add retry with exponential backoff to the upload worker queue",
+        "url": "https://github.com/user-a/other-repo/pull/42",
+        "isDraft": false,
+        "state": "MERGED",
+        "createdAt": "2026-02-01T10:00:00Z",
+        "updatedAt": "2026-03-05T11:00:00Z",
+        "mergedAt": "2026-03-05T11:00:00Z",
+        "closedAt": "2026-03-05T11:00:00Z",
+        "author": {
+          "login": "user-a"
+        },
+        "baseRefName": "main",
+        "headRefName": "feature-42",
+        "mergeable": "UNKNOWN",
+        "mergeStateStatus": "UNKNOWN",
+        "reviewDecision": "APPROVED",
+        "viewerCanUpdate": true,
+        "autoMergeRequest": null,
+        "repository": {
+          "nameWithOwner": "user-a/other-repo",
+          "mergeCommitAllowed": true,
+          "squashMergeAllowed": true,
+          "rebaseMergeAllowed": false,
+          "autoMergeAllowed": false,
+          "deleteBranchOnMerge": true
+        },
+        "comments": {
+          "totalCount": 0
+        },
+        "reviews": {
+          "totalCount": 1
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "id": "C_node_42",
+                "statusCheckRollup": null
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-03-05T13:00:00Z"
+    }
+  }
+}

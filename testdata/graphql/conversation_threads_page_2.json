@@ -1,0 +1,39 @@
+{
+  "data": {
+    "node": {
+      "reviewThreads": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "id": "RT_node_3",
+            "path": "README.md",
+            "line": 8,
+            "originalLine": 8,
+            "isResolved": false,
+            "comments": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": [
+                {
+                  "author": null,
+                  "body": "Mention the new tag.",
+                  "createdAt": "2026-03-05T14:05:00Z"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4970,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

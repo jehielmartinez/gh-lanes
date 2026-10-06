@@ -1,0 +1,165 @@
+{
+  "data": {
+    "node": {
+      "id": "PR_node_behind",
+      "number": 13,
+      "title": "Bump the base image",
+      "url": "https://github.com/user-a/other-repo/pull/13",
+      "isDraft": false,
+      "state": "OPEN",
+      "createdAt": "2026-02-01T10:00:00Z",
+      "updatedAt": "2026-03-05T16:40:00Z",
+      "mergedAt": null,
+      "closedAt": null,
+      "author": {
+        "login": "user-a"
+      },
+      "baseRefName": "main",
+      "headRefName": "feature-13",
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "reviewDecision": "CHANGES_REQUESTED",
+      "viewerCanUpdate": true,
+      "autoMergeRequest": null,
+      "repository": {
+        "nameWithOwner": "user-a/other-repo",
+        "mergeCommitAllowed": true,
+        "squashMergeAllowed": true,
+        "rebaseMergeAllowed": false,
+        "autoMergeAllowed": true,
+        "deleteBranchOnMerge": true
+      },
+      "comments": {
+        "totalCount": 2
+      },
+      "reviews": {
+        "totalCount": 1
+      },
+      "latestReviews": {
+        "nodes": [
+          {
+            "author": {
+              "login": "user-b"
+            },
+            "state": "COMMENTED",
+            "submittedAt": "2026-03-02T10:00:00Z"
+          }
+        ]
+      },
+      "commits": {
+        "nodes": [
+          {
+            "commit": {
+              "id": "C_node_behind",
+              "statusCheckRollup": null
+            }
+          }
+        ]
+      },
+      "body": "<!-- Describe the change and link the issue it closes. -->\n## Summary\n\nMoves the base image to **alpine 3.21** and pins it by [digest](https://github.com/octo-org/sample-repo/issues/3).\n\n- Updates the `Dockerfile`\n- Drops the old cache step\n  - keeps the build arguments\n\n1. Build the image\n2. Push it to the registry\n\n```sh\ndocker build -t sample .\n```\n\nBuild notes live at https://github.com/octo-org/sample-repo/wiki/Build. \u001b]0;pwned\u0007\u001b[31mDanger\u001b[0m zone.",
+      "conversationComments": {
+        "pageInfo": {
+          "hasNextPage": true,
+          "endCursor": "Y29tbWVudHM6MQ=="
+        },
+        "nodes": [
+          {
+            "author": {
+              "login": "user-b"
+            },
+            "body": "Looks close. One question about the cache.",
+            "createdAt": "2026-03-02T15:00:00Z"
+          }
+        ]
+      },
+      "conversationReviews": {
+        "pageInfo": {
+          "hasNextPage": true,
+          "endCursor": "cmV2aWV3czoy"
+        },
+        "nodes": [
+          {
+            "author": {
+              "login": "user-b"
+            },
+            "state": "CHANGES_REQUESTED",
+            "body": "Please pin the digest.",
+            "submittedAt": "2026-03-03T15:00:00Z"
+          },
+          {
+            "author": {
+              "login": "user-c"
+            },
+            "state": "COMMENTED",
+            "body": "",
+            "submittedAt": "2026-03-03T15:03:00Z"
+          }
+        ]
+      },
+      "reviewThreads": {
+        "pageInfo": {
+          "hasNextPage": true,
+          "endCursor": "dGhyZWFkczoy"
+        },
+        "nodes": [
+          {
+            "id": "RT_node_1",
+            "path": "Dockerfile",
+            "line": 3,
+            "originalLine": 3,
+            "isResolved": false,
+            "comments": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": [
+                {
+                  "author": {
+                    "login": "user-b"
+                  },
+                  "body": "Pin this to a digest.",
+                  "createdAt": "2026-03-03T15:01:00Z"
+                },
+                {
+                  "author": {
+                    "login": "user-a"
+                  },
+                  "body": "Done in the next push.",
+                  "createdAt": "2026-03-04T16:00:00Z"
+                }
+              ]
+            }
+          },
+          {
+            "id": "RT_node_2",
+            "path": "scripts/build.sh",
+            "line": null,
+            "originalLine": 12,
+            "isResolved": true,
+            "comments": {
+              "pageInfo": {
+                "hasNextPage": true,
+                "endCursor": "dGhyZWFkLWNvbW1lbnRzOjE="
+              },
+              "nodes": [
+                {
+                  "author": {
+                    "login": "user-b"
+                  },
+                  "body": "Typo here: biuld.",
+                  "createdAt": "2026-03-03T15:02:00Z"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4980,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "data": {
+    "nodes": [
+      {
+        "id": "PR_node_pending",
+        "number": 32,
+        "title": "Speed up the importer",
+        "url": "https://github.com/octo-org/sample-repo/pull/32",
+        "isDraft": false,
+        "state": "OPEN",
+        "createdAt": "2026-02-01T10:00:00Z",
+        "updatedAt": "2026-03-05T15:00:00Z",
+        "mergedAt": null,
+        "closedAt": null,
+        "author": {
+          "login": "user-a"
+        },
+        "baseRefName": "main",
+        "headRefName": "fast-import",
+        "headRef": {
+          "id": "REF_node_pending"
+        },
+        "mergeable": "MERGEABLE",
+        "mergeStateStatus": "BLOCKED",
+        "reviewDecision": "APPROVED",
+        "viewerCanUpdate": true,
+        "viewerCanUpdateBranch": false,
+        "autoMergeRequest": {
+          "mergeMethod": "SQUASH",
+          "enabledAt": "2026-03-05T12:00:00Z",
+          "enabledBy": {
+            "login": "user-a"
+          }
+        },
+        "repository": {
+          "nameWithOwner": "octo-org/sample-repo",
+          "mergeCommitAllowed": false,
+          "squashMergeAllowed": true,
+          "rebaseMergeAllowed": true,
+          "autoMergeAllowed": true,
+          "deleteBranchOnMerge": false
+        },
+        "comments": {
+          "totalCount": 0
+        },
+        "reviews": {
+          "totalCount": 1
+        },
+        "latestReviews": {
+          "nodes": [
+            {
+              "author": {
+                "login": "user-b"
+              },
+              "state": "APPROVED",
+              "submittedAt": "2026-03-02T10:00:00Z"
+            }
+          ]
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "id": "C_PR_node_pending",
+                "statusCheckRollup": {
+                  "contexts": {
+                    "pageInfo": {
+                      "hasNextPage": false,
+                      "endCursor": "Y3Vyc29yOjE="
+                    },
+                    "nodes": [
+                      {
+                        "__typename": "CheckRun",
+                        "name": "test",
+                        "status": "IN_PROGRESS",
+                        "conclusion": null,
+                        "startedAt": "2026-03-05T11:50:00Z",
+                        "completedAt": null,
+                        "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1",
+                        "checkSuite": {
+                          "workflowRun": {
+                            "workflow": {
+                              "name": "CI"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

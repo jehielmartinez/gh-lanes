@@ -1,0 +1,61 @@
+{
+  "data": {
+    "nodes": [
+      {
+        "id": "PR_node_review_open",
+        "number": 31,
+        "title": "Add pagination to the export API",
+        "url": "https://github.com/octo-org/sample-repo/pull/31",
+        "isDraft": false,
+        "state": "OPEN",
+        "createdAt": "2026-02-01T10:00:00Z",
+        "updatedAt": "2026-03-05T17:00:00Z",
+        "mergedAt": null,
+        "closedAt": null,
+        "author": {
+          "login": "user-b"
+        },
+        "baseRefName": "main",
+        "headRefName": "export-pages",
+        "mergeable": "MERGEABLE",
+        "mergeStateStatus": "CLEAN",
+        "reviewDecision": "REVIEW_REQUIRED",
+        "viewerCanUpdate": true,
+        "autoMergeRequest": null,
+        "repository": {
+          "nameWithOwner": "octo-org/sample-repo",
+          "mergeCommitAllowed": true,
+          "squashMergeAllowed": true,
+          "rebaseMergeAllowed": false,
+          "autoMergeAllowed": true,
+          "deleteBranchOnMerge": true
+        },
+        "comments": {
+          "totalCount": 2
+        },
+        "reviews": {
+          "totalCount": 0
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "id": "C_PR_node_review_open",
+                "statusCheckRollup": null
+              }
+            }
+          ]
+        },
+        "viewerCanUpdateBranch": false
+      }
+    ],
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

@@ -34,7 +34,7 @@ The dev loop (areas, gates, stop rules, seams) is in [docs/agents/dev-loop.md](d
 - **More than one tag per PR**, or badges that don't change the lane. v2 candidate.
 - **Manual card ordering inside a lane.** Cards sort by most recently updated.
 - **Drag-and-drop.**
-- **Custom search queries or tabs** beyond Board and Review requests.
+- **Custom search queries or tabs** beyond Board, Review requests and Archived.
 - **Syncing tags across machines.**
 - **Any auth of its own:** token prompts, OAuth flows, token fields in config.
 - **Modifying workflow files** in the user's repos.

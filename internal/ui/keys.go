@@ -17,6 +17,7 @@ type keyMap struct {
 	MoveTo    key.Binding
 	Tags      key.Binding
 	Open      key.Binding
+	Archive   key.Binding
 	Refresh   key.Binding
 	Help      key.Binding
 	Quit      key.Binding
@@ -48,6 +49,7 @@ func newKeyMap() keyMap {
 		MoveTo:    key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "move to…")),
 		Tags:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tags")),
 		Open:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
+		Archive:   key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "archive")),
 		Refresh:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
 		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:      key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
@@ -83,7 +85,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
-		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags},
+		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Archive},
 		{k.Refresh, k.Help, k.Quit},
 	}
 }

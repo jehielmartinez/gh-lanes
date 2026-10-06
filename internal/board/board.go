@@ -26,8 +26,9 @@ func (l Lane) Untagged() bool { return l.Tag.ID == "" }
 // Assemble builds the board's lanes: Untagged first, then one lane per tag in
 // tag order, most recently updated first within each. assignments maps a pull
 // request node ID to a tag ID; a pull request whose tag no longer exists is
-// untagged, so every pull request is in exactly one lane.
-func Assemble(prs []domain.PullRequest, tags []domain.Tag, assignments map[string]string) []Lane {
+// untagged, so every pull request is in exactly one lane. Archived pull
+// requests are left off.
+func Assemble(prs []domain.PullRequest, tags []domain.Tag, assignments map[string]string, archived []domain.Archived) []Lane {
 	lanes := make([]Lane, 0, len(tags)+1)
 	lanes = append(lanes, Lane{Tag: domain.Tag{Name: UntaggedName}})
 	index := map[string]int{}
@@ -36,7 +37,11 @@ func Assemble(prs []domain.PullRequest, tags []domain.Tag, assignments map[strin
 		lanes = append(lanes, Lane{Tag: t})
 	}
 
-	sorted := slices.Clone(prs)
+	hidden := map[string]bool{}
+	for _, a := range archived {
+		hidden[a.ID] = true
+	}
+	sorted := slices.DeleteFunc(slices.Clone(prs), func(pr domain.PullRequest) bool { return hidden[pr.ID] })
 	slices.SortStableFunc(sorted, func(a, b domain.PullRequest) int {
 		return cmp.Compare(b.UpdatedAt.UnixNano(), a.UpdatedAt.UnixNano())
 	})

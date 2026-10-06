@@ -33,6 +33,7 @@ const clockTick = time.Second
 // GitHub is what the UI needs from the GitHub layer.
 type GitHub interface {
 	SearchPullRequests(ctx context.Context, query string) ([]domain.PullRequest, domain.RateLimit, error)
+	PullRequestsByID(ctx context.Context, ids []string) ([]domain.PullRequest, domain.RateLimit, error)
 	PullRequest(ctx context.Context, id string) (domain.PullRequest, domain.RateLimit, error)
 }
 
@@ -70,6 +71,8 @@ type Model struct {
 	// loaded is whether the board holds data from a successful refresh.
 	loaded    bool
 	updatedAt time.Time
+	// prs are the open pull requests and the tagged ones that have since
+	// merged or closed.
 	prs       []domain.PullRequest
 	rateLimit domain.RateLimit
 	// err is the last refresh's error. With loaded set, the board on screen
@@ -83,6 +86,7 @@ type Model struct {
 	storeErr    error
 	tags        []domain.Tag
 	assignments map[string]string
+	archived    []domain.Archived
 
 	// One state write is in flight at a time; a move made meanwhile queues
 	// another, so writes land in the order the moves were made.
@@ -134,11 +138,21 @@ func New(opts Options) Model {
 	return m.rebuild()
 }
 
-type pullRequestsMsg struct {
-	prs       []domain.PullRequest
+// searchedMsg is the open search's result, the first half of a refresh.
+type searchedMsg struct {
+	open      []domain.PullRequest
 	rateLimit domain.RateLimit
 	err       error
 	at        time.Time
+}
+
+// refreshedMsg is a finished refresh: the open pull requests, and the tagged
+// ones the search no longer returns, fetched by node ID.
+type refreshedMsg struct {
+	open, tracked []domain.PullRequest
+	rateLimit     domain.RateLimit
+	err           error
+	at            time.Time
 }
 
 type tickMsg struct {
@@ -171,7 +185,22 @@ func (m Model) fetchBoard() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 		defer cancel()
 		prs, limit, err := gh.SearchPullRequests(ctx, boardSearch)
-		return pullRequestsMsg{prs: prs, rateLimit: limit, err: err, at: now()}
+		return searchedMsg{open: prs, rateLimit: limit, err: err, at: now()}
+	}
+}
+
+// fetchTracked completes a refresh by fetching the tagged pull requests the
+// open search didn't return.
+func (m Model) fetchTracked(searched searchedMsg, ids []string) tea.Cmd {
+	gh, now := m.opts.GitHub, m.opts.Now
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+		defer cancel()
+		prs, limit, err := gh.PullRequestsByID(ctx, ids)
+		if limit == (domain.RateLimit{}) {
+			limit = searched.rateLimit
+		}
+		return refreshedMsg{open: searched.open, tracked: prs, rateLimit: limit, err: err, at: now()}
 	}
 }
 
@@ -213,7 +242,7 @@ func (m Model) saveState() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.saving = true
-	dir, state := m.opts.ConfigDir, store.State{Assignments: m.assignments}
+	dir, state := m.opts.ConfigDir, store.State{Assignments: m.assignments, Archived: m.archived}
 	return m, func() tea.Msg { return stateSavedMsg{err: store.SaveState(dir, state)} }
 }
 
@@ -317,17 +346,15 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
-	case pullRequestsMsg:
-		m.refreshing = false
-		m.now, m.lastRefresh = msg.at, msg.at
-		m.err = msg.err
+	case searchedMsg:
 		if msg.err == nil {
-			m.loaded = true
-			m.updatedAt = msg.at
-			m.prs = msg.prs
-			m.rateLimit = msg.rateLimit
+			if missing := board.Missing(msg.open, board.Tagged(m.assignments, m.tags)); len(missing) > 0 {
+				return m, m.fetchTracked(msg, missing)
+			}
 		}
-		return m.rebuild(), nil
+		return m.refreshed(refreshedMsg{open: msg.open, rateLimit: msg.rateLimit, err: msg.err, at: msg.at})
+	case refreshedMsg:
+		return m.refreshed(msg)
 	case detailMsg:
 		return m.detailFetched(msg), nil
 	case storeLoadedMsg:
@@ -342,6 +369,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.storeReady = true
 			m.tags = msg.config.Tags
 			m.assignments = msg.state.Assignments
+			m.archived = msg.state.Archived
 		}
 		return m.rebuild(), nil
 	case moveMsg:
@@ -414,6 +442,28 @@ func (m Model) tagManagerUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	return m, tea.Batch(saveState, saveConfig)
 }
 
+// refreshed takes in a finished refresh. A failed one keeps the board it had;
+// a successful one replaces it and brings the archived list up to date,
+// saving it when that changed.
+func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
+	m.refreshing = false
+	m.now, m.lastRefresh = msg.at, msg.at
+	m.err = msg.err
+	if msg.err != nil {
+		return m.rebuild(), nil
+	}
+	m.loaded = true
+	m.updatedAt = msg.at
+	m.prs = board.Retain(msg.open, msg.tracked, board.Tagged(m.assignments, m.tags))
+	m.rateLimit = msg.rateLimit
+	archived, changed := board.Reconcile(m.archived, msg.open)
+	if !changed || !m.storeReady {
+		return m.rebuild(), nil
+	}
+	m.archived = archived
+	return m.rebuild().saveState()
+}
+
 // quit waits for in-flight writes so the last change isn't lost; asking a
 // second time quits regardless.
 func (m Model) quit() (Model, tea.Cmd) {
@@ -440,6 +490,8 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.moveSelectedBy(1)
 	case key.Matches(msg, m.keys.MoveTo):
 		return m.openMovePicker(), nil
+	case key.Matches(msg, m.keys.Archive):
+		return m.archiveSelected()
 	case key.Matches(msg, m.keys.Open):
 		if pr, ok := m.selected(); ok {
 			return m.openDetail(pr)
@@ -505,6 +557,17 @@ func (m Model) move(prID, tagID string) (Model, tea.Cmd) {
 	return m.saveState()
 }
 
+// archiveSelected takes the selected card off the board until its pull
+// request is reopened, and saves that.
+func (m Model) archiveSelected() (Model, tea.Cmd) {
+	pr, ok := m.selected()
+	if !ok || !m.storeReady {
+		return m, nil
+	}
+	m.assignments, m.archived = board.Archive(m.assignments, m.archived, pr)
+	return m.rebuild().saveState()
+}
+
 // withCursor selects card index in lane, kept inside the lane.
 func (m Model) withCursor(lane, index int) Model {
 	cursors := slices.Clone(m.cursors)
@@ -529,7 +592,7 @@ func (m Model) rebuild() Model {
 		focused = m.lanes[m.focus].Tag.ID
 	}
 
-	m.lanes = board.Assemble(m.prs, m.tags, m.assignments)
+	m.lanes = board.Assemble(m.prs, m.tags, m.assignments, m.archived)
 	cursors := make([]int, len(m.lanes))
 	offsets := make([]int, len(m.lanes))
 	for i, lane := range m.lanes {

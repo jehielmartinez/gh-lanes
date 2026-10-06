@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/cli/go-gh/v2/pkg/auth"
@@ -18,9 +17,14 @@ import (
 // ErrNotLoggedIn means gh holds no token for the host lanes would talk to.
 var ErrNotLoggedIn = errors.New("not logged in")
 
+// ErrLoginRejected means GitHub refused the token gh holds, usually because it
+// expired or was revoked.
+var ErrLoginRejected = errors.New("login rejected")
+
 // Client runs lanes' GraphQL queries against one GitHub host.
 type Client struct {
-	gql *api.GraphQLClient
+	gql  *api.GraphQLClient
+	host string
 }
 
 // New returns a client for the host and token gh is configured with, honouring
@@ -42,13 +46,25 @@ func New(transport http.RoundTripper) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create GraphQL client for %s: %w", host, err)
 	}
-	return &Client{gql: gql}, nil
+	return &Client{gql: gql, host: host}, nil
+}
+
+// do runs one GraphQL operation, turning a rejected token into
+// ErrLoginRejected so the UI can say how to fix it.
+func (c *Client) do(ctx context.Context, query string, vars map[string]any, resp any) error {
+	err := c.gql.DoWithContext(ctx, query, vars, resp)
+	var httpErr *api.HTTPError
+	if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("%w by %s: run `gh auth login`", ErrLoginRejected, c.host)
+	}
+	return err
 }
 
 // GitHub search never returns more than 1,000 results, so this many pages
-// covers everything a search can produce.
+// covers everything a search can produce. Pages are kept small because each
+// pull request carries its checks and reviews.
 const (
-	searchPageSize = 50
+	searchPageSize = 25
 	maxSearchPages = 1000 / searchPageSize
 )
 
@@ -56,54 +72,49 @@ const searchPullRequestsQuery = `query SearchPullRequests($query: String!, $firs
   search(query: $query, type: ISSUE, first: $first, after: $after) {
     pageInfo { hasNextPage endCursor }
     nodes {
-      ... on PullRequest {
-        id
-        number
-        title
-        updatedAt
-        repository { nameWithOwner }
-      }
+      ... on PullRequest { ...PullRequestFields }
     }
   }
-}`
+  ...RateLimitFields
+}` + pullRequestFragment + checkContextFragment + rateLimitFragment
 
 type searchResponse struct {
 	Search struct {
-		PageInfo struct {
-			HasNextPage bool
-			EndCursor   string
-		}
-		Nodes []pullRequestNode
+		PageInfo pageInfo
+		Nodes    []pullRequestNode
 	}
-}
-
-type pullRequestNode struct {
-	ID         string
-	Number     int
-	Title      string
-	UpdatedAt  time.Time
-	Repository struct {
-		NameWithOwner string
-	}
+	rateLimitResponse
 }
 
 // SearchPullRequests returns every pull request the search string matches,
-// paging through the results.
-func (c *Client) SearchPullRequests(ctx context.Context, query string) ([]domain.PullRequest, error) {
+// paging through the results and through each one's checks, along with the
+// rate-limit budget left afterwards.
+func (c *Client) SearchPullRequests(ctx context.Context, query string) ([]domain.PullRequest, domain.RateLimit, error) {
 	var prs []domain.PullRequest
+	var limit domain.RateLimit
 	var after *string
 	for range maxSearchPages {
 		var resp searchResponse
 		vars := map[string]any{"query": query, "first": searchPageSize, "after": after}
-		if err := c.gql.DoWithContext(ctx, searchPullRequestsQuery, vars, &resp); err != nil {
-			return nil, fmt.Errorf("search pull requests: %w", err)
+		if err := c.do(ctx, searchPullRequestsQuery, vars, &resp); err != nil {
+			return nil, domain.RateLimit{}, fmt.Errorf("search pull requests: %w", err)
 		}
+		limit = resp.toDomain()
 		for _, n := range resp.Search.Nodes {
 			// Search nodes that aren't pull requests decode as empty objects.
 			if n.ID == "" {
 				continue
 			}
-			prs = append(prs, n.toDomain())
+			pr := n.toDomain()
+			if rollup := n.rollup(); rollup != nil && rollup.Contexts.PageInfo.HasNextPage {
+				rest, l, err := c.remainingChecks(ctx, n.headCommitID(), rollup.Contexts.PageInfo.EndCursor)
+				if err != nil {
+					return nil, domain.RateLimit{}, fmt.Errorf("checks for %s#%d: %w", pr.Repository.NameWithOwner, pr.Number, err)
+				}
+				pr.Checks = append(pr.Checks, rest...)
+				limit = l
+			}
+			prs = append(prs, pr)
 		}
 		page := resp.Search.PageInfo
 		if !page.HasNextPage || page.EndCursor == "" {
@@ -111,15 +122,48 @@ func (c *Client) SearchPullRequests(ctx context.Context, query string) ([]domain
 		}
 		after = &page.EndCursor
 	}
-	return prs, nil
+	return prs, limit, nil
 }
 
-func (n pullRequestNode) toDomain() domain.PullRequest {
-	return domain.PullRequest{
-		ID:         n.ID,
-		Number:     n.Number,
-		Title:      n.Title,
-		Repository: n.Repository.NameWithOwner,
-		UpdatedAt:  n.UpdatedAt,
+const checkContextsQuery = `query CheckContexts($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on Commit {
+      statusCheckRollup {
+        contexts(first: 100, after: $after) { ...CheckContextFields }
+      }
+    }
+  }
+  ...RateLimitFields
+}` + checkContextFragment + rateLimitFragment
+
+type checkContextsResponse struct {
+	Node struct {
+		StatusCheckRollup *statusCheckRollup
 	}
+	rateLimitResponse
+}
+
+// remainingChecks pages through a commit's checks after the first page, which
+// came with the search.
+func (c *Client) remainingChecks(ctx context.Context, commitID, after string) ([]domain.Check, domain.RateLimit, error) {
+	var checks []domain.Check
+	var limit domain.RateLimit
+	for after != "" {
+		var resp checkContextsResponse
+		vars := map[string]any{"id": commitID, "after": after}
+		if err := c.do(ctx, checkContextsQuery, vars, &resp); err != nil {
+			return nil, domain.RateLimit{}, err
+		}
+		limit = resp.toDomain()
+		rollup := resp.Node.StatusCheckRollup
+		if rollup == nil {
+			break
+		}
+		checks = append(checks, rollup.Contexts.toDomain()...)
+		after = ""
+		if rollup.Contexts.PageInfo.HasNextPage {
+			after = rollup.Contexts.PageInfo.EndCursor
+		}
+	}
+	return checks, limit, nil
 }

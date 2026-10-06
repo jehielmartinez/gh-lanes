@@ -1,0 +1,382 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjQ="
+      },
+      "nodes": [
+        {
+          "id": "PR_node_conflict",
+          "number": 11,
+          "title": "Add retry to the upload worker",
+          "url": "https://github.com/octo-org/sample-repo/pull/11",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-05T14:00:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-a"
+          },
+          "baseRefName": "main",
+          "headRefName": "feature-11",
+          "mergeable": "CONFLICTING",
+          "mergeStateStatus": "DIRTY",
+          "reviewDecision": "APPROVED",
+          "viewerCanUpdate": true,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": true,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 2
+          },
+          "reviews": {
+            "totalCount": 1
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "author": {
+                  "login": "user-b"
+                },
+                "state": "COMMENTED",
+                "submittedAt": "2026-03-02T10:00:00Z"
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_node_conflict",
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "pageInfo": {
+                        "hasNextPage": false,
+                        "endCursor": "Y3Vyc29yOjk="
+                      },
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "build",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS",
+                          "startedAt": "2026-03-05T13:00:00Z",
+                          "completedAt": "2026-03-05T13:05:00Z",
+                          "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1/job/333",
+                          "checkSuite": {
+                            "workflowRun": {
+                              "workflow": {
+                                "name": "CI"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "lint",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS",
+                          "startedAt": "2026-03-05T13:00:00Z",
+                          "completedAt": "2026-03-05T13:05:00Z",
+                          "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1/job/608",
+                          "checkSuite": {
+                            "workflowRun": {
+                              "workflow": {
+                                "name": "CI"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "FAILURE",
+                          "startedAt": "2026-03-05T13:00:00Z",
+                          "completedAt": "2026-03-05T13:05:00Z",
+                          "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1/job/559",
+                          "checkSuite": {
+                            "workflowRun": {
+                              "workflow": {
+                                "name": "CI"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "e2e",
+                          "status": "IN_PROGRESS",
+                          "conclusion": null,
+                          "startedAt": "2026-03-05T13:00:00Z",
+                          "completedAt": null,
+                          "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1/job/531",
+                          "checkSuite": {
+                            "workflowRun": {
+                              "workflow": {
+                                "name": "CI"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "docs",
+                          "status": "COMPLETED",
+                          "conclusion": "SKIPPED",
+                          "startedAt": "2026-03-05T13:00:00Z",
+                          "completedAt": "2026-03-05T13:05:00Z",
+                          "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1/job/741",
+                          "checkSuite": {
+                            "workflowRun": {
+                              "workflow": {
+                                "name": "CI"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "context": "ci/external",
+                          "state": "SUCCESS",
+                          "targetUrl": "https://ci.example.com/build/1",
+                          "createdAt": "2026-03-05T13:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "PR_node_checking",
+          "number": 12,
+          "title": "Rename the config loader",
+          "url": "https://github.com/octo-org/sample-repo/pull/12",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-03T12:00:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-a"
+          },
+          "baseRefName": "main",
+          "headRefName": "feature-12",
+          "mergeable": "UNKNOWN",
+          "mergeStateStatus": "UNKNOWN",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "viewerCanUpdate": true,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": true,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 2
+          },
+          "reviews": {
+            "totalCount": 1
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "author": {
+                  "login": "user-b"
+                },
+                "state": "COMMENTED",
+                "submittedAt": "2026-03-02T10:00:00Z"
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_node_checking",
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "PR_node_behind",
+          "number": 13,
+          "title": "Bump the base image",
+          "url": "https://github.com/user-a/other-repo/pull/13",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-05T16:40:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-a"
+          },
+          "baseRefName": "main",
+          "headRefName": "feature-13",
+          "mergeable": "MERGEABLE",
+          "mergeStateStatus": "BEHIND",
+          "reviewDecision": "CHANGES_REQUESTED",
+          "viewerCanUpdate": true,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "user-a/other-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": true,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 2
+          },
+          "reviews": {
+            "totalCount": 1
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "author": {
+                  "login": "user-b"
+                },
+                "state": "COMMENTED",
+                "submittedAt": "2026-03-02T10:00:00Z"
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_node_behind",
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "pageInfo": {
+                        "hasNextPage": false,
+                        "endCursor": "Y3Vyc29yOjk="
+                      },
+                      "nodes": [
+                        {
+                          "__typename": "StatusContext",
+                          "context": "ci/external",
+                          "state": "PENDING",
+                          "targetUrl": "https://ci.example.com/build/1",
+                          "createdAt": "2026-03-05T13:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "PR_node_paged",
+          "number": 14,
+          "title": "Split the test matrix",
+          "url": "https://github.com/user-a/other-repo/pull/14",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-02-28T17:00:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-a"
+          },
+          "baseRefName": "main",
+          "headRefName": "feature-14",
+          "mergeable": "MERGEABLE",
+          "mergeStateStatus": "CLEAN",
+          "reviewDecision": null,
+          "viewerCanUpdate": true,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "user-a/other-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": true,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 2
+          },
+          "reviews": {
+            "totalCount": 1
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "author": {
+                  "login": "user-b"
+                },
+                "state": "COMMENTED",
+                "submittedAt": "2026-03-02T10:00:00Z"
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_node_paged",
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "pageInfo": {
+                        "hasNextPage": true,
+                        "endCursor": "Y3Vyc29yOjE="
+                      },
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "unit-1",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS",
+                          "startedAt": "2026-03-05T13:00:00Z",
+                          "completedAt": "2026-03-05T13:05:00Z",
+                          "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1/job/592",
+                          "checkSuite": {
+                            "workflowRun": {
+                              "workflow": {
+                                "name": "CI"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

@@ -7,16 +7,18 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 )
 
-const (
-	configFileName = "config.yaml"
-	stateFileName  = "state.json"
-)
+// ConfigFile is the name of the user-editable config file in the config
+// directory.
+const ConfigFile = "config.yaml"
+
+const stateFileName = "state.json"
 
 // Schema versions of the files this build reads and writes. A file with any
 // other version is refused rather than rewritten, so a newer release's data
@@ -40,6 +42,8 @@ var defaultTags = []domain.Tag{
 type Config struct {
 	// Tags are the lanes after Untagged, in display order.
 	Tags []domain.Tag
+	// RefreshInterval is how often the board refreshes.
+	RefreshInterval time.Duration
 }
 
 // State is what lanes records on its own about the pull requests it shows.
@@ -50,8 +54,9 @@ type State struct {
 }
 
 type configFile struct {
-	Version int        `yaml:"version"`
-	Tags    []tagEntry `yaml:"tags"`
+	Version         int        `yaml:"version"`
+	RefreshInterval string     `yaml:"refresh_interval,omitempty"`
+	Tags            []tagEntry `yaml:"tags"`
 }
 
 type tagEntry struct {
@@ -67,28 +72,34 @@ type stateFile struct {
 }
 
 // LoadConfig reads the config file in dir. On first run, when there is no
-// file yet, it writes one with the default tags and returns that.
+// file yet, it writes one with the default tags and returns that. A setting
+// the file leaves out means the default. Whenever it returns an error the
+// config still carries a usable refresh interval; a *RefreshIntervalError
+// leaves the rest of the config intact, any other error means the file
+// couldn't be used.
 func LoadConfig(dir string) (Config, error) {
-	path := filepath.Join(dir, configFileName)
+	failed := Config{RefreshInterval: DefaultRefreshInterval}
+	path := filepath.Join(dir, ConfigFile)
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return writeDefaultConfig(path)
 	}
 	if err != nil {
-		return Config{}, fmt.Errorf("read config: %w", err)
+		return failed, fmt.Errorf("read config: %w", err)
 	}
 	var file configFile
 	if err := yaml.Unmarshal(raw, &file); err != nil {
-		return Config{}, fmt.Errorf("read config %s: %w", path, err)
+		return failed, fmt.Errorf("read config %s: %w", path, err)
 	}
 	if file.Version != configVersion {
-		return Config{}, fmt.Errorf("read config %s: unsupported version %d (want %d)", path, file.Version, configVersion)
+		return failed, fmt.Errorf("read config %s: unsupported version %d (want %d)", path, file.Version, configVersion)
 	}
 	tags, err := tagsFromFile(file.Tags)
 	if err != nil {
-		return Config{}, fmt.Errorf("read config %s: %w", path, err)
+		return failed, fmt.Errorf("read config %s: %w", path, err)
 	}
-	return Config{Tags: tags}, nil
+	interval, err := parseRefreshInterval(file.RefreshInterval)
+	return Config{Tags: tags, RefreshInterval: interval}, err
 }
 
 func writeDefaultConfig(path string) (Config, error) {
@@ -98,12 +109,12 @@ func writeDefaultConfig(path string) (Config, error) {
 	}
 	raw, err := yaml.Marshal(file)
 	if err != nil {
-		return Config{}, fmt.Errorf("encode default config: %w", err)
+		return Config{RefreshInterval: DefaultRefreshInterval}, fmt.Errorf("encode default config: %w", err)
 	}
 	if err := writeAtomic(path, raw); err != nil {
-		return Config{}, fmt.Errorf("write default config: %w", err)
+		return Config{RefreshInterval: DefaultRefreshInterval}, fmt.Errorf("write default config: %w", err)
 	}
-	return Config{Tags: append([]domain.Tag(nil), defaultTags...)}, nil
+	return Config{Tags: append([]domain.Tag(nil), defaultTags...), RefreshInterval: DefaultRefreshInterval}, nil
 }
 
 func tagsFromFile(entries []tagEntry) ([]domain.Tag, error) {

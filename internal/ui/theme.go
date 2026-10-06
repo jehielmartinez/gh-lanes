@@ -15,6 +15,9 @@ type theme struct {
 	text     color.Color
 	errText  color.Color
 	accent   color.Color
+	success  color.Color
+	failure  color.Color
+	pending  color.Color
 }
 
 func newTheme(dark bool) theme {
@@ -26,5 +29,8 @@ func newTheme(dark bool) theme {
 		text:     pick(lipgloss.Color("#111827"), lipgloss.Color("#F3F4F6")),
 		errText:  pick(lipgloss.Color("#B91C1C"), lipgloss.Color("#F87171")),
 		accent:   pick(lipgloss.Color("#2563EB"), lipgloss.Color("#60A5FA")),
+		success:  pick(lipgloss.Color("#15803D"), lipgloss.Color("#4ADE80")),
+		failure:  pick(lipgloss.Color("#B91C1C"), lipgloss.Color("#F87171")),
+		pending:  pick(lipgloss.Color("#B45309"), lipgloss.Color("#FBBF24")),
 	}
 }

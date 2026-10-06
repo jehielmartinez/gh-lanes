@@ -4,11 +4,13 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jehielmartinez/gh-lanes/internal/board"
@@ -20,9 +22,13 @@ const boardSearch = "is:pr is:open author:@me archived:false"
 
 const fetchTimeout = 30 * time.Second
 
+// clockTick is how often the clock is sampled, which is what keeps
+// "updated Ns ago" and card ages current and fires refreshes when due.
+const clockTick = time.Second
+
 // GitHub is what the UI needs from the GitHub layer.
 type GitHub interface {
-	SearchPullRequests(ctx context.Context, query string) ([]domain.PullRequest, error)
+	SearchPullRequests(ctx context.Context, query string) ([]domain.PullRequest, domain.RateLimit, error)
 }
 
 // Options are the boundaries the root model is given rather than reaching for
@@ -34,20 +40,36 @@ type Options struct {
 	// Now is the clock. Local times are shown in the location of the times it
 	// returns.
 	Now func() time.Time
+	// After waits for a duration on the same clock as Now, like time.After.
+	After func(time.Duration) <-chan time.Time
 }
 
 // Model is the root model of the app.
 type Model struct {
-	opts  Options
-	keys  keyMap
-	help  help.Model
-	theme theme
+	opts    Options
+	keys    keyMap
+	help    help.Model
+	spinner spinner.Model
+	theme   theme
 
 	width, height int
 
-	loading bool
-	prs     []domain.PullRequest
-	err     error
+	now             time.Time
+	refreshInterval time.Duration
+	configErr       error
+
+	refreshing bool
+	// lastRefresh is when the last refresh finished, successful or not; the
+	// next automatic one is due an interval after it.
+	lastRefresh time.Time
+	// loaded is whether the board holds data from a successful refresh.
+	loaded    bool
+	updatedAt time.Time
+	prs       []domain.PullRequest
+	rateLimit domain.RateLimit
+	// err is the last refresh's error. With loaded set, the board on screen
+	// is stale.
+	err error
 
 	// storeReady is false until the config and state files have been read.
 	// Nothing is written while it is false, so a file lanes couldn't read is
@@ -73,18 +95,27 @@ type Model struct {
 // New returns the root model, ready to load the board when started.
 func New(opts Options) Model {
 	m := Model{
-		opts:    opts,
-		keys:    newKeyMap(),
-		help:    help.New(),
-		theme:   newTheme(true),
-		loading: true,
+		opts:            opts,
+		keys:            newKeyMap(),
+		help:            help.New(),
+		spinner:         spinner.New(spinner.WithSpinner(spinner.Dot)),
+		theme:           newTheme(true),
+		now:             opts.Now(),
+		refreshInterval: store.DefaultRefreshInterval,
+		refreshing:      true,
 	}
 	return m.rebuild()
 }
 
 type pullRequestsMsg struct {
-	prs []domain.PullRequest
-	err error
+	prs       []domain.PullRequest
+	rateLimit domain.RateLimit
+	err       error
+	at        time.Time
+}
+
+type tickMsg struct {
+	now time.Time
 }
 
 type storeLoadedMsg struct {
@@ -100,23 +131,43 @@ type stateSavedMsg struct{ err error }
 type moveMsg struct{ prID, tagID string }
 
 func (m Model) fetchBoard() tea.Cmd {
-	gh := m.opts.GitHub
+	gh, now := m.opts.GitHub, m.opts.Now
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 		defer cancel()
-		prs, err := gh.SearchPullRequests(ctx, boardSearch)
-		return pullRequestsMsg{prs: prs, err: err}
+		prs, limit, err := gh.SearchPullRequests(ctx, boardSearch)
+		return pullRequestsMsg{prs: prs, rateLimit: limit, err: err, at: now()}
 	}
+}
+
+func (m Model) tick() tea.Cmd {
+	after := m.opts.After
+	return func() tea.Msg {
+		return tickMsg{now: <-after(clockTick)}
+	}
+}
+
+// refresh starts a refresh unless one is already in flight.
+func (m Model) refresh() (Model, tea.Cmd) {
+	if m.refreshing {
+		return m, nil
+	}
+	m.refreshing = true
+	return m, tea.Batch(m.fetchBoard(), m.spinner.Tick)
 }
 
 func (m Model) loadStore() tea.Cmd {
 	dir := m.opts.ConfigDir
 	return func() tea.Msg {
 		cfg, err := store.LoadConfig(dir)
-		if err != nil {
-			return storeLoadedMsg{err: err}
+		var intervalErr *store.RefreshIntervalError
+		if err != nil && !errors.As(err, &intervalErr) {
+			return storeLoadedMsg{config: cfg, err: err}
 		}
-		st, err := store.LoadState(dir)
+		st, stateErr := store.LoadState(dir)
+		if stateErr != nil {
+			return storeLoadedMsg{config: cfg, err: stateErr}
+		}
 		return storeLoadedMsg{config: cfg, state: st, err: err}
 	}
 }
@@ -131,9 +182,15 @@ func (m Model) saveState() (Model, tea.Cmd) {
 	return m, func() tea.Msg { return stateSavedMsg{err: store.SaveState(dir, state)} }
 }
 
-// Init starts the first board load and reads the local files.
+// Init reads the local files, then starts the first board load and the
+// clock. The config comes first so no tick can be measured against the
+// default interval once the file has set another.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.fetchBoard(), m.loadStore(), tea.RequestBackgroundColor)
+	return tea.Batch(
+		tea.Sequence(m.loadStore(), tea.Batch(m.fetchBoard(), m.tick())),
+		m.spinner.Tick,
+		tea.RequestBackgroundColor,
+	)
 }
 
 // Update routes messages to the state they change.
@@ -155,16 +212,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m.boardKey(msg)
+	case tickMsg:
+		m.now = msg.now
+		next := m.tick()
+		if m.now.Sub(m.lastRefresh) < m.refreshInterval {
+			return m, next
+		}
+		m, cmd := m.refresh()
+		return m, tea.Batch(next, cmd)
+	case spinner.TickMsg:
+		if !m.refreshing {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
 	case pullRequestsMsg:
-		m.loading = false
+		m.refreshing = false
+		m.now, m.lastRefresh = msg.at, msg.at
 		m.err = msg.err
 		if msg.err == nil {
+			m.loaded = true
+			m.updatedAt = msg.at
 			m.prs = msg.prs
+			m.rateLimit = msg.rateLimit
 		}
 		return m.rebuild(), nil
 	case storeLoadedMsg:
-		m.storeErr = msg.err
-		if msg.err == nil {
+		m.refreshInterval = msg.config.RefreshInterval
+		var intervalErr *store.RefreshIntervalError
+		if errors.As(msg.err, &intervalErr) {
+			m.configErr = msg.err
+		} else {
+			m.storeErr = msg.err
+		}
+		if m.storeErr == nil {
 			m.storeReady = true
 			m.tags = msg.config.Tags
 			m.assignments = msg.state.Assignments
@@ -212,6 +294,8 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.moveSelectedBy(1)
 	case key.Matches(msg, m.keys.MoveTo):
 		return m.openMovePicker(), nil
+	case key.Matches(msg, m.keys.Refresh):
+		return m.refresh()
 	}
 	return m, nil
 }

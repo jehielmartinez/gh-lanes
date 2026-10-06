@@ -10,6 +10,134 @@ type PullRequest struct {
 	ID         string
 	Number     int
 	Title      string
-	Repository string
-	UpdatedAt  time.Time
+	URL        string
+	Author     string
+	State      State
+	IsDraft    bool
+	Repository Repository
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	// MergedAt and ClosedAt are zero while the pull request is open.
+	MergedAt time.Time
+	ClosedAt time.Time
+
+	BaseRef string
+	HeadRef string
+
+	Mergeable        Mergeable
+	MergeStateStatus MergeStateStatus
+	ReviewDecision   ReviewDecision
+	// AutoMerge is nil when auto-merge is not enabled.
+	AutoMerge       *AutoMerge
+	ViewerCanUpdate bool
+
+	Checks        []Check
+	CommentCount  int
+	ReviewCount   int
+	LatestReviews []Review
+}
+
+// State is whether a pull request is open, merged or closed without merging.
+type State string
+
+// The states GitHub reports.
+const (
+	StateOpen   State = "OPEN"
+	StateClosed State = "CLOSED"
+	StateMerged State = "MERGED"
+)
+
+// Repository is the repository a pull request belongs to, with the merge
+// settings that decide which actions it offers.
+type Repository struct {
+	NameWithOwner       string
+	MergeMethods        []MergeMethod
+	AutoMergeAllowed    bool
+	DeleteBranchOnMerge bool
+}
+
+// MergeMethod is one way GitHub can merge a pull request.
+type MergeMethod string
+
+// The merge methods GitHub supports.
+const (
+	MergeMethodMerge  MergeMethod = "MERGE"
+	MergeMethodSquash MergeMethod = "SQUASH"
+	MergeMethodRebase MergeMethod = "REBASE"
+)
+
+// AutoMerge describes a pending auto-merge request.
+type AutoMerge struct {
+	Method    MergeMethod
+	EnabledBy string
+	EnabledAt time.Time
+}
+
+// Mergeable is GitHub's verdict on whether the branch merges cleanly.
+type Mergeable string
+
+// The mergeable values GitHub reports. MergeableUnknown means GitHub is still
+// computing it.
+const (
+	MergeableMergeable   Mergeable = "MERGEABLE"
+	MergeableConflicting Mergeable = "CONFLICTING"
+	MergeableUnknown     Mergeable = "UNKNOWN"
+)
+
+// MergeStateStatus is GitHub's mergeStateStatus enum, kept as reported.
+type MergeStateStatus string
+
+// The merge state statuses the board reads.
+const (
+	MergeStateBehind  MergeStateStatus = "BEHIND"
+	MergeStateDirty   MergeStateStatus = "DIRTY"
+	MergeStateUnknown MergeStateStatus = "UNKNOWN"
+)
+
+// ReviewDecision is the review outcome required by the base branch's rules.
+// It is empty when the repository requires no review.
+type ReviewDecision string
+
+// The review decisions GitHub reports.
+const (
+	ReviewApproved         ReviewDecision = "APPROVED"
+	ReviewChangesRequested ReviewDecision = "CHANGES_REQUESTED"
+	ReviewRequired         ReviewDecision = "REVIEW_REQUIRED"
+)
+
+// Review is the latest review one reviewer left.
+type Review struct {
+	Author      string
+	State       string
+	SubmittedAt time.Time
+}
+
+// MergeStatus is the one-glance answer to "can this merge as it stands?".
+type MergeStatus int
+
+// The merge statuses, from nothing-to-report to blocked.
+const (
+	MergeStatusClear MergeStatus = iota
+	// MergeStatusChecking means GitHub hasn't finished computing
+	// mergeability. It is neither a conflict nor mergeable.
+	MergeStatusChecking
+	MergeStatusBehind
+	MergeStatusConflict
+)
+
+// MergeStatus decides the pull request's merge status from mergeable and
+// mergeStateStatus.
+func (pr PullRequest) MergeStatus() MergeStatus {
+	switch {
+	case pr.Mergeable == MergeableUnknown:
+		return MergeStatusChecking
+	case pr.Mergeable == MergeableConflicting || pr.MergeStateStatus == MergeStateDirty:
+		return MergeStatusConflict
+	case pr.MergeStateStatus == MergeStateUnknown:
+		return MergeStatusChecking
+	case pr.MergeStateStatus == MergeStateBehind:
+		return MergeStatusBehind
+	}
+	return MergeStatusClear
 }

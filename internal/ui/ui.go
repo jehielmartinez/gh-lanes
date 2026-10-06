@@ -39,6 +39,10 @@ type GitHub interface {
 	UpdateBranch(ctx context.Context, id string, method domain.UpdateMethod) error
 	MarkReadyForReview(ctx context.Context, id string) error
 	ConvertToDraft(ctx context.Context, id string) error
+	Merge(ctx context.Context, id string, method domain.MergeMethod) error
+	DeleteBranch(ctx context.Context, refID string) error
+	EnableAutoMerge(ctx context.Context, id string, method domain.MergeMethod) error
+	DisableAutoMerge(ctx context.Context, id string) error
 }
 
 // Options are the boundaries the root model is given rather than reaching for
@@ -134,6 +138,8 @@ type Model struct {
 	linkErr *linkFailure
 	// confirm is the open confirmation dialog, nil when none is.
 	confirm *confirmation
+	// mergeDialog is the open merge dialog, nil when none is.
+	mergeDialog *mergeDialog
 	// acting is whether an action is waiting on GitHub; one runs at a time.
 	acting bool
 	toast  toast
@@ -333,6 +339,9 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.confirm != nil {
 			return m.confirmKey(msg)
 		}
+		if m.mergeDialog != nil {
+			return m.mergeDialogKey(msg)
+		}
 		if key.Matches(msg, m.keys.Tags) {
 			return m.openTagManager(), nil
 		}
@@ -356,7 +365,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
 		switch {
-		case m.picker != nil || m.tagManager != nil || m.confirm != nil:
+		case m.dialogOpen():
 		case m.detail != nil:
 			return m.clickDetail(msg)
 		default:
@@ -366,7 +375,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.detail != nil {
 			return m.detailScroll(msg), nil
 		}
-		if m.picker == nil && m.tagManager == nil && m.confirm == nil {
+		if !m.dialogOpen() {
 			return m.wheeled(msg), nil
 		}
 	case tickMsg:
@@ -555,6 +564,12 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.keys = m.keys.withFullHelp(m.help.ShowAll)
 	}
 	return m, nil
+}
+
+// dialogOpen reports whether a picker, the tag manager or a dialog has the
+// keys.
+func (m Model) dialogOpen() bool {
+	return m.picker != nil || m.tagManager != nil || m.confirm != nil || m.mergeDialog != nil
 }
 
 func (m Model) selected() (domain.PullRequest, bool) {

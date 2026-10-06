@@ -299,15 +299,7 @@ func (m Model) autoMergeLine(am *domain.AutoMerge) string {
 	if am == nil {
 		return lipgloss.NewStyle().Foreground(m.theme.muted).Render("Off")
 	}
-	method := map[domain.MergeMethod]string{
-		domain.MergeMethodMerge:  "Merge commit",
-		domain.MergeMethodSquash: "Squash",
-		domain.MergeMethodRebase: "Rebase",
-	}[am.Method]
-	if method == "" {
-		method = "Merge"
-	}
-	line := method + " when ready"
+	line := autoMergeName(am.Method) + " when ready"
 	if am.EnabledBy != "" {
 		line += ", enabled by " + am.EnabledBy
 	}

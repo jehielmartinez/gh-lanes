@@ -26,6 +26,7 @@ fragment PullRequestFields on PullRequest {
   author { login }
   baseRefName
   headRefName
+  headRef { id }
   mergeable
   mergeStateStatus
   reviewDecision
@@ -110,6 +111,7 @@ type pullRequestNode struct {
 	Author                *login
 	BaseRefName           string
 	HeadRefName           string
+	HeadRef               *struct{ ID string }
 	Mergeable             string
 	MergeStateStatus      string
 	ReviewDecision        string
@@ -236,6 +238,9 @@ func (n pullRequestNode) toDomain() domain.PullRequest {
 		ViewerCanUpdateBranch: n.ViewerCanUpdateBranch,
 		CommentCount:          n.Comments.TotalCount,
 		ReviewCount:           n.Reviews.TotalCount,
+	}
+	if n.HeadRef != nil {
+		pr.HeadRefID = n.HeadRef.ID
 	}
 	if am := n.AutoMergeRequest; am != nil {
 		pr.AutoMerge = &domain.AutoMerge{

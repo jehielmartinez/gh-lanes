@@ -24,6 +24,8 @@ type PullRequest struct {
 
 	BaseRef string
 	HeadRef string
+	// HeadRefID is the node ID of the head branch, empty once it is deleted.
+	HeadRefID string
 
 	Mergeable        Mergeable
 	MergeStateStatus MergeStateStatus

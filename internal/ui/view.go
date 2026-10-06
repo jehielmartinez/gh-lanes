@@ -26,7 +26,7 @@ const (
 const statusSeparator = " · "
 
 // View draws the board, the status bar and the help footer, with the detail
-// modal over them when it is open.
+// modal or any open picker over them.
 func (m Model) View() tea.View {
 	body := m.boardView()
 	if m.height > footerLines {
@@ -40,19 +40,29 @@ func (m Model) View() tea.View {
 	if m.detail != nil {
 		screen = m.overlay(screen, m.detailView())
 	}
+	if m.picker != nil {
+		screen = m.overlay(screen, m.picker.view(m.theme, m.help))
+	}
 	v := tea.NewView(screen)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
-// overlay draws box centred over screen.
-func (m Model) overlay(screen, box string) string {
-	width, height := max(m.width, lipgloss.Width(screen)), max(m.height, lipgloss.Height(screen))
-	x := max((width-lipgloss.Width(box))/2, 0)
-	y := max((height-lipgloss.Height(box))/2, 0)
-	layers := lipgloss.NewCompositor(lipgloss.NewLayer(screen), lipgloss.NewLayer(box).X(x).Y(y).Z(1))
-	return lipgloss.NewCanvas(width, height).Compose(layers).Render()
+// overlay draws fg centred on the terminal over bg.
+func (m Model) overlay(bg, fg string) string {
+	termW, termH := m.width, m.height
+	if termW == 0 || termH == 0 {
+		termW, termH = lipgloss.Width(bg), lipgloss.Height(bg)
+	}
+	x := max(0, (termW-lipgloss.Width(fg))/2)
+	y := max(0, (termH-lipgloss.Height(fg))/2)
+	canvas := lipgloss.NewCanvas(max(termW, lipgloss.Width(bg)), max(termH, lipgloss.Height(bg)))
+	canvas.Compose(lipgloss.NewCompositor(
+		lipgloss.NewLayer(bg),
+		lipgloss.NewLayer(fg).X(x).Y(y).Z(1),
+	))
+	return canvas.Render()
 }
 
 // cardAt finds the card drawn at a screen cell, measuring the cards as
@@ -65,9 +75,10 @@ func (m Model) cardAt(x, y int) (domain.PullRequest, bool) {
 	if x < 0 || lane >= len(m.lanes) || x%(laneWidth+laneGap) >= laneWidth {
 		return domain.PullRequest{}, false
 	}
-	top := lipgloss.Height(m.laneHeader(m.lanes[lane]))
-	for _, pr := range m.lanes[lane].PullRequests {
-		bottom := top + lipgloss.Height(m.cardView(pr))
+	focused := lane == m.focus
+	top := lipgloss.Height(m.laneHeader(m.lanes[lane], focused))
+	for i, pr := range m.lanes[lane].PullRequests {
+		bottom := top + lipgloss.Height(m.cardView(pr, focused && i == m.cursors[lane]))
 		if y >= top && y < bottom {
 			return pr, true
 		}
@@ -78,29 +89,36 @@ func (m Model) cardAt(x, y int) (domain.PullRequest, bool) {
 
 func (m Model) boardView() string {
 	cols := make([]string, 0, len(m.lanes))
-	for _, lane := range m.lanes {
-		cols = append(cols, m.laneView(lane))
+	for i, lane := range m.lanes {
+		cols = append(cols, m.laneView(lane, i == m.focus, m.cursors[i]))
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, cols...)
 }
 
-func (m Model) laneHeader(lane board.Lane) string {
-	return lipgloss.NewStyle().Bold(true).Foreground(m.theme.untagged).Render(lane.Name) +
-		" " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
+func (m Model) laneHeader(lane board.Lane, focused bool) string {
+	name := lipgloss.NewStyle().Bold(true).Underline(focused).Foreground(m.laneColor(lane)).Render(lane.Tag.Name)
+	return name + " " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
 }
 
-func (m Model) laneView(lane board.Lane) string {
-	rows := []string{m.laneHeader(lane)}
-	if m.loaded && len(lane.PullRequests) == 0 {
+func (m Model) laneView(lane board.Lane, focused bool, cursor int) string {
+	rows := []string{m.laneHeader(lane, focused)}
+	if lane.Untagged() && m.loaded && len(m.prs) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}
-	for _, pr := range lane.PullRequests {
-		rows = append(rows, m.cardView(pr))
+	for i, pr := range lane.PullRequests {
+		rows = append(rows, m.cardView(pr, focused && i == cursor))
 	}
 	return lipgloss.NewStyle().Width(laneWidth).MarginRight(laneGap).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
 
-func (m Model) cardView(pr domain.PullRequest) string {
+func (m Model) laneColor(lane board.Lane) color.Color {
+	if lane.Tag.Color == "" {
+		return m.theme.untagged
+	}
+	return lipgloss.Color(lane.Tag.Color)
+}
+
+func (m Model) cardView(pr domain.PullRequest, selected bool) string {
 	inner := laneWidth - cardPadding
 	number := fmt.Sprintf("#%d", pr.Number)
 	ref := truncate(pr.Repository.NameWithOwner, inner-lipgloss.Width(number)) + number
@@ -110,11 +128,17 @@ func (m Model) cardView(pr domain.PullRequest) string {
 		titleColor = m.theme.muted
 	}
 	title := lipgloss.NewStyle().Foreground(titleColor).Render(truncate(oneLine(pr.Title), inner))
+	// The selected card gets a heavier border as well as a colour, so the
+	// selection still shows on a terminal without colour.
+	border, borderColor := lipgloss.RoundedBorder(), m.theme.border
+	if selected {
+		border, borderColor = lipgloss.ThickBorder(), m.theme.accent
+	}
 	return lipgloss.NewStyle().
 		Width(laneWidth).
 		Padding(0, 1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.theme.border).
+		Border(border).
+		BorderForeground(borderColor).
 		Render(ref + "\n" + title + "\n" + m.cardStatusLine(pr, inner))
 }
 
@@ -176,6 +200,12 @@ func (m Model) statusView() string {
 			updated = m.spinner.View() + " " + updated
 		}
 		parts = append(parts, updated)
+	}
+	if m.storeErr != nil {
+		parts = append(parts, errStyle.Render("Couldn't load tags: "+oneLine(m.storeErr.Error())))
+	}
+	if m.saveErr != nil {
+		parts = append(parts, errStyle.Render("Couldn't save lanes: "+oneLine(m.saveErr.Error())))
 	}
 	if m.rateLimit.Low() {
 		parts = append(parts, errStyle.Render(fmt.Sprintf("rate limit %d/%d left", m.rateLimit.Remaining, m.rateLimit.Limit)))

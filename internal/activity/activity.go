@@ -3,7 +3,6 @@
 package activity
 
 import (
-	"maps"
 	"time"
 
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
@@ -50,20 +49,14 @@ func Same(a, b domain.Snapshot) bool {
 	return a == b
 }
 
-// Baseline returns snapshots with every pull request in prs recorded as seen
-// at now, except those that already have one, so nothing already on the
-// board counts as new.
-func Baseline(snapshots map[string]domain.Snapshot, prs []domain.PullRequest, now time.Time) map[string]domain.Snapshot {
-	next := maps.Clone(snapshots)
-	if next == nil {
-		next = map[string]domain.Snapshot{}
-	}
+// Baseline records every pull request in prs as seen at now, so nothing on
+// the board at the first run counts as new.
+func Baseline(prs []domain.PullRequest, now time.Time) map[string]domain.Snapshot {
+	snapshots := make(map[string]domain.Snapshot, len(prs))
 	for _, pr := range prs {
-		if _, ok := next[pr.ID]; !ok {
-			next[pr.ID] = Take(pr, now, domain.Snapshot{}, false)
-		}
+		snapshots[pr.ID] = Take(pr, now, domain.Snapshot{}, false)
 	}
-	return next
+	return snapshots
 }
 
 // Of decides the marker for pr given the snapshots taken so far.
@@ -72,13 +65,13 @@ func Of(pr domain.PullRequest, snapshots map[string]domain.Snapshot) Marker {
 	switch {
 	case !ok:
 		return New
-	case changed(snap, pr):
+	case differs(snap, pr):
 		return Changed
 	}
 	return None
 }
 
-func changed(snap domain.Snapshot, pr domain.PullRequest) bool {
+func differs(snap domain.Snapshot, pr domain.PullRequest) bool {
 	now := Take(pr, snap.SeenAt, snap, true)
 	// A mergeability nobody has seen computed can't have changed.
 	if snap.Mergeable == domain.MergeableUnknown {
@@ -99,14 +92,14 @@ func Markers(prs []domain.PullRequest, snapshots map[string]domain.Snapshot) map
 }
 
 // Tally counts the changed and the new pull requests among markers.
-func Tally(markers map[string]Marker) (changed, new int) {
+func Tally(markers map[string]Marker) (changed, added int) {
 	for _, m := range markers {
 		switch m {
 		case Changed:
 			changed++
 		case New:
-			new++
+			added++
 		}
 	}
-	return changed, new
+	return changed, added
 }

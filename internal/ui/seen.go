@@ -14,7 +14,7 @@ import (
 func (m Model) observe() (Model, tea.Cmd) {
 	changed := false
 	if m.storeReady && m.loaded && m.snapshots == nil {
-		m.snapshots = activity.Baseline(nil, m.prs, m.updatedAt)
+		m.snapshots = activity.Baseline(m.prs, m.updatedAt)
 		changed = true
 	}
 	m, seen := m.markSeen()

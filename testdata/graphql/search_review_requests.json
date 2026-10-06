@@ -1,0 +1,117 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjI="
+      },
+      "nodes": [
+        {
+          "id": "PR_node_review_open",
+          "number": 31,
+          "title": "Add pagination to the export API",
+          "url": "https://github.com/octo-org/sample-repo/pull/31",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-05T14:00:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-b"
+          },
+          "baseRefName": "main",
+          "headRefName": "export-pages",
+          "mergeable": "MERGEABLE",
+          "mergeStateStatus": "BEHIND",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "viewerCanUpdate": true,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": true,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 2
+          },
+          "reviews": {
+            "totalCount": 0
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_PR_node_review_open",
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          },
+          "viewerCanUpdateBranch": true
+        },
+        {
+          "id": "PR_node_review_locked",
+          "number": 32,
+          "title": "Speed up the lint step",
+          "url": "https://github.com/octo-org/tools-repo/pull/32",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-05T16:30:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-c"
+          },
+          "baseRefName": "main",
+          "headRefName": "faster-lint",
+          "mergeable": "MERGEABLE",
+          "mergeStateStatus": "BEHIND",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "viewerCanUpdate": false,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "octo-org/tools-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": true,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 2
+          },
+          "reviews": {
+            "totalCount": 0
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_PR_node_review_locked",
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          },
+          "viewerCanUpdateBranch": true
+        }
+      ]
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

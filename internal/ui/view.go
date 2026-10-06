@@ -20,8 +20,9 @@ const cardPadding = 4
 
 const statusSeparator = " · "
 
-// View draws the board, the status bar and the help footer, with the detail
-// modal, the tag manager or any open picker over them.
+// View draws the tab bar, the board or the review requests, the status bar
+// and the help footer, with the detail modal, the tag manager or any open
+// picker over them.
 func (m Model) View() tea.View {
 	body := lipgloss.NewStyle()
 	if height := m.boardHeight(); height > 0 {
@@ -30,7 +31,11 @@ func (m Model) View() tea.View {
 	if m.width > 0 {
 		body = body.MaxWidth(m.width)
 	}
-	screen := lipgloss.JoinVertical(lipgloss.Left, body.Render(m.boardView()), m.footerView())
+	content := m.boardView()
+	if m.tab == tabReview {
+		content = m.reviewView()
+	}
+	screen := lipgloss.JoinVertical(lipgloss.Left, m.tabsView(), body.Render(content), m.footerView())
 	if m.detail != nil {
 		screen = m.overlay(screen, m.detailView())
 	}
@@ -49,13 +54,16 @@ func (m Model) View() tea.View {
 	return v
 }
 
-// footerView is the status bar over the help footer, which lists the
-// modal's keys while the detail modal is open.
+// footerView is the status bar over the help footer, which lists the keys of
+// the detail modal while it is open, or else of the tab in view.
 func (m Model) footerView() string {
 	actionKeys := m.actionKeys()
 	var keys help.KeyMap = actionKeys
-	if m.detail != nil {
+	switch {
+	case m.detail != nil:
 		keys = modalHelp{keys: actionKeys}
+	case m.tab == tabReview:
+		keys = reviewHelp{keys: actionKeys}
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, m.statusView(), m.help.View(keys))
 }

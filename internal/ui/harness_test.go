@@ -31,6 +31,19 @@ const (
 	defaultTermHeight = 30
 )
 
+// reviewSearch is the search behind the Review requests tab.
+const reviewSearch = "is:pr is:open review-requested:@me archived:false"
+
+// replyReviewRequests queues a fixture for the review requests search.
+func replyReviewRequests(t *testing.T, transport *githubtest.Transport, name string) {
+	t.Helper()
+	transport.ReplyFixtureWhen(t, "SearchPullRequests", "query", reviewSearch, fixture(name))
+}
+
+func isReviewSearch(r githubtest.Request) bool {
+	return r.Operation == "SearchPullRequests" && r.Variables["query"] == reviewSearch
+}
+
 // fixedZone keeps local-time output identical on every machine.
 var fixedZone = time.FixedZone("UTC-5", -5*60*60)
 
@@ -92,6 +105,11 @@ func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOp
 		t.Setenv(k, v)
 	}
 
+	// Tests that aren't about review requests have none, so the review
+	// search never takes a reply queued for the board's.
+	if !transport.HasRepliesWhen("SearchPullRequests", "query", reviewSearch) {
+		replyReviewRequests(t, transport, "search_empty.json")
+	}
 	client, err := github.New(transport)
 	if err != nil {
 		t.Fatalf("github.New: %v", err)
@@ -147,6 +165,10 @@ func (h *harness) press(key string) {
 		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyUp})
 	case "down":
 		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyDown})
+	case "tab":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyTab})
+	case "shift+tab":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	case "enter":
 		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEnter})
 	case "ctrl+u":
@@ -301,12 +323,25 @@ func (h *harness) settle(d time.Duration) {
 	}
 }
 
-// waitForRequests waits until the transport has received n requests.
+// requests are the requests the transport has received, oldest first, leaving
+// out the review requests search that runs beside every board search.
+func (h *harness) requests() []githubtest.Request {
+	var reqs []githubtest.Request
+	for _, r := range h.transport.Requests() {
+		if !isReviewSearch(r) {
+			reqs = append(reqs, r)
+		}
+	}
+	return reqs
+}
+
+// waitForRequests waits until the transport has received n requests other
+// than review requests searches.
 func (h *harness) waitForRequests(n int) []githubtest.Request {
 	h.t.Helper()
 	deadline := time.Now().Add(waitTimeout)
 	for {
-		reqs := h.transport.Requests()
+		reqs := h.requests()
 		if len(reqs) >= n {
 			return reqs
 		}

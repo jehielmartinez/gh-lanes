@@ -42,12 +42,65 @@ type Response struct {
 type Transport struct {
 	mu       sync.Mutex
 	replies  map[string][]Response
+	matched  []*matchedReplies
 	requests []Request
+}
+
+// matchedReplies are the replies for an operation sent with one variable set
+// to one value.
+type matchedReplies struct {
+	operation, variable string
+	value               any
+	replies             []Response
 }
 
 // New returns a transport with no replies queued.
 func New() *Transport {
 	return &Transport{replies: map[string][]Response{}}
+}
+
+// ReplyWhen queues a response for the named operation sent with the variable
+// set to value. A request that matches is answered from these replies, in
+// order with the last one repeating, and never from those queued with Reply.
+func (t *Transport) ReplyWhen(operation, variable string, value any, r Response) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if m := t.match(operation, map[string]any{variable: value}); m != nil {
+		m.replies = append(m.replies, r)
+		return
+	}
+	t.matched = append(t.matched, &matchedReplies{operation: operation, variable: variable, value: value, replies: []Response{r}})
+}
+
+// ReplyFixtureWhen queues, as ReplyWhen does, a 200 response whose body is the
+// fixture file at path.
+func (t *Transport) ReplyFixtureWhen(tb testing.TB, operation, variable string, value any, path string) {
+	tb.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		tb.Fatalf("read fixture: %v", err)
+	}
+	t.ReplyWhen(operation, variable, value, Response{Body: body})
+}
+
+// HasRepliesWhen reports whether any reply is queued with ReplyWhen for the
+// operation, variable and value.
+func (t *Transport) HasRepliesWhen(operation, variable string, value any) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	m := t.match(operation, map[string]any{variable: value})
+	return m != nil
+}
+
+// match is the first set of matched replies the request's operation and
+// variables select, or nil.
+func (t *Transport) match(operation string, variables map[string]any) *matchedReplies {
+	for _, m := range t.matched {
+		if v, ok := variables[m.variable]; m.operation == operation && ok && v == m.value {
+			return m
+		}
+	}
+	return nil
 }
 
 // Reply queues a response for the named operation.
@@ -103,7 +156,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		Query:     payload.Query,
 		Variables: payload.Variables,
 	})
-	reply, ok := t.next(op)
+	reply, ok := t.next(op, payload.Variables)
 	t.mu.Unlock()
 
 	if reply.Release != nil {
@@ -133,7 +186,14 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-func (t *Transport) next(op string) (Response, bool) {
+func (t *Transport) next(op string, variables map[string]any) (Response, bool) {
+	if m := t.match(op, variables); m != nil {
+		reply := m.replies[0]
+		if len(m.replies) > 1 {
+			m.replies = m.replies[1:]
+		}
+		return reply, true
+	}
 	queue := t.replies[op]
 	if len(queue) == 0 {
 		return Response{}, false

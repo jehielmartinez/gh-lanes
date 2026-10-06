@@ -79,12 +79,12 @@ type prRefreshedMsg struct {
 }
 
 // actionTarget is the pull request actions apply to: the one in the modal,
-// or else the selected card.
+// or else the selected card on the tab in view.
 func (m Model) actionTarget() (domain.PullRequest, bool) {
 	if m.detail != nil {
 		return m.detail.pr, true
 	}
-	return m.selected()
+	return m.current()
 }
 
 // actionKeys is the keymap with each action enabled only when it can be taken
@@ -195,8 +195,8 @@ func (m Model) fetchPullRequest(id string) tea.Cmd {
 	}
 }
 
-// prRefreshed puts the fetched pull request in place of the board's copy,
-// keeping it selected if it was.
+// prRefreshed puts the fetched pull request in place of the board's copy and
+// the review requests' copy, keeping it selected if it was.
 func (m Model) prRefreshed(msg prRefreshedMsg) Model {
 	if msg.rateLimit != (domain.RateLimit{}) {
 		m.rateLimit = msg.rateLimit
@@ -210,15 +210,8 @@ func (m Model) prRefreshed(msg prRefreshedMsg) Model {
 	}
 	selected, wasSelected := m.selected()
 	wasSelected = wasSelected && selected.ID == msg.id
-	prs := make([]domain.PullRequest, len(m.prs))
-	copy(prs, m.prs)
-	for i, pr := range prs {
-		if pr.ID == msg.id {
-			prs[i] = msg.prs[0]
-		}
-	}
-	m.prs = prs
-	m = m.rebuild()
+	m.prs = replaced(m.prs, msg.prs[0])
+	m = m.withReviews(replaced(m.reviews, msg.prs[0])).rebuild()
 	if lane, card, ok := board.Locate(m.lanes, msg.id); ok && wasSelected {
 		m.focus = lane
 		m = m.withCursor(lane, card)
@@ -264,4 +257,17 @@ func (m Model) confirmView() string {
 // "octo-org/sample-repo#12".
 func ref(pr domain.PullRequest) string {
 	return fmt.Sprintf("%s#%d", pr.Repository.NameWithOwner, pr.Number)
+}
+
+// replaced is a copy of prs with any pull request sharing pr's ID swapped for
+// pr.
+func replaced(prs []domain.PullRequest, pr domain.PullRequest) []domain.PullRequest {
+	next := make([]domain.PullRequest, len(prs))
+	for i, p := range prs {
+		next[i] = p
+		if p.ID == pr.ID {
+			next[i] = pr
+		}
+	}
+	return next
 }

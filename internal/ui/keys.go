@@ -8,6 +8,8 @@ import (
 // keyMap is the single source of every binding; the help footer is generated
 // from it.
 type keyMap struct {
+	NextTab   key.Binding
+	PrevTab   key.Binding
 	LaneLeft  key.Binding
 	LaneRight key.Binding
 	CardUp    key.Binding
@@ -47,6 +49,8 @@ type modalKeys struct {
 
 func newKeyMap() keyMap {
 	return keyMap{
+		NextTab:      key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next tab")),
+		PrevTab:      key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "previous tab")),
 		LaneLeft:     key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("←/h", "lane")),
 		LaneRight:    key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("→/l", "lane")),
 		CardUp:       key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "card")),
@@ -89,13 +93,13 @@ func (k keyMap) withFullHelp(showAll bool) keyMap {
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open, k.MoveTo, k.Help, k.Quit}
+	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open, k.MoveTo, k.NextTab, k.Help, k.Quit}
 }
 
 // FullHelp lists every binding on the board.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
+		{k.NextTab, k.PrevTab, k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
 		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Archive},
 		{k.UpdateBranch, k.RebaseBranch, k.Draft},
 		{k.Refresh, k.Help, k.Quit},

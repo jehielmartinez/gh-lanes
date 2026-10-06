@@ -49,7 +49,8 @@ func TestNarrowTerminalScrollsLanesToKeepTheFocusedOneVisible(t *testing.T) {
 func TestLanesKeepTheirMinimumWidthInANarrowTerminal(t *testing.T) {
 	h := startBoard(t, withTermSize(narrowWidth, 30))
 
-	border := strings.Split(h.screen.plain(), "\n")[1]
+	// Under the tab bar and the lane headers.
+	border := strings.Split(h.screen.plain(), "\n")[2]
 	first := strings.Fields(border)[0]
 	if got := len([]rune(first)); got != 32 {
 		t.Errorf("card is %d columns wide, want 32:\n%s", got, h.screen.plain())

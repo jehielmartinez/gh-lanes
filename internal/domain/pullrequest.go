@@ -48,6 +48,12 @@ const (
 	StateMerged State = "MERGED"
 )
 
+// Finished reports whether the pull request has left the open search: merged,
+// or closed without merging.
+func (pr PullRequest) Finished() bool {
+	return pr.State == StateMerged || pr.State == StateClosed
+}
+
 // Repository is the repository a pull request belongs to, with the merge
 // settings that decide which actions it offers.
 type Repository struct {

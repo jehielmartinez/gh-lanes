@@ -12,6 +12,7 @@ type keyMap struct {
 	MoveLeft  key.Binding
 	MoveRight key.Binding
 	MoveTo    key.Binding
+	Archive   key.Binding
 	Refresh   key.Binding
 	Quit      key.Binding
 }
@@ -25,13 +26,14 @@ func newKeyMap() keyMap {
 		MoveLeft:  key.NewBinding(key.WithKeys("H", "<"), key.WithHelp("H/<", "move left")),
 		MoveRight: key.NewBinding(key.WithKeys("L", ">"), key.WithHelp("L/>", "move right")),
 		MoveTo:    key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "move to…")),
+		Archive:   key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "archive")),
 		Refresh:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
 		Quit:      key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	}
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.MoveLeft, k.MoveRight, k.MoveTo, k.Refresh, k.Quit}
+	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.MoveLeft, k.MoveRight, k.MoveTo, k.Archive, k.Refresh, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {

@@ -1,0 +1,77 @@
+{
+  "data": {
+    "nodes": [
+      {
+        "id": "PR_node_merged",
+        "number": 20,
+        "title": "Ship the upload worker",
+        "url": "https://github.com/octo-org/sample-repo/pull/20",
+        "isDraft": false,
+        "state": "MERGED",
+        "createdAt": "2026-02-01T10:00:00Z",
+        "updatedAt": "2026-03-03T10:00:00Z",
+        "mergedAt": "2026-03-03T10:00:00Z",
+        "closedAt": "2026-03-03T10:00:00Z",
+        "author": {
+          "login": "user-a"
+        },
+        "baseRefName": "main",
+        "headRefName": "feature-20",
+        "mergeable": "UNKNOWN",
+        "mergeStateStatus": "UNKNOWN",
+        "reviewDecision": "APPROVED",
+        "viewerCanUpdate": true,
+        "autoMergeRequest": null,
+        "repository": {
+          "nameWithOwner": "octo-org/sample-repo",
+          "mergeCommitAllowed": true,
+          "squashMergeAllowed": true,
+          "rebaseMergeAllowed": false,
+          "autoMergeAllowed": false,
+          "deleteBranchOnMerge": true
+        },
+        "comments": {
+          "totalCount": 0
+        },
+        "reviews": {
+          "totalCount": 1
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "id": "C_node_20",
+                "statusCheckRollup": null
+              }
+            }
+          ]
+        }
+      },
+      null
+    ],
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-03-05T13:00:00Z"
+    }
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": [
+        "nodes",
+        1
+      ],
+      "locations": [
+        {
+          "line": 2,
+          "column": 3
+        }
+      ],
+      "message": "Could not resolve to a node with the global id of 'PR_node_gone'"
+    }
+  ]
+}

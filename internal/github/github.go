@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/cli/go-gh/v2/pkg/auth"
@@ -100,22 +101,12 @@ func (c *Client) SearchPullRequests(ctx context.Context, query string) ([]domain
 			return nil, domain.RateLimit{}, fmt.Errorf("search pull requests: %w", err)
 		}
 		limit = resp.toDomain()
-		for _, n := range resp.Search.Nodes {
-			// Search nodes that aren't pull requests decode as empty objects.
-			if n.ID == "" {
-				continue
-			}
-			pr := n.toDomain()
-			if rollup := n.rollup(); rollup != nil && rollup.Contexts.PageInfo.HasNextPage {
-				rest, l, err := c.remainingChecks(ctx, n.headCommitID(), rollup.Contexts.PageInfo.EndCursor)
-				if err != nil {
-					return nil, domain.RateLimit{}, fmt.Errorf("checks for %s#%d: %w", pr.Repository.NameWithOwner, pr.Number, err)
-				}
-				pr.Checks = append(pr.Checks, rest...)
-				limit = l
-			}
-			prs = append(prs, pr)
+		found, l, err := c.toDomain(ctx, resp.Search.Nodes)
+		if err != nil {
+			return nil, domain.RateLimit{}, err
 		}
+		prs = append(prs, found...)
+		limit = latest(limit, l)
 		page := resp.Search.PageInfo
 		if !page.HasNextPage || page.EndCursor == "" {
 			break
@@ -123,6 +114,82 @@ func (c *Client) SearchPullRequests(ctx context.Context, query string) ([]domain
 		after = &page.EndCursor
 	}
 	return prs, limit, nil
+}
+
+// The nodes query accepts up to 100 IDs; batches are kept to a search page
+// for the same reason search pages are small.
+const nodesBatchSize = searchPageSize
+
+const pullRequestsByIDQuery = `query PullRequestsByID($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    ... on PullRequest { ...PullRequestFields }
+  }
+  ...RateLimitFields
+}` + pullRequestFragment + checkContextFragment + rateLimitFragment
+
+type nodesResponse struct {
+	Nodes []pullRequestNode
+	rateLimitResponse
+}
+
+// PullRequestsByID fetches pull requests by node ID, whatever their state,
+// along with the rate-limit budget left afterwards. An ID that no longer
+// resolves, such as a deleted pull request or one the login can no longer
+// see, is left out rather than failing the rest.
+func (c *Client) PullRequestsByID(ctx context.Context, ids []string) ([]domain.PullRequest, domain.RateLimit, error) {
+	var prs []domain.PullRequest
+	var limit domain.RateLimit
+	for batch := range slices.Chunk(ids, nodesBatchSize) {
+		var resp nodesResponse
+		err := c.do(ctx, pullRequestsByIDQuery, map[string]any{"ids": batch}, &resp)
+		var gqlErr *api.GraphQLError
+		if err != nil && !(errors.As(err, &gqlErr) && gqlErr.Match("NOT_FOUND", "nodes.")) {
+			return nil, domain.RateLimit{}, fmt.Errorf("fetch pull requests by id: %w", err)
+		}
+		limit = latest(limit, resp.toDomain())
+		found, l, err := c.toDomain(ctx, resp.Nodes)
+		if err != nil {
+			return nil, domain.RateLimit{}, err
+		}
+		prs = append(prs, found...)
+		limit = latest(limit, l)
+	}
+	return prs, limit, nil
+}
+
+// toDomain maps pull request nodes into domain values, paging through the
+// checks of any that has more than came with it. The rate limit is from the
+// last checks page fetched, zero if none was.
+func (c *Client) toDomain(ctx context.Context, nodes []pullRequestNode) ([]domain.PullRequest, domain.RateLimit, error) {
+	var prs []domain.PullRequest
+	var limit domain.RateLimit
+	for _, n := range nodes {
+		// Nodes that aren't pull requests, and IDs that didn't resolve,
+		// decode as empty objects.
+		if n.ID == "" {
+			continue
+		}
+		pr := n.toDomain()
+		if rollup := n.rollup(); rollup != nil && rollup.Contexts.PageInfo.HasNextPage {
+			rest, l, err := c.remainingChecks(ctx, n.headCommitID(), rollup.Contexts.PageInfo.EndCursor)
+			if err != nil {
+				return nil, domain.RateLimit{}, fmt.Errorf("checks for %s#%d: %w", pr.Repository.NameWithOwner, pr.Number, err)
+			}
+			pr.Checks = append(pr.Checks, rest...)
+			limit = l
+		}
+		prs = append(prs, pr)
+	}
+	return prs, limit, nil
+}
+
+// latest returns next, or prev when next is the zero value of a response that
+// didn't report one.
+func latest(prev, next domain.RateLimit) domain.RateLimit {
+	if next == (domain.RateLimit{}) {
+		return prev
+	}
+	return next
 }
 
 const checkContextsQuery = `query CheckContexts($id: ID!, $after: String) {

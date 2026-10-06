@@ -1,0 +1,21 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjM="
+      },
+      "nodes": [
+        {
+          "id": "PR_node_older",
+          "number": 7,
+          "title": "Fix typo in README",
+          "updatedAt": "2026-03-01T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo"
+          }
+        }
+      ]
+    }
+  }
+}

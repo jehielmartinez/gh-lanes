@@ -36,6 +36,10 @@ type PullRequest struct {
 	CommentCount  int
 	ReviewCount   int
 	LatestReviews []Review
+
+	// Conversation is filled only by the detail query; the board's search
+	// leaves it empty.
+	Conversation Conversation
 }
 
 // State is whether a pull request is open, merged or closed without merging.
@@ -117,12 +121,22 @@ const (
 	ReviewRequired         ReviewDecision = "REVIEW_REQUIRED"
 )
 
-// Review is the latest review one reviewer left.
+// Review is one review a reviewer submitted. Its Body is filled only by the
+// detail query.
 type Review struct {
 	Author      string
 	State       string
+	Body        string
 	SubmittedAt time.Time
 }
+
+// The review states GitHub reports for a submitted review.
+const (
+	ReviewStateApproved         = "APPROVED"
+	ReviewStateChangesRequested = "CHANGES_REQUESTED"
+	ReviewStateCommented        = "COMMENTED"
+	ReviewStateDismissed        = "DISMISSED"
+)
 
 // MergeStatus is the one-glance answer to "can this merge as it stands?".
 type MergeStatus int

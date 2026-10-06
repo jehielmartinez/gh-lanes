@@ -32,6 +32,8 @@ type modalKeys struct {
 	Top      key.Binding
 	Bottom   key.Binding
 	Close    key.Binding
+	// ExpandResolved shows or hides the comments of resolved review threads.
+	ExpandResolved key.Binding
 }
 
 func newKeyMap() keyMap {
@@ -49,13 +51,14 @@ func newKeyMap() keyMap {
 		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:      key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 		Modal: modalKeys{
-			Up:       key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
-			Down:     key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "down")),
-			PageUp:   key.NewBinding(key.WithKeys("pgup", "b"), key.WithHelp("b/pgup", "page up")),
-			PageDown: key.NewBinding(key.WithKeys("pgdown", "space", "f"), key.WithHelp("f/pgdn", "page down")),
-			Top:      key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g/home", "top")),
-			Bottom:   key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G/end", "bottom")),
-			Close:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
+			Up:             key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
+			Down:           key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "down")),
+			PageUp:         key.NewBinding(key.WithKeys("pgup", "b"), key.WithHelp("b/pgup", "page up")),
+			PageDown:       key.NewBinding(key.WithKeys("pgdown", "space", "f"), key.WithHelp("f/pgdn", "page down")),
+			Top:            key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g/home", "top")),
+			Bottom:         key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G/end", "bottom")),
+			Close:          key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
+			ExpandResolved: key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "resolved threads")),
 		},
 	}
 }
@@ -95,12 +98,12 @@ type modalHelp struct{ keys keyMap }
 
 func (h modalHelp) ShortHelp() []key.Binding {
 	m := h.keys.Modal
-	return []key.Binding{m.Up, m.Down, m.PageDown, m.Close, h.keys.Refresh, h.keys.Quit}
+	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, m.Close, h.keys.Refresh, h.keys.Quit}
 }
 
 func (h modalHelp) FullHelp() [][]key.Binding {
 	m := h.keys.Modal
-	return [][]key.Binding{{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.Close, h.keys.Refresh, h.keys.Quit}}
+	return [][]key.Binding{{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.ExpandResolved, m.Close, h.keys.Refresh, h.keys.Quit}}
 }
 
 // pickerKeys are the bindings inside a picker.

@@ -35,6 +35,9 @@ type detail struct {
 	fetchedAt time.Time
 	err       error
 	viewport  viewport.Model
+	// expandResolved shows the comments of resolved review threads, which
+	// are collapsed to one line by default.
+	expandResolved bool
 }
 
 type detailMsg struct {
@@ -114,6 +117,8 @@ func (m Model) detailKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		d.viewport.GotoTop()
 	case key.Matches(msg, m.keys.Modal.Bottom):
 		d.viewport.GotoBottom()
+	case key.Matches(msg, m.keys.Modal.ExpandResolved):
+		d.expandResolved = !d.expandResolved
 	default:
 		d.viewport, _ = d.viewport.Update(msg)
 	}
@@ -188,32 +193,36 @@ func (m Model) detailStatus(width int) string {
 func (m Model) detailContent(width int) string {
 	pr := m.detail.pr
 	muted := lipgloss.NewStyle().Foreground(m.theme.muted)
-	heading := lipgloss.NewStyle().Bold(true).Foreground(m.theme.text)
 	wrap := lipgloss.NewStyle().Width(width)
 
 	ref := fmt.Sprintf("%s#%d", pr.Repository.NameWithOwner, pr.Number)
-	author := pr.Author
-	if author == "" {
-		author = "ghost"
-	}
+	author := authorName(pr.Author)
 	lines := []string{
 		muted.Render(ref) + "  " + m.stateBadge(pr),
 		wrap.Bold(true).Foreground(m.theme.text).Render(oneLine(pr.Title)),
 		wrap.Render(muted.Render(author + statusSeparator + pr.HeadRef + " → " + pr.BaseRef)),
 		wrap.Render(muted.Render("Created " + m.timestamp(pr.CreatedAt) + statusSeparator + "Updated " + m.timestamp(pr.UpdatedAt))),
 		"",
-		heading.Render("Merge status"),
+		m.sectionHeading("Merge status"),
 		wrap.Render("  " + m.mergeLine(pr)),
 		"",
-		heading.Render("Review"),
+		m.sectionHeading("Review"),
 		"  " + m.reviewLine(pr.ReviewDecision),
 		"",
-		heading.Render("Auto-merge"),
+		m.sectionHeading("Auto-merge"),
 		wrap.Render("  " + m.autoMergeLine(pr.AutoMerge)),
 		"",
-		heading.Render("Checks") + "  " + muted.Render(checkSummary(pr.Checks)),
+		m.sectionHeading("Checks") + "  " + muted.Render(checkSummary(pr.Checks)),
 	}
 	lines = append(lines, m.checkLines(pr.Checks, width)...)
+	// The board's copy carries no conversation, so these wait for the
+	// detail query rather than claiming there is nothing to show.
+	if m.detail.fresh {
+		lines = append(lines, "")
+		lines = append(lines, m.descriptionLines(pr.Conversation, width)...)
+		lines = append(lines, "")
+		lines = append(lines, m.conversationLines(pr.Conversation, m.detail.expandResolved, width)...)
+	}
 	return strings.Join(lines, "\n")
 }
 

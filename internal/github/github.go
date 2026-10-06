@@ -129,10 +129,10 @@ const pullRequestsByIDQuery = `query PullRequestsByID($ids: [ID!]!) {
 
 const pullRequestDetailQuery = `query PullRequestDetail($id: ID!) {
   node(id: $id) {
-    ... on PullRequest { ...PullRequestFields }
+    ... on PullRequest { ...PullRequestFields ...ConversationFields }
   }
   ...RateLimitFields
-}` + pullRequestFragment + checkContextFragment + rateLimitFragment
+}` + pullRequestFragment + checkContextFragment + conversationFragment + rateLimitFragment
 
 type nodesResponse struct {
 	Nodes []pullRequestNode
@@ -196,7 +196,7 @@ func latest(prev, next domain.RateLimit) domain.RateLimit {
 }
 
 type pullRequestDetailResponse struct {
-	Node *pullRequestNode
+	Node *pullRequestDetailNode
 	rateLimitResponse
 }
 
@@ -204,8 +204,8 @@ type pullRequestDetailResponse struct {
 // usually because it was deleted or its repository became inaccessible.
 var ErrPullRequestNotFound = errors.New("pull request not found")
 
-// PullRequest fetches one pull request by node ID, with all of its checks,
-// along with the rate-limit budget left afterwards.
+// PullRequest fetches one pull request by node ID, with all of its checks and
+// its whole conversation, along with the rate-limit budget left afterwards.
 func (c *Client) PullRequest(ctx context.Context, id string) (domain.PullRequest, domain.RateLimit, error) {
 	var resp pullRequestDetailResponse
 	if err := c.do(ctx, pullRequestDetailQuery, map[string]any{"id": id}, &resp); err != nil {
@@ -215,13 +215,21 @@ func (c *Client) PullRequest(ctx context.Context, id string) (domain.PullRequest
 	if resp.Node == nil || resp.Node.ID == "" {
 		return domain.PullRequest{}, limit, ErrPullRequestNotFound
 	}
-	pr, l, err := c.withAllChecks(ctx, *resp.Node)
+	pr, l, err := c.withAllChecks(ctx, resp.Node.pullRequestNode)
 	if err != nil {
 		return domain.PullRequest{}, domain.RateLimit{}, err
 	}
 	if l != (domain.RateLimit{}) {
 		limit = l
 	}
+	conv, l, err := c.conversation(ctx, pr.ID, resp.Node.conversationNode)
+	if err != nil {
+		return domain.PullRequest{}, domain.RateLimit{}, fmt.Errorf("conversation of %s#%d: %w", pr.Repository.NameWithOwner, pr.Number, err)
+	}
+	if l != (domain.RateLimit{}) {
+		limit = l
+	}
+	pr.Conversation = conv
 	return pr, limit, nil
 }
 

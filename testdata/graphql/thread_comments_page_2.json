@@ -1,0 +1,26 @@
+{
+  "data": {
+    "node": {
+      "comments": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "author": {
+              "login": "user-a"
+            },
+            "body": "Fixed in the next push.",
+            "createdAt": "2026-03-04T15:30:00Z"
+          }
+        ]
+      }
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4970,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

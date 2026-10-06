@@ -12,13 +12,15 @@ import (
 // that allows merge commits and squash and leaves branches behind (#31), one
 // whose checks are still running (#32), one already set to auto-merge (#33),
 // one that conflicts with its base (#34), and one ready to merge in a repo
-// that deletes merged branches itself (#35).
+// that deletes merged branches itself (#35), and one blocked by a failed
+// check with nothing left for auto-merge to wait for (#36).
 const (
 	cleanRef     = "octo-org/sample-repo#31"
 	pendingRef   = "octo-org/sample-repo#32"
 	autoRef      = "octo-org/sample-repo#33"
 	conflictRef  = "octo-org/sample-repo#34"
 	selfCleanRef = "octo-org/sample-repo#35"
+	blockedRef   = "octo-org/sample-repo#36"
 )
 
 const (
@@ -48,8 +50,9 @@ func newMergeHarness(t *testing.T, reply func(*githubtest.Transport)) *harness {
 	if reply != nil {
 		reply(transport)
 	}
-	h := newHarness(t, transport)
-	h.waitForText(selfCleanRef)
+	// Tall enough for all six cards in one lane.
+	h := newHarness(t, transport, withTermSize(defaultTermWidth, 40))
+	h.waitForText(blockedRef)
 	return h
 }
 
@@ -176,7 +179,7 @@ func TestARepoThatDeletesMergedBranchesGetsNoDeleteRef(t *testing.T) {
 	h.press("M")
 	screen := h.waitForText("Merge " + selfCleanRef)
 	// The toggle starts at the repo's own setting.
-	assertContains(t, screen, "[x] Delete branch drop-legacy-flag")
+	assertContains(t, screen, "[x] Delete branch drop-legacy-flag (the repository deletes merged branches)")
 	h.press("enter")
 	h.waitForText("Merge pull request?")
 	h.press("enter")
@@ -241,22 +244,33 @@ func TestEnabledAutoMergeCanBeDisabled(t *testing.T) {
 }
 
 func TestMergeIsNotOfferedWhenGitHubWouldRefuse(t *testing.T) {
-	h := newMergeHarness(t, nil)
-
-	for range 3 {
-		h.press("j")
+	for _, tc := range []struct {
+		name string
+		ref  string
+		down int
+	}{
+		{"conflicting", conflictRef, 3},
+		{"blocked with nothing to wait for", blockedRef, 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newMergeHarness(t, nil)
+			for range tc.down {
+				h.press("j")
+			}
+			// The help opens after the cursor has moved, so it describes tc.ref.
+			h.press("?")
+			screen := h.waitForText("close help")
+			if strings.Contains(screen, "merge…") {
+				t.Errorf("merge should be hidden for %s:\n%s", tc.ref, screen)
+			}
+			h.press("M")
+			time.Sleep(50 * time.Millisecond)
+			if strings.Contains(h.screen.plain(), "Merge "+tc.ref) {
+				t.Errorf("no merge dialog should open for %s", tc.ref)
+			}
+			assertNoMergeMutations(t, h)
+		})
 	}
-	h.press("?")
-	screen := h.waitForText("close help")
-	if strings.Contains(screen, "merge…") {
-		t.Errorf("merge should be hidden for a conflicting pull request:\n%s", screen)
-	}
-	h.press("M")
-	time.Sleep(50 * time.Millisecond)
-	if strings.Contains(h.screen.plain(), "Merge "+conflictRef) {
-		t.Errorf("no merge dialog should open for %s", conflictRef)
-	}
-	assertNoMergeMutations(t, h)
 }
 
 func TestMergeIsNotOfferedForAPullRequestTheLoginCantChange(t *testing.T) {

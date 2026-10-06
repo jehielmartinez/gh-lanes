@@ -58,6 +58,10 @@ func (pr PullRequest) MergeOffer() MergeOffer {
 		return MergeOfferAutoMerge
 	case pr.MergeStatus() == MergeStatusChecking:
 		return MergeOfferNone
+	case pr.MergeStateStatus == MergeStateBlocked:
+		// Nothing outstanding that auto-merge could wait for, so whatever
+		// blocks it, such as a failed required check, needs a person.
+		return MergeOfferNone
 	}
 	return MergeOfferMerge
 }

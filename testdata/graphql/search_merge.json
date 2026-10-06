@@ -391,6 +391,92 @@
               }
             ]
           }
+        },
+        {
+          "id": "PR_node_blocked",
+          "number": 36,
+          "title": "Cache the avatars",
+          "url": "https://github.com/octo-org/sample-repo/pull/36",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-05T11:00:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-a"
+          },
+          "baseRefName": "main",
+          "headRefName": "cache-avatars",
+          "headRef": {
+            "id": "REF_node_blocked"
+          },
+          "mergeable": "MERGEABLE",
+          "mergeStateStatus": "BLOCKED",
+          "reviewDecision": "APPROVED",
+          "viewerCanUpdate": true,
+          "viewerCanUpdateBranch": false,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": true,
+            "deleteBranchOnMerge": false
+          },
+          "comments": {
+            "totalCount": 0
+          },
+          "reviews": {
+            "totalCount": 1
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "author": {
+                  "login": "user-b"
+                },
+                "state": "APPROVED",
+                "submittedAt": "2026-03-02T10:00:00Z"
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_PR_node_blocked",
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "pageInfo": {
+                        "hasNextPage": false,
+                        "endCursor": "Y3Vyc29yOjE="
+                      },
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "test",
+                          "status": "COMPLETED",
+                          "conclusion": "FAILURE",
+                          "startedAt": "2026-03-05T11:50:00Z",
+                          "completedAt": "2026-03-05T11:55:00Z",
+                          "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1",
+                          "checkSuite": {
+                            "workflowRun": {
+                              "workflow": {
+                                "name": "CI"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
         }
       ]
     },

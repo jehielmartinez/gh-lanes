@@ -146,7 +146,12 @@ func (m Model) mergeDialogView() string {
 		if d.deleteBranch {
 			box = "[x]"
 		}
-		rows = append(rows, "", text.Render(box+" Delete branch "+pr.HeadRef))
+		row := text.Render(box + " Delete branch " + pr.HeadRef)
+		if pr.Repository.DeleteBranchOnMerge {
+			// GitHub deletes it whatever the toggle says, so say so.
+			row += " " + lipgloss.NewStyle().Foreground(m.theme.muted).Render("(the repository deletes merged branches)")
+		}
+		rows = append(rows, "", row)
 	}
 	rows = append(rows, "", m.help.ShortHelpView(d.keys().ShortHelp()))
 	return modal(m.theme, rows)

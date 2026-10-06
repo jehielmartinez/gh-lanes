@@ -132,9 +132,23 @@ func (h *harness) press(key string) {
 		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEnter})
 	case "esc":
 		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEscape})
+	case "end":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEnd})
 	default:
 		h.tm.Type(key)
 	}
+}
+
+// click sends a left click at a screen cell.
+func (h *harness) click(x, y int) {
+	h.t.Helper()
+	h.tm.Send(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+}
+
+// resize tells the app the terminal changed size.
+func (h *harness) resize(width, height int) {
+	h.t.Helper()
+	h.tm.Send(tea.WindowSizeMsg{Width: width, Height: height})
 }
 
 // waitForScreen waits until the rendered screen, with styling removed,

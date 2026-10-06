@@ -283,6 +283,7 @@ func (c checkContexts) toDomain() []domain.Check {
 		switch n.Typename {
 		case "CheckRun":
 			check := domain.Check{
+				Kind:        domain.CheckRun,
 				Name:        n.Name,
 				Outcome:     checkRunOutcome(n.Status, n.Conclusion),
 				StartedAt:   n.StartedAt,
@@ -295,6 +296,7 @@ func (c checkContexts) toDomain() []domain.Check {
 			checks = append(checks, check)
 		case "StatusContext":
 			checks = append(checks, domain.Check{
+				Kind:       domain.CommitStatus,
 				Name:       n.Context,
 				Outcome:    statusContextOutcome(n.State),
 				StartedAt:  n.CreatedAt,

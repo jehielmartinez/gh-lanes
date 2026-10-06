@@ -22,6 +22,10 @@ const boardSearch = "is:pr is:open author:@me archived:false"
 
 const fetchTimeout = 30 * time.Second
 
+// doubleClick is the longest gap between two clicks on a card that still
+// counts as a double click.
+const doubleClick = 500 * time.Millisecond
+
 // clockTick is how often the clock is sampled, which is what keeps
 // "updated Ns ago" and card ages current and fires refreshes when due.
 const clockTick = time.Second
@@ -29,6 +33,7 @@ const clockTick = time.Second
 // GitHub is what the UI needs from the GitHub layer.
 type GitHub interface {
 	SearchPullRequests(ctx context.Context, query string) ([]domain.PullRequest, domain.RateLimit, error)
+	PullRequest(ctx context.Context, id string) (domain.PullRequest, domain.RateLimit, error)
 }
 
 // Options are the boundaries the root model is given rather than reaching for
@@ -95,6 +100,17 @@ type Model struct {
 	// view in each lane.
 	firstLane int
 	offsets   []int
+
+	// detail is the open detail modal, nil while the board has the keys.
+	detail    *detail
+	detailSeq int
+	lastClick click
+}
+
+// click is a left click that landed on a card.
+type click struct {
+	prID string
+	at   time.Time
 }
 
 // New returns the root model, ready to load the board when started.
@@ -202,7 +218,7 @@ func (m Model) Init() tea.Cmd {
 // that moved back into view.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
-	return next.scrolled(), cmd
+	return next.scrolled().syncDetail(), cmd
 }
 
 func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
@@ -222,25 +238,37 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.picker, cmd = m.picker.update(msg)
 			return m, cmd
 		}
+		if key.Matches(msg, m.keys.Refresh) {
+			m, board := m.refresh()
+			m, detail := m.fetchDetail()
+			return m, tea.Batch(board, detail)
+		}
+		if m.detail != nil {
+			return m.detailKey(msg)
+		}
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
-		if m.picker == nil {
-			return m.clicked(msg), nil
+		if m.detail == nil && m.picker == nil {
+			return m.clickBoard(msg)
 		}
 	case tea.MouseWheelMsg:
+		if m.detail != nil {
+			return m.detailScroll(msg), nil
+		}
 		if m.picker == nil {
 			return m.wheeled(msg), nil
 		}
 	case tickMsg:
 		m.now = msg.now
 		next := m.tick()
+		m, detail := m.detailDue()
 		if m.now.Sub(m.lastRefresh) < m.refreshInterval {
-			return m, next
+			return m, tea.Batch(next, detail)
 		}
-		m, cmd := m.refresh()
-		return m, tea.Batch(next, cmd)
+		m, board := m.refresh()
+		return m, tea.Batch(next, detail, board)
 	case spinner.TickMsg:
-		if !m.refreshing {
+		if !m.refreshing && (m.detail == nil || !m.detail.fetching) {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -257,6 +285,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.rateLimit = msg.rateLimit
 		}
 		return m.rebuild(), nil
+	case detailMsg:
+		return m.detailFetched(msg), nil
 	case storeLoadedMsg:
 		m.refreshInterval = msg.config.RefreshInterval
 		var intervalErr *store.RefreshIntervalError
@@ -313,6 +343,10 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.moveSelectedBy(1)
 	case key.Matches(msg, m.keys.MoveTo):
 		return m.openMovePicker(), nil
+	case key.Matches(msg, m.keys.Open):
+		if pr, ok := m.selected(); ok {
+			return m.openDetail(pr)
+		}
 	case key.Matches(msg, m.keys.Refresh):
 		return m.refresh()
 	case key.Matches(msg, m.keys.Help):
@@ -397,4 +431,24 @@ func (m Model) rebuild() Model {
 	m.cursors, m.offsets = cursors, offsets
 	m.focus = max(0, min(m.focus, len(m.lanes)-1))
 	return m
+}
+
+// clickBoard selects the card under a left click, and opens it when the
+// click follows another on the same card quickly enough to make a double
+// click.
+func (m Model) clickBoard(msg tea.MouseClickMsg) (Model, tea.Cmd) {
+	lane, card, ok := m.cardAt(msg.X, msg.Y)
+	if msg.Button != tea.MouseLeft || !ok {
+		m.lastClick = click{}
+		return m, nil
+	}
+	m = m.clicked(msg)
+	pr := m.lanes[lane].PullRequests[card]
+	now := m.opts.Now()
+	if m.lastClick.prID == pr.ID && now.Sub(m.lastClick.at) <= doubleClick {
+		m.lastClick = click{}
+		return m.openDetail(pr)
+	}
+	m.lastClick = click{prID: pr.ID, at: now}
+	return m, nil
 }

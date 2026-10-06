@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/help"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -18,8 +19,8 @@ const cardPadding = 4
 
 const statusSeparator = " · "
 
-// View draws the board, the status bar and the help footer, with any open
-// picker over them.
+// View draws the board, the status bar and the help footer, with the detail
+// modal or any open picker over them.
 func (m Model) View() tea.View {
 	body := lipgloss.NewStyle()
 	if height := m.boardHeight(); height > 0 {
@@ -28,19 +29,27 @@ func (m Model) View() tea.View {
 	if m.width > 0 {
 		body = body.MaxWidth(m.width)
 	}
-	content := lipgloss.JoinVertical(lipgloss.Left, body.Render(m.boardView()), m.footerView())
-	if m.picker != nil {
-		content = m.overlay(content, m.picker.view(m.theme, m.help))
+	screen := lipgloss.JoinVertical(lipgloss.Left, body.Render(m.boardView()), m.footerView())
+	if m.detail != nil {
+		screen = m.overlay(screen, m.detailView())
 	}
-	v := tea.NewView(content)
+	if m.picker != nil {
+		screen = m.overlay(screen, m.picker.view(m.theme, m.help))
+	}
+	v := tea.NewView(screen)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
-// footerView is the status bar over the help footer.
+// footerView is the status bar over the help footer, which lists the
+// modal's keys while the detail modal is open.
 func (m Model) footerView() string {
-	return lipgloss.JoinVertical(lipgloss.Left, m.statusView(), m.help.View(m.keys))
+	var keys help.KeyMap = m.keys
+	if m.detail != nil {
+		keys = modalHelp{keys: m.keys}
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, m.statusView(), m.help.View(keys))
 }
 
 // overlay draws fg centred on the terminal over bg.
@@ -69,11 +78,16 @@ func (m Model) boardView() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, cols...)
 }
 
+// laneHeader is a lane's name and card count.
+func (m Model) laneHeader(lane board.Lane, focused bool) string {
+	name := lipgloss.NewStyle().Bold(true).Underline(focused).Foreground(m.laneColor(lane)).Render(lane.Tag.Name)
+	return name + " " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
+}
+
+// laneView draws a lane's header and the cards in view from offset.
 func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) string {
 	width := m.laneWidth()
-	name := lipgloss.NewStyle().Bold(true).Underline(focused).Foreground(m.laneColor(lane)).Render(lane.Tag.Name)
-	header := name + " " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
-	rows := []string{header}
+	rows := []string{m.laneHeader(lane, focused)}
 	if lane.Untagged() && m.loaded && len(m.prs) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}

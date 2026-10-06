@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/teatest/v2"
@@ -21,6 +22,13 @@ import (
 const (
 	placeholderToken = "placeholder-token"
 	waitTimeout      = 3 * time.Second
+)
+
+// The default terminal is wide enough for all six default lanes, so tests that
+// aren't about scrolling see the whole board.
+const (
+	defaultTermWidth  = 240
+	defaultTermHeight = 30
 )
 
 // fixedZone keeps local-time output identical on every machine.
@@ -40,9 +48,15 @@ type harness struct {
 type harnessOption func(*harnessConfig)
 
 type harnessConfig struct {
-	env       map[string]string
-	configDir string
-	config    string
+	env           map[string]string
+	configDir     string
+	config        string
+	width, height int
+}
+
+// withTermSize starts the app in a terminal of the given size.
+func withTermSize(width, height int) harnessOption {
+	return func(c *harnessConfig) { c.width, c.height = width, height }
 }
 
 // withEnv sets an environment variable before the GitHub layer resolves auth.
@@ -65,7 +79,7 @@ func withConfig(yaml string) harnessOption {
 // the call, since the app fetches as soon as it starts.
 func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOption) *harness {
 	t.Helper()
-	cfg := harnessConfig{env: map[string]string{}}
+	cfg := harnessConfig{env: map[string]string{}, width: defaultTermWidth, height: defaultTermHeight}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -95,7 +109,7 @@ func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOp
 		screen:    &screen{},
 	}
 	root := ui.New(ui.Options{GitHub: client, ConfigDir: h.configDir, Now: h.clock.Now, After: h.clock.After})
-	h.tm = teatest.NewTestModel(t, spy{inner: root, screen: h.screen}, teatest.WithInitialTermSize(100, 30))
+	h.tm = teatest.NewTestModel(t, spy{inner: root, screen: h.screen}, teatest.WithInitialTermSize(cfg.width, cfg.height))
 	t.Cleanup(func() { _ = h.tm.Quit() })
 	return h
 }
@@ -139,10 +153,30 @@ func (h *harness) press(key string) {
 	}
 }
 
-// click sends a left click at a screen cell.
+// click presses and releases the left mouse button at a screen cell.
 func (h *harness) click(x, y int) {
 	h.t.Helper()
 	h.tm.Send(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	h.tm.Send(tea.MouseReleaseMsg{X: x, Y: y, Button: tea.MouseLeft})
+}
+
+// wheel turns the mouse wheel once, up or down, with the pointer at a cell.
+func (h *harness) wheel(x, y int, down bool) {
+	button := tea.MouseWheelUp
+	if down {
+		button = tea.MouseWheelDown
+	}
+	h.tm.Send(tea.MouseWheelMsg{X: x, Y: y, Button: button})
+}
+
+// locate finds text on the plain screen and returns its column and row.
+func locate(screen, text string) (x, y int, ok bool) {
+	for row, line := range strings.Split(screen, "\n") {
+		if i := strings.Index(line, text); i >= 0 {
+			return utf8.RuneCountInString(line[:i]), row, true
+		}
+	}
+	return 0, 0, false
 }
 
 // resize tells the app the terminal changed size.

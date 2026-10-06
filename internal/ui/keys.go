@@ -17,6 +17,7 @@ type keyMap struct {
 	MoveTo    key.Binding
 	Open      key.Binding
 	Refresh   key.Binding
+	Help      key.Binding
 	Quit      key.Binding
 	Modal     modalKeys
 }
@@ -43,6 +44,7 @@ func newKeyMap() keyMap {
 		MoveTo:    key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "move to…")),
 		Open:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Refresh:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
+		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:      key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 		Modal: modalKeys{
 			Up:       key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
@@ -56,12 +58,28 @@ func newKeyMap() keyMap {
 	}
 }
 
-func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open, k.MoveLeft, k.MoveRight, k.MoveTo, k.Refresh, k.Quit}
+// withFullHelp returns the keymap with the help binding describing what
+// pressing it will now do.
+func (k keyMap) withFullHelp(showAll bool) keyMap {
+	desc := "help"
+	if showAll {
+		desc = "close help"
+	}
+	k.Help.SetHelp("?", desc)
+	return k
 }
 
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open, k.MoveTo, k.Help, k.Quit}
+}
+
+// FullHelp lists every binding on the board.
 func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{k.ShortHelp()}
+	return [][]key.Binding{
+		{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
+		{k.MoveLeft, k.MoveRight, k.MoveTo},
+		{k.Refresh, k.Help, k.Quit},
+	}
 }
 
 // viewportKeys hands the modal's scroll bindings to the viewport. The

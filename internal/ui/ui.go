@@ -96,6 +96,11 @@ type Model struct {
 	cursors []int
 	picker  *picker
 
+	// firstLane is the leftmost lane in view, and offsets the first card in
+	// view in each lane.
+	firstLane int
+	offsets   []int
+
 	// detail is the open detail modal, nil while the board has the keys.
 	detail    *detail
 	detailSeq int
@@ -209,10 +214,11 @@ func (m Model) Init() tea.Cmd {
 	)
 }
 
-// Update routes messages to the state they change.
+// Update routes messages to the state they change, then scrolls whatever
+// that moved back into view.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
-	return next.syncDetail(), cmd
+	return next.scrolled().syncDetail(), cmd
 }
 
 func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
@@ -242,12 +248,15 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
-		if m.detail == nil && m.picker == nil && msg.Button == tea.MouseLeft {
-			return m.clickBoard(msg.X, msg.Y)
+		if m.detail == nil && m.picker == nil {
+			return m.clickBoard(msg)
 		}
 	case tea.MouseWheelMsg:
 		if m.detail != nil {
 			return m.detailScroll(msg), nil
+		}
+		if m.picker == nil {
+			return m.wheeled(msg), nil
 		}
 	case tickMsg:
 		m.now = msg.now
@@ -340,6 +349,9 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 	case key.Matches(msg, m.keys.Refresh):
 		return m.refresh()
+	case key.Matches(msg, m.keys.Help):
+		m.help.ShowAll = !m.help.ShowAll
+		m.keys = m.keys.withFullHelp(m.help.ShowAll)
 	}
 	return m, nil
 }
@@ -409,24 +421,29 @@ func (m Model) withCursor(lane, index int) Model {
 func (m Model) rebuild() Model {
 	m.lanes = board.Assemble(m.prs, m.tags, m.assignments)
 	cursors := make([]int, len(m.lanes))
+	offsets := make([]int, len(m.lanes))
 	for i, lane := range m.lanes {
 		if i < len(m.cursors) {
 			cursors[i] = max(0, min(m.cursors[i], len(lane.PullRequests)-1))
+			offsets[i] = m.offsets[i]
 		}
 	}
-	m.cursors = cursors
+	m.cursors, m.offsets = cursors, offsets
 	m.focus = max(0, min(m.focus, len(m.lanes)-1))
 	return m
 }
 
-// clickBoard opens the card under a click that follows another on the same
-// card quickly enough to make a double click.
-func (m Model) clickBoard(x, y int) (Model, tea.Cmd) {
-	pr, ok := m.cardAt(x, y)
-	if !ok {
+// clickBoard selects the card under a left click, and opens it when the
+// click follows another on the same card quickly enough to make a double
+// click.
+func (m Model) clickBoard(msg tea.MouseClickMsg) (Model, tea.Cmd) {
+	lane, card, ok := m.cardAt(msg.X, msg.Y)
+	if msg.Button != tea.MouseLeft || !ok {
 		m.lastClick = click{}
 		return m, nil
 	}
+	m = m.clicked(msg)
+	pr := m.lanes[lane].PullRequests[card]
 	now := m.opts.Now()
 	if m.lastClick.prID == pr.ID && now.Sub(m.lastClick.at) <= doubleClick {
 		m.lastClick = click{}

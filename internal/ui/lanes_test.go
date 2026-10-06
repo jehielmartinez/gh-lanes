@@ -418,7 +418,8 @@ func TestUnreadableConfigIsReportedAndNothingIsWritten(t *testing.T) {
 			seedFile(t, dir, tc.file, tc.content)
 			h := newHarness(t, boardTransport(t), withConfigDir(dir))
 
-			screen := h.waitForText(tc.want)
+			screen := h.waitForText("octo-org/sample-repo#7")
+			screen = h.waitForText(tc.want)
 			if !strings.Contains(screen, "Couldn't load tags") {
 				t.Errorf("status bar should say the tags couldn't load:\n%s", screen)
 			}

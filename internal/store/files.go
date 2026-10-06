@@ -53,6 +53,10 @@ type State struct {
 	Assignments map[string]string
 	// Archived lists the pull requests archived off the board.
 	Archived []domain.Archived
+	// Snapshots maps a pull request node ID to what it looked like when last
+	// seen. It is nil until the first board load has recorded what was on the
+	// board then, which is how a later run tells new pull requests apart.
+	Snapshots map[string]domain.Snapshot
 }
 
 type configFile struct {
@@ -69,14 +73,26 @@ type tagEntry struct {
 }
 
 type stateFile struct {
-	Version     int               `json:"version"`
-	Assignments map[string]string `json:"assignments"`
-	Archived    []archivedEntry   `json:"archived"`
+	Version     int                      `json:"version"`
+	Assignments map[string]string        `json:"assignments"`
+	Archived    []archivedEntry          `json:"archived"`
+	Snapshots   map[string]snapshotEntry `json:"snapshots"`
 }
 
 type archivedEntry struct {
 	ID   string `json:"id"`
 	Open bool   `json:"open"`
+}
+
+type snapshotEntry struct {
+	SeenAt         time.Time             `json:"seen_at"`
+	Checks         domain.CheckState     `json:"checks"`
+	Mergeable      domain.Mergeable      `json:"mergeable"`
+	ReviewDecision domain.ReviewDecision `json:"review_decision"`
+	Comments       int                   `json:"comments"`
+	Reviews        int                   `json:"reviews"`
+	Draft          bool                  `json:"draft"`
+	State          domain.State          `json:"state"`
 }
 
 // LoadConfig reads the config file in dir. On first run, when there is no
@@ -205,7 +221,14 @@ func LoadState(dir string) (State, error) {
 			archived = append(archived, domain.Archived(e))
 		}
 	}
-	return State{Assignments: file.Assignments, Archived: archived}, nil
+	st := State{Assignments: file.Assignments, Archived: archived}
+	if file.Snapshots != nil {
+		st.Snapshots = make(map[string]domain.Snapshot, len(file.Snapshots))
+		for id, e := range file.Snapshots {
+			st.Snapshots[id] = domain.Snapshot(e)
+		}
+	}
+	return st, nil
 }
 
 // SaveState writes the state file in dir atomically.
@@ -218,7 +241,14 @@ func SaveState(dir string, s State) error {
 	for _, a := range s.Archived {
 		archived = append(archived, archivedEntry(a))
 	}
-	raw, err := json.MarshalIndent(stateFile{Version: stateVersion, Assignments: assignments, Archived: archived}, "", "  ")
+	file := stateFile{Version: stateVersion, Assignments: assignments, Archived: archived}
+	if s.Snapshots != nil {
+		file.Snapshots = make(map[string]snapshotEntry, len(s.Snapshots))
+		for id, snap := range s.Snapshots {
+			file.Snapshots[id] = snapshotEntry(snap)
+		}
+	}
+	raw, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode state: %w", err)
 	}

@@ -13,6 +13,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/jehielmartinez/gh-lanes/internal/activity"
 	"github.com/jehielmartinez/gh-lanes/internal/board"
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 	"github.com/jehielmartinez/gh-lanes/internal/store"
@@ -87,6 +88,10 @@ type Model struct {
 	tags        []domain.Tag
 	assignments map[string]string
 	archived    []domain.Archived
+	// snapshots is nil until the first successful board load has been
+	// recorded as seen; see store.State.
+	snapshots map[string]domain.Snapshot
+	markers   map[string]activity.Marker
 
 	// One state write is in flight at a time; a move made meanwhile queues
 	// another, so writes land in the order the moves were made.
@@ -242,7 +247,7 @@ func (m Model) saveState() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.saving = true
-	dir, state := m.opts.ConfigDir, store.State{Assignments: m.assignments, Archived: m.archived}
+	dir, state := m.opts.ConfigDir, store.State{Assignments: m.assignments, Archived: m.archived, Snapshots: m.snapshots}
 	return m, func() tea.Msg { return stateSavedMsg{err: store.SaveState(dir, state)} }
 }
 
@@ -277,7 +282,8 @@ func (m Model) Init() tea.Cmd {
 // that moved back into view.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
-	return next.scrolled().syncDetail(), cmd
+	next, save := next.observe()
+	return next.scrolled().syncDetail(), tea.Batch(cmd, save)
 }
 
 func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
@@ -370,6 +376,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.tags = msg.config.Tags
 			m.assignments = msg.state.Assignments
 			m.archived = msg.state.Archived
+			m.snapshots = msg.state.Snapshots
 		}
 		return m.rebuild(), nil
 	case moveMsg:
@@ -549,12 +556,17 @@ func (m Model) move(prID, tagID string) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.assignments = board.Assign(m.assignments, prID, tagID)
-	m = m.rebuild()
+	m = m.rebuild().reselect(prID)
+	return m.saveState()
+}
+
+// reselect focuses the pull request's card wherever it now sits.
+func (m Model) reselect(prID string) Model {
 	if lane, card, ok := board.Locate(m.lanes, prID); ok {
 		m.focus = lane
 		m = m.withCursor(lane, card)
 	}
-	return m.saveState()
+	return m
 }
 
 // archiveSelected takes the selected card off the board until its pull

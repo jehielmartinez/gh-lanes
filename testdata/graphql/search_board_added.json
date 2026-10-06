@@ -1,0 +1,49 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjM="
+      },
+      "nodes": [
+        {
+          "id": "PR_node_added",
+          "number": 8,
+          "title": "Add a changelog",
+          "updatedAt": "2026-03-05T10:00:00Z",
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo"
+          }
+        },
+        {
+          "id": "PR_node_older",
+          "number": 7,
+          "title": "Fix typo in README",
+          "updatedAt": "2026-03-01T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo"
+          }
+        },
+        {
+          "id": "PR_node_newer",
+          "number": 42,
+          "title": "Add retry with exponential backoff to the upload worker queue",
+          "updatedAt": "2026-03-04T15:30:00Z",
+          "repository": {
+            "nameWithOwner": "user-a/other-repo"
+          }
+        },
+        {
+          "id": "PR_node_long_repo",
+          "number": 1234,
+          "title": "Bump dependencies",
+          "updatedAt": "2026-02-20T08:00:00Z",
+          "repository": {
+            "nameWithOwner": "octo-org/a-very-long-sample-repository-name"
+          }
+        },
+        {}
+      ]
+    }
+  }
+}

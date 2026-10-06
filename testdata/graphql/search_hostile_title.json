@@ -1,0 +1,16 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": { "hasNextPage": false, "endCursor": null },
+      "nodes": [
+        {
+          "id": "PR_node_hostile",
+          "number": 9,
+          "title": "Fix \u001b[2J\u001b]0;pwned\u0007bug\u009b31m\u0007 now",
+          "updatedAt": "2026-03-01T09:00:00Z",
+          "repository": { "nameWithOwner": "octo-org/sample-repo" }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": { "hasNextPage": false, "endCursor": "Y3Vyc29yOjI=" },
+      "nodes": [
+        {
+          "id": "PR_node_page_2",
+          "number": 2,
+          "title": "Second page change",
+          "updatedAt": "2026-03-01T09:00:00Z",
+          "repository": { "nameWithOwner": "octo-org/sample-repo" }
+        }
+      ]
+    }
+  }
+}

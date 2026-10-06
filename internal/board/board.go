@@ -61,3 +61,16 @@ func Assign(assignments map[string]string, prID, tagID string) map[string]string
 	}
 	return next
 }
+
+// Locate finds the pull request on the board: the index of its lane and of its
+// card within that lane.
+func Locate(lanes []Lane, prID string) (lane, card int, ok bool) {
+	for li, l := range lanes {
+		for ci, pr := range l.PullRequests {
+			if pr.ID == prID {
+				return li, ci, true
+			}
+		}
+	}
+	return 0, 0, false
+}

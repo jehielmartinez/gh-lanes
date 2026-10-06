@@ -13,10 +13,9 @@ import (
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 )
 
-// The file names inside the config directory.
 const (
-	ConfigFile = "config.yaml"
-	StateFile  = "state.json"
+	configFileName = "config.yaml"
+	stateFileName  = "state.json"
 )
 
 // Schema versions of the files this build reads and writes. A file with any
@@ -70,7 +69,7 @@ type stateFile struct {
 // LoadConfig reads the config file in dir. On first run, when there is no
 // file yet, it writes one with the default tags and returns that.
 func LoadConfig(dir string) (Config, error) {
-	path := filepath.Join(dir, ConfigFile)
+	path := filepath.Join(dir, configFileName)
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return writeDefaultConfig(path)
@@ -127,7 +126,7 @@ func tagsFromFile(entries []tagEntry) ([]domain.Tag, error) {
 
 // LoadState reads the state file in dir. A missing file is an empty state.
 func LoadState(dir string) (State, error) {
-	path := filepath.Join(dir, StateFile)
+	path := filepath.Join(dir, stateFileName)
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return State{Assignments: map[string]string{}}, nil
@@ -158,7 +157,7 @@ func SaveState(dir string, s State) error {
 	if err != nil {
 		return fmt.Errorf("encode state: %w", err)
 	}
-	if err := writeAtomic(filepath.Join(dir, StateFile), append(raw, '\n')); err != nil {
+	if err := writeAtomic(filepath.Join(dir, stateFileName), append(raw, '\n')); err != nil {
 		return fmt.Errorf("write state: %w", err)
 	}
 	return nil

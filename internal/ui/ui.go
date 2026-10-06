@@ -255,33 +255,17 @@ func (m Model) openMovePicker() Model {
 // move puts the pull request in the tag's lane, keeps it selected there and
 // saves the assignment.
 func (m Model) move(prID, tagID string) (Model, tea.Cmd) {
-	if !m.storeReady || m.assignedTag(prID) == tagID {
+	from, _, onBoard := board.Locate(m.lanes, prID)
+	if !m.storeReady || !onBoard || m.lanes[from].Tag.ID == tagID {
 		return m, nil
 	}
 	m.assignments = board.Assign(m.assignments, prID, tagID)
 	m = m.rebuild()
-	for li, lane := range m.lanes {
-		for ci, pr := range lane.PullRequests {
-			if pr.ID == prID {
-				m.focus = li
-				m = m.withCursor(li, ci)
-			}
-		}
+	if lane, card, ok := board.Locate(m.lanes, prID); ok {
+		m.focus = lane
+		m = m.withCursor(lane, card)
 	}
 	return m.saveState()
-}
-
-// assignedTag is the ID of the tag whose lane the pull request is shown in,
-// empty for Untagged.
-func (m Model) assignedTag(prID string) string {
-	for _, lane := range m.lanes {
-		for _, pr := range lane.PullRequests {
-			if pr.ID == prID {
-				return lane.Tag.ID
-			}
-		}
-	}
-	return ""
 }
 
 // withCursor selects card index in lane, kept inside the lane.

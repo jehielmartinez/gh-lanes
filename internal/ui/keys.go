@@ -15,10 +15,14 @@ type keyMap struct {
 	MoveLeft  key.Binding
 	MoveRight key.Binding
 	MoveTo    key.Binding
+	Tags      key.Binding
 	Open      key.Binding
 	Refresh   key.Binding
 	Help      key.Binding
 	Quit      key.Binding
+	// Interrupt is the one way to quit while text is being typed, where q is
+	// just a letter.
+	Interrupt key.Binding
 	Modal     modalKeys
 }
 
@@ -42,10 +46,12 @@ func newKeyMap() keyMap {
 		MoveLeft:  key.NewBinding(key.WithKeys("H", "<"), key.WithHelp("H/<", "move left")),
 		MoveRight: key.NewBinding(key.WithKeys("L", ">"), key.WithHelp("L/>", "move right")),
 		MoveTo:    key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "move to…")),
+		Tags:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tags")),
 		Open:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Refresh:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
 		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:      key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
+		Interrupt: key.NewBinding(key.WithKeys("ctrl+c")),
 		Modal: modalKeys{
 			Up:       key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
 			Down:     key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "down")),
@@ -77,7 +83,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
-		{k.MoveLeft, k.MoveRight, k.MoveTo},
+		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags},
 		{k.Refresh, k.Help, k.Quit},
 	}
 }
@@ -124,4 +130,63 @@ func (k pickerKeys) ShortHelp() []key.Binding {
 
 func (k pickerKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
+}
+
+// tagManagerKeys are the bindings in the tag manager's list.
+type tagManagerKeys struct {
+	Up       key.Binding
+	Down     key.Binding
+	New      key.Binding
+	Rename   key.Binding
+	Color    key.Binding
+	MoveUp   key.Binding
+	MoveDown key.Binding
+	Terminal key.Binding
+	Delete   key.Binding
+	Close    key.Binding
+}
+
+func newTagManagerKeys() tagManagerKeys {
+	return tagManagerKeys{
+		Up:       key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
+		Down:     key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "down")),
+		New:      key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new")),
+		Rename:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "rename")),
+		Color:    key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "color")),
+		MoveUp:   key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K", "move up")),
+		MoveDown: key.NewBinding(key.WithKeys("J", "shift+down"), key.WithHelp("J", "move down")),
+		Terminal: key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "terminal")),
+		Delete:   key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
+		Close:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
+	}
+}
+
+func (k tagManagerKeys) ShortHelp() []key.Binding {
+	return []key.Binding{k.New, k.Rename, k.Color, k.MoveUp, k.MoveDown, k.Terminal, k.Delete, k.Close}
+}
+
+func (k tagManagerKeys) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{k.Up, k.Down}, k.ShortHelp()}
+}
+
+// dialogKeys are the bindings while a tag's name or colour is being edited, or
+// its deletion confirmed.
+type dialogKeys struct {
+	Prev    key.Binding
+	Next    key.Binding
+	Save    key.Binding
+	Cancel  key.Binding
+	Confirm key.Binding
+	Decline key.Binding
+}
+
+func newDialogKeys() dialogKeys {
+	return dialogKeys{
+		Prev:    key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("←/h", "prev")),
+		Next:    key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("→/l", "next")),
+		Save:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save")),
+		Cancel:  key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+		Confirm: key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "delete")),
+		Decline: key.NewBinding(key.WithKeys("n", "esc"), key.WithHelp("n/esc", "keep")),
+	}
 }

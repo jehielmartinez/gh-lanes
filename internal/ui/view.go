@@ -20,7 +20,7 @@ const cardPadding = 4
 const statusSeparator = " · "
 
 // View draws the board, the status bar and the help footer, with the detail
-// modal or any open picker over them.
+// modal, the tag manager or any open picker over them.
 func (m Model) View() tea.View {
 	body := lipgloss.NewStyle()
 	if height := m.boardHeight(); height > 0 {
@@ -32,6 +32,9 @@ func (m Model) View() tea.View {
 	screen := lipgloss.JoinVertical(lipgloss.Left, body.Render(m.boardView()), m.footerView())
 	if m.detail != nil {
 		screen = m.overlay(screen, m.detailView())
+	}
+	if m.tagManager != nil {
+		screen = m.overlay(screen, m.tagManager.view(m.theme, m.help, m.lanes))
 	}
 	if m.picker != nil {
 		screen = m.overlay(screen, m.picker.view(m.theme, m.help))
@@ -80,7 +83,7 @@ func (m Model) boardView() string {
 
 // laneHeader is a lane's name and card count.
 func (m Model) laneHeader(lane board.Lane, focused bool) string {
-	name := lipgloss.NewStyle().Bold(true).Underline(focused).Foreground(m.laneColor(lane)).Render(lane.Tag.Name)
+	name := lipgloss.NewStyle().Bold(true).Underline(focused).Foreground(laneColor(m.theme, lane)).Render(lane.Tag.Name)
 	return name + " " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
 }
 
@@ -98,9 +101,9 @@ func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) strin
 	return lipgloss.NewStyle().Width(width).MarginRight(laneGap).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
 
-func (m Model) laneColor(lane board.Lane) color.Color {
+func laneColor(t theme, lane board.Lane) color.Color {
 	if lane.Tag.Color == "" {
-		return m.theme.untagged
+		return t.untagged
 	}
 	return lipgloss.Color(lane.Tag.Color)
 }
@@ -193,6 +196,9 @@ func (m Model) statusView() string {
 	}
 	if m.saveErr != nil {
 		parts = append(parts, errStyle.Render("Couldn't save lanes: "+oneLine(m.saveErr.Error())))
+	}
+	if m.tagSaveErr != nil {
+		parts = append(parts, errStyle.Render("Couldn't save tags: "+oneLine(m.tagSaveErr.Error())))
 	}
 	if m.rateLimit.Low() {
 		parts = append(parts, errStyle.Render(fmt.Sprintf("rate limit %d/%d left", m.rateLimit.Remaining, m.rateLimit.Limit)))

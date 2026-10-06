@@ -71,6 +71,11 @@ func (p picker) view(t theme, h help.Model) string {
 		rows = append(rows, row)
 	}
 	rows = append(rows, "", h.ShortHelpView(p.keys.ShortHelp()))
+	return modal(t, rows)
+}
+
+// modal frames rows as a dialog drawn over the board.
+func modal(t theme, rows []string) string {
 	return lipgloss.NewStyle().
 		Padding(0, 2).
 		Border(lipgloss.RoundedBorder()).

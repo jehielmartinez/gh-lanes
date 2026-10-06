@@ -110,7 +110,12 @@ func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOp
 	}
 	root := ui.New(ui.Options{GitHub: client, ConfigDir: h.configDir, Now: h.clock.Now, After: h.clock.After})
 	h.tm = teatest.NewTestModel(t, spy{inner: root, screen: h.screen}, teatest.WithInitialTermSize(cfg.width, cfg.height))
-	t.Cleanup(func() { _ = h.tm.Quit() })
+	// Quitting the way a user does lets in-flight writes land before the
+	// config directory is removed.
+	t.Cleanup(func() {
+		h.tm.Send(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		h.waitFinished()
+	})
 	return h
 }
 
@@ -144,6 +149,8 @@ func (h *harness) press(key string) {
 		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyDown})
 	case "enter":
 		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEnter})
+	case "ctrl+u":
+		h.tm.Send(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	case "esc":
 		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEscape})
 	case "end":

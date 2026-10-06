@@ -31,11 +31,11 @@ const (
 // defaultTags are written on first run. Their IDs never change, so a rename
 // keeps every assignment.
 var defaultTags = []domain.Tag{
-	{ID: "in-progress", Name: "In Progress", Color: "#3B82F6"},
-	{ID: "review", Name: "Review", Color: "#A855F7"},
-	{ID: "testing", Name: "Testing", Color: "#F59E0B"},
-	{ID: "demo", Name: "Demo", Color: "#10B981"},
-	{ID: "done", Name: "Done", Color: "#6B7280", Terminal: true},
+	{ID: "in-progress", Name: "In Progress", Color: domain.TagColors[0]},
+	{ID: "review", Name: "Review", Color: domain.TagColors[1]},
+	{ID: "testing", Name: "Testing", Color: domain.TagColors[2]},
+	{ID: "demo", Name: "Demo", Color: domain.TagColors[3]},
+	{ID: "done", Name: "Done", Color: domain.TagColors[4], Terminal: true},
 }
 
 // Config is the user-editable configuration.
@@ -133,6 +133,42 @@ func tagsFromFile(entries []tagEntry) ([]domain.Tag, error) {
 		tags = append(tags, domain.Tag(e))
 	}
 	return tags, nil
+}
+
+// SaveTags replaces the tags in the config file in dir, atomically, and keeps
+// every other setting as the file has it. It refuses to touch a file it can't
+// read, so a hand edit it doesn't understand is never overwritten.
+func SaveTags(dir string, tags []domain.Tag) error {
+	path := filepath.Join(dir, ConfigFile)
+	file := configFile{Version: configVersion}
+	raw, err := os.ReadFile(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+	case err != nil:
+		return fmt.Errorf("read config: %w", err)
+	default:
+		if err := yaml.Unmarshal(raw, &file); err != nil {
+			return fmt.Errorf("read config %s: %w", path, err)
+		}
+		if file.Version != configVersion {
+			return fmt.Errorf("read config %s: unsupported version %d (want %d)", path, file.Version, configVersion)
+		}
+	}
+	file.Tags = make([]tagEntry, len(tags))
+	for i, t := range tags {
+		file.Tags[i] = tagEntry(t)
+	}
+	if _, err := tagsFromFile(file.Tags); err != nil {
+		return fmt.Errorf("save tags: %w", err)
+	}
+	out, err := yaml.Marshal(file)
+	if err != nil {
+		return fmt.Errorf("encode config: %w", err)
+	}
+	if err := writeAtomic(path, out); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+	return nil
 }
 
 // LoadState reads the state file in dir. A missing file is an empty state.

@@ -40,13 +40,20 @@ type harness struct {
 type harnessOption func(*harnessConfig)
 
 type harnessConfig struct {
-	env    map[string]string
-	config string
+	env       map[string]string
+	configDir string
+	config    string
 }
 
 // withEnv sets an environment variable before the GitHub layer resolves auth.
 func withEnv(key, value string) harnessOption {
 	return func(c *harnessConfig) { c.env[key] = value }
+}
+
+// withConfigDir starts the app on an existing config directory, as a restart
+// would.
+func withConfigDir(dir string) harnessOption {
+	return func(c *harnessConfig) { c.configDir = dir }
 }
 
 // withConfig seeds the config file before the app starts.
@@ -62,6 +69,9 @@ func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOp
 	for _, o := range opts {
 		o(&cfg)
 	}
+	if cfg.configDir == "" {
+		cfg.configDir = t.TempDir()
+	}
 	isolateGHAuth(t)
 	t.Setenv("GH_TOKEN", placeholderToken)
 	for k, v := range cfg.env {
@@ -72,16 +82,15 @@ func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOp
 	if err != nil {
 		t.Fatalf("github.New: %v", err)
 	}
-	configDir := t.TempDir()
 	if cfg.config != "" {
-		if err := os.WriteFile(filepath.Join(configDir, store.ConfigFile), []byte(cfg.config), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(cfg.configDir, store.ConfigFile), []byte(cfg.config), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
 	h := &harness{
 		t:         t,
 		transport: transport,
-		configDir: configDir,
+		configDir: cfg.configDir,
 		clock:     &clock{now: time.Date(2026, 3, 5, 12, 0, 0, 0, fixedZone)},
 		screen:    &screen{},
 	}
@@ -111,6 +120,18 @@ func (h *harness) press(key string) {
 	switch key {
 	case "ctrl+c":
 		h.tm.Send(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	case "left":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyLeft})
+	case "right":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyRight})
+	case "up":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyUp})
+	case "down":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyDown})
+	case "enter":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEnter})
+	case "esc":
+		h.tm.Send(tea.KeyPressMsg{Code: tea.KeyEscape})
 	default:
 		h.tm.Type(key)
 	}
@@ -136,6 +157,18 @@ func (h *harness) waitForScreen(desc string, cond func(screen string) bool) stri
 func (h *harness) waitForText(text string) string {
 	h.t.Helper()
 	return h.waitForScreen(text, func(s string) bool { return strings.Contains(s, text) })
+}
+
+// waitFor polls cond until it holds, failing the test with desc on timeout.
+func (h *harness) waitFor(desc string, cond func() bool) {
+	h.t.Helper()
+	deadline := time.Now().Add(waitTimeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			h.t.Fatalf("timed out waiting for %s; screen:\n%s", desc, h.screen.plain())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 func (h *harness) waitFinished() {

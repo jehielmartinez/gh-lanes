@@ -1,19 +1,9 @@
 package store
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
-
-// ConfigFile is the name of the user-editable config file in the config
-// directory.
-const ConfigFile = "config.yaml"
 
 // DefaultRefreshInterval is how often the board refreshes when the config
 // doesn't say.
@@ -23,40 +13,25 @@ const DefaultRefreshInterval = 60 * time.Second
 // can't spend the whole rate-limit budget.
 const MinRefreshInterval = 10 * time.Second
 
-// Config is the user's settings.
-type Config struct {
-	RefreshInterval time.Duration
+// RefreshIntervalError is a refresh_interval the config file sets but that
+// can't be used. LoadConfig returns it with the rest of the config intact and
+// the default interval, so the app can run on and say what was wrong.
+type RefreshIntervalError struct {
+	Value string
 }
 
-type configFile struct {
-	RefreshInterval string `yaml:"refresh_interval"`
+func (e *RefreshIntervalError) Error() string {
+	return fmt.Sprintf("%s: refresh_interval %q must be a duration of at least %s, like 60s or 5m; using %s",
+		ConfigFile, e.Value, MinRefreshInterval, DefaultRefreshInterval)
 }
 
-// LoadConfig reads the config file in dir. A missing file, or a setting it
-// leaves out, means the default. When the file can't be used, LoadConfig
-// returns the defaults together with the error, so the app can run on and
-// say what was wrong.
-func LoadConfig(dir string) (Config, error) {
-	cfg := Config{RefreshInterval: DefaultRefreshInterval}
-	path := filepath.Join(dir, ConfigFile)
-	raw, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return cfg, nil
+func parseRefreshInterval(value string) (time.Duration, error) {
+	if value == "" {
+		return DefaultRefreshInterval, nil
 	}
-	if err != nil {
-		return cfg, fmt.Errorf("read config: %w", err)
+	d, err := time.ParseDuration(value)
+	if err != nil || d < MinRefreshInterval {
+		return DefaultRefreshInterval, &RefreshIntervalError{Value: value}
 	}
-	var file configFile
-	if err := yaml.Unmarshal(raw, &file); err != nil {
-		return cfg, fmt.Errorf("parse %s: %w", path, err)
-	}
-	if file.RefreshInterval != "" {
-		d, err := time.ParseDuration(file.RefreshInterval)
-		if err != nil || d < MinRefreshInterval {
-			return cfg, fmt.Errorf("%s: refresh_interval %q must be a duration of at least %s, like 60s or 5m; using %s",
-				ConfigFile, file.RefreshInterval, MinRefreshInterval, DefaultRefreshInterval)
-		}
-		cfg.RefreshInterval = d
-	}
-	return cfg, nil
+	return d, nil
 }

@@ -80,9 +80,10 @@ type stateFile struct {
 }
 
 type archivedEntry struct {
-	ID   string `json:"id"`
-	Open bool   `json:"open"`
-	Tag  string `json:"tag,omitempty"`
+	ID     string        `json:"id"`
+	Open   bool          `json:"open"`
+	Tag    string        `json:"tag,omitempty"`
+	Origin domain.Origin `json:"origin,omitempty"`
 }
 
 type snapshotEntry struct {

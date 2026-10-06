@@ -149,7 +149,7 @@ func TestActionsOnReviewRequestsFollowWhatTheLoginMayChange(t *testing.T) {
 	// The login can't change #32, though its branch is behind.
 	h.press("?")
 	screen := h.waitForText("close help")
-	for _, hidden := range []string{"update branch", "rebase branch", "convert to draft", "ready for review", "move to", "archive"} {
+	for _, hidden := range []string{"update branch", "rebase branch", "convert to draft", "ready for review", "move to"} {
 		if strings.Contains(screen, hidden) {
 			t.Errorf("%q should not be offered for #32:\n%s", hidden, screen)
 		}
@@ -157,7 +157,6 @@ func TestActionsOnReviewRequestsFollowWhatTheLoginMayChange(t *testing.T) {
 	h.press("u")
 	h.press("U")
 	h.press("d")
-	h.press("x")
 	h.press("H")
 	assertNoMutations(t, h)
 	if s := h.screen.plain(); strings.Contains(s, "Rebase branch?") || strings.Contains(s, "Convert to draft?") {

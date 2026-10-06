@@ -73,19 +73,46 @@ func Unarchive(assignments map[string]string, archived []domain.Archived, tags [
 	return Assign(assignments, prID, tagID), rest, tagID
 }
 
+// ArchiveReviewRequest returns a copy of archived with the review request
+// taken out of the review requests. It gets no lane, now or when unarchived.
+func ArchiveReviewRequest(archived []domain.Archived, pr domain.PullRequest) []domain.Archived {
+	next := slices.DeleteFunc(slices.Clone(archived), func(a domain.Archived) bool { return a.ID == pr.ID })
+	return append(next, domain.Archived{ID: pr.ID, Open: true, Origin: domain.OriginReviewRequests})
+}
+
 // IsArchived reports whether the pull request is on the archived list.
 func IsArchived(archived []domain.Archived, prID string) bool {
 	return slices.ContainsFunc(archived, func(a domain.Archived) bool { return a.ID == prID })
 }
 
-// Reconcile updates the archived list against a fresh open search. A pull
-// request missing from the search is no longer open; one that is back in it
-// after being seen closed was reopened, so it leaves the archive and returns
-// to Untagged. changed reports whether anything differs from archived.
-func Reconcile(archived []domain.Archived, open []domain.PullRequest) (next []domain.Archived, changed bool) {
-	seen := ids(open)
+// OriginOf is the tab the pull request was archived from.
+func OriginOf(archived []domain.Archived, prID string) domain.Origin {
 	for _, a := range archived {
-		switch isOpen := seen[a.ID]; {
+		if a.ID == prID {
+			return a.Origin
+		}
+	}
+	return domain.OriginBoard
+}
+
+// Unarchived returns the pull requests that are not on the archived list.
+func Unarchived(prs []domain.PullRequest, archived []domain.Archived) []domain.PullRequest {
+	return slices.DeleteFunc(slices.Clone(prs), func(pr domain.PullRequest) bool { return IsArchived(archived, pr.ID) })
+}
+
+// Reconcile updates the archived list against a fresh open search and review
+// requests search, checking each entry against its origin's. A pull request
+// missing from the search has left it; one that is back after being seen gone
+// was reopened or re-requested, so it leaves the archive and returns to its
+// origin, Untagged for the board. changed reports whether anything differs
+// from archived.
+func Reconcile(archived []domain.Archived, open, requested []domain.PullRequest) (next []domain.Archived, changed bool) {
+	seen := map[domain.Origin]map[string]bool{
+		domain.OriginBoard:          ids(open),
+		domain.OriginReviewRequests: ids(requested),
+	}
+	for _, a := range archived {
+		switch isOpen := seen[a.Origin][a.ID]; {
 		case isOpen && !a.Open:
 			changed = true
 		case !isOpen && a.Open:

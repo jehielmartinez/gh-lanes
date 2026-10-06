@@ -147,6 +147,11 @@ func (m Model) cardView(pr domain.PullRequest, width int, selected, dimmed bool)
 	if marker := m.markerView(m.markers[pr.ID]); marker != "" {
 		right = marker + " " + right
 	}
+	// Only the archived tab shows archived cards, so this marks just its
+	// review requests, which would otherwise look like the user's own.
+	if board.OriginOf(m.archived, pr.ID) == domain.OriginReviewRequests {
+		right = muted.Italic(true).Render("review request") + " " + right
+	}
 	owner := muted.Render(truncate(oneLine(pr.Repository.Owner()), max(inner-lipgloss.Width(right)-1, 1)))
 	ownerLine := owner + strings.Repeat(" ", max(inner-lipgloss.Width(owner)-lipgloss.Width(right), 1)) + right
 	repo := muted.Bold(!dimmed).Render(truncate(oneLine(pr.Repository.Name()), inner))

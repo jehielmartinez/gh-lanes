@@ -70,12 +70,7 @@ func (m Model) overlay(bg, fg string) string {
 	return canvas.Render()
 }
 
-// overlayOrigin is the screen cell where an overlay of the given size is
-// drawn, its top-left corner.
-func (m Model) overlayOrigin(width, height int) (x, y int) {
-	return centred(m.width, m.height, width, height)
-}
-
+// centred is the top-left cell of a w by h box centred in an outer one.
 func centred(outerW, outerH, w, h int) (x, y int) {
 	return max(0, (outerW-w)/2), max(0, (outerH-h)/2)
 }

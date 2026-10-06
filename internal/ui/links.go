@@ -51,6 +51,9 @@ type linksMsg struct {
 	err       error
 }
 
+// openFailed is how the status bar reports a link the browser didn't open.
+const openFailed = "Couldn't open link"
+
 // linkFailure is why the last link couldn't be loaded or opened.
 type linkFailure struct {
 	// action is what failed, as the status bar starts the sentence.
@@ -63,7 +66,7 @@ func (m Model) open(url string) (Model, tea.Cmd) {
 	// The links drawn and listed are already filtered; this guards the
 	// opener against any other way a URL might reach it.
 	if !links.Openable(url) {
-		m.linkErr = &linkFailure{action: "Couldn't open link", err: links.ErrNotOpenable}
+		m.linkErr = &linkFailure{action: openFailed, err: links.ErrNotOpenable}
 		return m, nil
 	}
 	m.linkErr = nil
@@ -169,7 +172,7 @@ func (m Model) clickDetail(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	width, height := m.modalSize()
-	x, y := m.overlayOrigin(width, height)
+	x, y := centred(m.width, m.height, width, height)
 	// The modal's content starts inside its border and left padding.
 	col, row := msg.X-x-2, msg.Y-y-1
 	vp := m.detail.viewport

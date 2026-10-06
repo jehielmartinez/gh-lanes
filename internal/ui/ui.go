@@ -382,7 +382,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.open(msg.url)
 	case openedMsg:
 		if msg.err != nil {
-			m.linkErr = &linkFailure{action: "Couldn't open link", err: msg.err}
+			m.linkErr = &linkFailure{action: openFailed, err: msg.err}
 		}
 	case storeLoadedMsg:
 		m.refreshInterval = msg.config.RefreshInterval

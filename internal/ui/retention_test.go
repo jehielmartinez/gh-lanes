@@ -132,6 +132,18 @@ func TestUntaggedPRsDropOffAndTaggedOnesStayOnceNoLongerOpen(t *testing.T) {
 	}
 }
 
+func TestAPRWhoseTagWasDeletedIsUntaggedAndNotKept(t *testing.T) {
+	h := startWithState(t, boardTransport(t),
+		`{"version":1,"assignments":{"PR_node_older":"tag-gone","PR_node_merged":"tag-gone"}}`,
+		"Untagged 3")
+
+	h.refreshUntil(2)
+	h.settle(time.Second)
+	if got := byIDRequests(h); len(got) != 0 {
+		t.Errorf("fetched %v by ID; a PR whose tag is gone is untagged, so not tracked", got)
+	}
+}
+
 func TestTrackedPRsThatNoLongerResolveAreSkipped(t *testing.T) {
 	transport := boardTransport(t)
 	transport.ReplyFixture(t, "PullRequestsByID", fixture("nodes_not_found.json"))

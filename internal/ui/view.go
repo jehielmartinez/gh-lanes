@@ -66,7 +66,7 @@ func (m Model) laneView(lane board.Lane, focused bool, cursor int) string {
 	name := lipgloss.NewStyle().Bold(true).Underline(focused).Foreground(m.laneColor(lane)).Render(lane.Tag.Name)
 	header := name + " " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
 	rows := []string{header}
-	if lane.Untagged() && m.loaded && !hasOpen(m.lanes) {
+	if lane.Untagged() && m.loaded && !board.HasOpen(m.lanes) {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}
 	for i, pr := range lane.PullRequests {
@@ -80,18 +80,6 @@ func (m Model) laneColor(lane board.Lane) color.Color {
 		return m.theme.untagged
 	}
 	return lipgloss.Color(lane.Tag.Color)
-}
-
-// hasOpen reports whether any card on the board is an open pull request.
-func hasOpen(lanes []board.Lane) bool {
-	for _, l := range lanes {
-		for _, pr := range l.PullRequests {
-			if !pr.Finished() {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func (m Model) cardView(pr domain.PullRequest, selected, dimmed bool) string {

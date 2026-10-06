@@ -258,7 +258,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case searchedMsg:
 		if msg.err == nil {
-			if missing := board.Missing(msg.open, m.assignments); len(missing) > 0 {
+			if missing := board.Missing(msg.open, board.Tagged(m.assignments, m.tags)); len(missing) > 0 {
 				return m, m.fetchTracked(msg, missing)
 			}
 		}
@@ -308,7 +308,7 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 	}
 	m.loaded = true
 	m.updatedAt = msg.at
-	m.prs = board.Retain(msg.open, msg.tracked, m.assignments)
+	m.prs = board.Retain(msg.open, msg.tracked, board.Tagged(m.assignments, m.tags))
 	m.rateLimit = msg.rateLimit
 	archived, changed := board.Reconcile(m.archived, msg.open)
 	if !changed || !m.storeReady {

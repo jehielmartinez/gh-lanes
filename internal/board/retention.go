@@ -6,6 +6,22 @@ import (
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 )
 
+// Tagged returns the assignments whose tag still exists. A pull request
+// assigned to a deleted tag is untagged, and is not kept once it closes.
+func Tagged(assignments map[string]string, tags []domain.Tag) map[string]string {
+	exists := map[string]bool{}
+	for _, t := range tags {
+		exists[t.ID] = true
+	}
+	live := map[string]string{}
+	for pr, tag := range assignments {
+		if exists[tag] {
+			live[pr] = tag
+		}
+	}
+	return live
+}
+
 // Missing returns, sorted, the IDs of tagged pull requests the open search
 // didn't return. They have most likely merged or closed, and only a fetch by
 // node ID can say.
@@ -67,6 +83,18 @@ func Reconcile(archived []domain.Archived, open []domain.PullRequest) (next []do
 // finished work in a terminal lane.
 func (l Lane) Dimmed(pr domain.PullRequest) bool {
 	return l.Tag.Terminal && pr.Finished()
+}
+
+// HasOpen reports whether any card on the board is an open pull request.
+func HasOpen(lanes []Lane) bool {
+	for _, l := range lanes {
+		for _, pr := range l.PullRequests {
+			if !pr.Finished() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func ids(prs []domain.PullRequest) map[string]bool {

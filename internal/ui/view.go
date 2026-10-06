@@ -40,6 +40,9 @@ func (m Model) View() tea.View {
 	if m.picker != nil {
 		screen = m.overlay(screen, m.picker.view(m.theme, m.help))
 	}
+	if m.confirm != nil {
+		screen = m.overlay(screen, m.confirmView())
+	}
 	v := tea.NewView(screen)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
@@ -49,9 +52,10 @@ func (m Model) View() tea.View {
 // footerView is the status bar over the help footer, which lists the
 // modal's keys while the detail modal is open.
 func (m Model) footerView() string {
-	var keys help.KeyMap = m.keys
+	actionKeys := m.actionKeys()
+	var keys help.KeyMap = actionKeys
 	if m.detail != nil {
-		keys = modalHelp{keys: m.keys}
+		keys = modalHelp{keys: actionKeys}
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, m.statusView(), m.help.View(keys))
 }
@@ -217,6 +221,9 @@ func (m Model) statusView() string {
 	muted := lipgloss.NewStyle().Foreground(m.theme.muted)
 	errStyle := lipgloss.NewStyle().Foreground(m.theme.errText)
 	var parts []string
+	if t := m.toastView(); t != "" {
+		parts = append(parts, t)
+	}
 	switch {
 	case !m.loaded && m.err != nil:
 		parts = append(parts, errStyle.Render("Couldn't load pull requests: "+oneLine(m.err.Error())))

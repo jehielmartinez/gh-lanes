@@ -31,6 +31,9 @@ type PullRequest struct {
 	// AutoMerge is nil when auto-merge is not enabled.
 	AutoMerge       *AutoMerge
 	ViewerCanUpdate bool
+	// ViewerCanUpdateBranch is GitHub's word on whether the viewer can bring
+	// the head branch up to date with the base branch right now.
+	ViewerCanUpdateBranch bool
 
 	Checks        []Check
 	CommentCount  int

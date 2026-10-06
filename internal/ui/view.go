@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/jehielmartinez/gh-lanes/internal/activity"
 	"github.com/jehielmartinez/gh-lanes/internal/board"
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 )
@@ -111,8 +112,16 @@ func laneColor(t theme, lane board.Lane) color.Color {
 func (m Model) cardView(pr domain.PullRequest, width int, selected, dimmed bool) string {
 	inner := width - cardPadding
 	number := fmt.Sprintf("#%d", pr.Number)
-	ref := truncate(pr.Repository.NameWithOwner, inner-lipgloss.Width(number)) + number
+	marker := m.markerView(m.markers[pr.ID])
+	room := inner - lipgloss.Width(number)
+	if marker != "" {
+		room -= lipgloss.Width(marker) + 1
+	}
+	ref := truncate(pr.Repository.NameWithOwner, room) + number
 	ref = lipgloss.NewStyle().Foreground(m.theme.muted).Faint(dimmed).Render(ref)
+	if marker != "" {
+		ref += strings.Repeat(" ", max(inner-lipgloss.Width(ref)-lipgloss.Width(marker), 1)) + marker
+	}
 	titleColor := m.theme.text
 	if m.err != nil || dimmed {
 		titleColor = m.theme.muted
@@ -150,6 +159,18 @@ func (m Model) cardStateLine(pr domain.PullRequest, width int, dimmed bool) stri
 	age := lipgloss.NewStyle().Foreground(m.theme.muted).Faint(dimmed).Render(shortAge(m.now.Sub(pr.UpdatedAt)))
 	gap := max(width-lipgloss.Width(badge)-lipgloss.Width(age), 1)
 	return badge + strings.Repeat(" ", gap) + age
+}
+
+// markerView is the activity marker drawn at the end of a card's first line.
+func (m Model) markerView(marker activity.Marker) string {
+	style := lipgloss.NewStyle().Bold(true).Foreground(m.theme.accent)
+	switch marker {
+	case activity.Changed:
+		return style.Render("●")
+	case activity.New:
+		return style.Render("new")
+	}
+	return ""
 }
 
 // cardStatusLine is the card's third line: checks, review decision and
@@ -210,6 +231,13 @@ func (m Model) statusView() string {
 			updated = m.spinner.View() + " " + updated
 		}
 		parts = append(parts, updated)
+	}
+	changed, added := activity.Tally(m.markers)
+	if changed > 0 {
+		parts = append(parts, plural(changed, "PR")+" changed")
+	}
+	if added > 0 {
+		parts = append(parts, plural(added, "new PR"))
 	}
 	if m.storeErr != nil {
 		parts = append(parts, errStyle.Render("Couldn't load tags: "+oneLine(m.storeErr.Error())))

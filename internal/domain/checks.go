@@ -136,3 +136,31 @@ func unnamedLast(workflow string) int {
 	}
 	return 0
 }
+
+// CheckState is the one-word verdict of all of a pull request's checks
+// together.
+type CheckState string
+
+// The check states. CheckStateNone means there are no checks, or none that
+// reached a verdict.
+const (
+	CheckStateNone    CheckState = ""
+	CheckStatePending CheckState = "PENDING"
+	CheckStatePassed  CheckState = "PASSED"
+	CheckStateFailed  CheckState = "FAILED"
+)
+
+// OverallCheckState folds checks into one state: any failure fails them all,
+// then anything still running keeps them pending.
+func OverallCheckState(checks []Check) CheckState {
+	c := CountChecks(checks)
+	switch {
+	case c.Failed > 0:
+		return CheckStateFailed
+	case c.Pending > 0:
+		return CheckStatePending
+	case c.Passed > 0:
+		return CheckStatePassed
+	}
+	return CheckStateNone
+}

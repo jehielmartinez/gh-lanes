@@ -38,6 +38,8 @@ type detail struct {
 	// expandResolved shows the comments of resolved review threads, which
 	// are collapsed to one line by default.
 	expandResolved bool
+	// seen is whether opening the modal has been recorded as a snapshot.
+	seen bool
 }
 
 type detailMsg struct {
@@ -96,7 +98,12 @@ func (m Model) detailFetched(msg detailMsg) Model {
 		m.rateLimit = msg.rateLimit
 	}
 	m.detail = &d
-	return m
+	if msg.err != nil {
+		return m
+	}
+	// The card takes the fresher copy too, so the snapshot taken of what the
+	// modal shows matches the card and leaves no marker behind.
+	return m.withBoardCopy(msg.pr)
 }
 
 // detailDue starts the modal's own refresh once an interval has passed since

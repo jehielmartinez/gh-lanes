@@ -196,14 +196,20 @@ func TestModalChecksArePagedThrough(t *testing.T) {
 	h.doubleClickCard("user-a/other-repo#14")
 	screen := h.waitForText("unit-3")
 	assertContains(t, screen, "1 passed · 2 failed")
-	var paged int
-	for _, r := range h.transport.Requests() {
-		if r.Operation == "CheckContexts" && r.Variables["id"] == "C_node_paged" {
-			paged++
+	// The modal opens on the board's checks, which already hold unit-3, so
+	// wait for its own fetch to page through rather than reading too early.
+	paged := func() int {
+		var n int
+		for _, r := range h.transport.Requests() {
+			if r.Operation == "CheckContexts" && r.Variables["id"] == "C_node_paged" {
+				n++
+			}
 		}
+		return n
 	}
-	if paged != 2 {
-		t.Errorf("want the head commit's checks paged for the board and the modal, got %d requests", paged)
+	h.waitFor("the head commit's checks paged for the board and the modal", func() bool { return paged() >= 2 })
+	if n := paged(); n != 2 {
+		t.Errorf("want the head commit's checks paged for the board and the modal, got %d requests", n)
 	}
 }
 

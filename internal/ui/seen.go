@@ -36,10 +36,13 @@ func (m Model) markSeen() (Model, bool) {
 	if m.detail == nil || !m.storeReady || m.snapshots == nil {
 		return m, false
 	}
-	pr := m.detail.pr
-	if i := m.boardIndex(pr.ID); i >= 0 {
-		pr = m.prs[i]
+	// Markers are for the board's own pull requests; a review request is
+	// someone else's work and is never snapshotted.
+	i := m.boardIndex(m.detail.pr.ID)
+	if i < 0 {
+		return m, false
 	}
+	pr := m.prs[i]
 	prev, had := m.snapshots[pr.ID]
 	next := activity.Take(pr, m.opts.Now(), prev, had)
 	if m.detail.seen && had && activity.Same(prev, next) {
@@ -63,18 +66,16 @@ func (m Model) boardIndex(id string) int {
 	return -1
 }
 
-// withBoardCopy replaces the board's copy of a pull request with a fresher
-// one, keeping the selection on the card it was on.
-func (m Model) withBoardCopy(pr domain.PullRequest) Model {
-	i := m.boardIndex(pr.ID)
-	if i < 0 {
+// withFresherCopy replaces the board's and the review requests' copies of a
+// pull request with a fresher one, keeping each selection on the card it was
+// on.
+func (m Model) withFresherCopy(pr domain.PullRequest) Model {
+	m = m.withReviews(replaced(m.reviews, pr))
+	if m.boardIndex(pr.ID) < 0 {
 		return m
 	}
 	selected, hadSelection := m.selected()
-	prs := make([]domain.PullRequest, len(m.prs))
-	copy(prs, m.prs)
-	prs[i] = pr
-	m.prs = prs
+	m.prs = replaced(m.prs, pr)
 	m = m.rebuild()
 	if hadSelection {
 		m = m.reselect(selected.ID)

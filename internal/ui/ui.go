@@ -5,6 +5,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -19,7 +20,12 @@ import (
 	"github.com/jehielmartinez/gh-lanes/internal/store"
 )
 
-const boardSearch = "is:pr is:open author:@me archived:false"
+// The searches behind the two tabs. Review requests are a separate search
+// rather than a filter on the board's, so they never reach its lanes.
+const (
+	boardSearch  = "is:pr is:open author:@me archived:false"
+	reviewSearch = "is:pr is:open review-requested:@me archived:false"
+)
 
 const fetchTimeout = 30 * time.Second
 
@@ -115,6 +121,15 @@ type Model struct {
 	tagSaveErr   error
 	quitting     bool
 
+	// tab is the view in the tab bar that has the screen.
+	tab tab
+	// reviews are the open pull requests whose review is requested of the
+	// login, most recently updated first. They are kept apart from prs so
+	// they never join a lane.
+	reviews      []domain.PullRequest
+	reviewCursor int
+	reviewOffset int
+
 	lanes      []board.Lane
 	focus      int
 	cursors    []int
@@ -166,9 +181,11 @@ func New(opts Options) Model {
 	return m.rebuild()
 }
 
-// searchedMsg is the open search's result, the first half of a refresh.
+// searchedMsg is the result of the open and review requests searches, the
+// first half of a refresh.
 type searchedMsg struct {
 	open      []domain.PullRequest
+	reviews   []domain.PullRequest
 	rateLimit domain.RateLimit
 	err       error
 	at        time.Time
@@ -178,6 +195,7 @@ type searchedMsg struct {
 // ones the search no longer returns, fetched by node ID.
 type refreshedMsg struct {
 	open, tracked []domain.PullRequest
+	reviews       []domain.PullRequest
 	rateLimit     domain.RateLimit
 	err           error
 	at            time.Time
@@ -207,14 +225,38 @@ type configSavedMsg struct {
 // tag ID is Untagged.
 type moveMsg struct{ prID, tagID string }
 
+// fetchBoard runs the board's search and the review requests search side by
+// side. A refresh fails if either does, so both tabs keep their last good data
+// together and are stale together.
 func (m Model) fetchBoard() tea.Cmd {
 	gh, now := m.opts.GitHub, m.opts.Now
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 		defer cancel()
+		var reviews []domain.PullRequest
+		var reviewLimit domain.RateLimit
+		var reviewErr error
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			reviews, reviewLimit, reviewErr = gh.SearchPullRequests(ctx, reviewSearch)
+		}()
 		prs, limit, err := gh.SearchPullRequests(ctx, boardSearch)
-		return searchedMsg{open: prs, rateLimit: limit, err: err, at: now()}
+		<-done
+		if err == nil && reviewErr != nil {
+			err = fmt.Errorf("review requests: %w", reviewErr)
+		}
+		return searchedMsg{open: prs, reviews: reviews, rateLimit: lowest(limit, reviewLimit), err: err, at: now()}
 	}
+}
+
+// lowest is whichever reported budget has less left, since both come out of
+// the same hourly allowance.
+func lowest(a, b domain.RateLimit) domain.RateLimit {
+	if a == (domain.RateLimit{}) || (b != (domain.RateLimit{}) && b.Remaining < a.Remaining) {
+		return b
+	}
+	return a
 }
 
 // fetchTracked completes a refresh by fetching the tagged pull requests the
@@ -228,7 +270,7 @@ func (m Model) fetchTracked(searched searchedMsg, ids []string) tea.Cmd {
 		if limit == (domain.RateLimit{}) {
 			limit = searched.rateLimit
 		}
-		return refreshedMsg{open: searched.open, tracked: prs, rateLimit: limit, err: err, at: now()}
+		return refreshedMsg{open: searched.open, tracked: prs, reviews: searched.reviews, rateLimit: limit, err: err, at: now()}
 	}
 }
 
@@ -362,6 +404,18 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.detail != nil {
 			return m.detailKey(msg)
 		}
+		switch {
+		case key.Matches(msg, m.keys.NextTab):
+			return m.switchTab(1), nil
+		case key.Matches(msg, m.keys.PrevTab):
+			return m.switchTab(-1), nil
+		case key.Matches(msg, m.keys.Help):
+			m.help.ShowAll = !m.help.ShowAll
+			m.keys = m.keys.withFullHelp(m.help.ShowAll)
+			return m, nil
+		case m.tab == tabReview:
+			return m.reviewKey(msg)
+		}
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
 		switch {
@@ -369,13 +423,17 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		case m.detail != nil:
 			return m.clickDetail(msg)
 		default:
-			return m.clickBoard(msg)
+			return m.click(msg)
 		}
 	case tea.MouseWheelMsg:
 		if m.detail != nil {
 			return m.detailScroll(msg), nil
 		}
-		if !m.dialogOpen() {
+		switch {
+		case m.dialogOpen():
+		case m.tab == tabReview:
+			return m.reviewWheeled(msg), nil
+		default:
 			return m.wheeled(msg), nil
 		}
 	case tickMsg:
@@ -400,7 +458,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 				return m, m.fetchTracked(msg, missing)
 			}
 		}
-		return m.refreshed(refreshedMsg{open: msg.open, rateLimit: msg.rateLimit, err: msg.err, at: msg.at})
+		return m.refreshed(refreshedMsg{open: msg.open, reviews: msg.reviews, rateLimit: msg.rateLimit, err: msg.err, at: msg.at})
 	case refreshedMsg:
 		return m.refreshed(msg)
 	case detailMsg:
@@ -516,6 +574,7 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 	m.loaded = true
 	m.updatedAt = msg.at
 	m.prs = board.Retain(msg.open, msg.tracked, board.Tagged(m.assignments, m.tags))
+	m = m.withReviews(msg.reviews)
 	m.rateLimit = msg.rateLimit
 	archived, changed := board.Reconcile(m.archived, msg.open)
 	if !changed || !m.storeReady {
@@ -559,9 +618,6 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 	case key.Matches(msg, m.keys.Refresh):
 		return m.refresh()
-	case key.Matches(msg, m.keys.Help):
-		m.help.ShowAll = !m.help.ShowAll
-		m.keys = m.keys.withFullHelp(m.help.ShowAll)
 	}
 	return m, nil
 }
@@ -679,8 +735,19 @@ func (m Model) rebuild() Model {
 	return m
 }
 
-// clickBoard selects the card under a left click, and opens it when the
-// click follows another on the same card quickly enough to make a double
+// click switches to the tab whose label was clicked, or else hands the click
+// to the tab in view.
+func (m Model) click(msg tea.MouseClickMsg) (Model, tea.Cmd) {
+	if t, ok := m.tabAt(msg.X, msg.Y); ok && msg.Button == tea.MouseLeft {
+		return m.switchTab(int(t - m.tab)), nil
+	}
+	if m.tab == tabReview {
+		return m.clickReview(msg)
+	}
+	return m.clickBoard(msg)
+}
+
+// clickBoard selects the card under a left click, and opens it on a double
 // click.
 func (m Model) clickBoard(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	lane, card, ok := m.cardAt(msg.X, msg.Y)
@@ -689,7 +756,12 @@ func (m Model) clickBoard(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m = m.clicked(msg)
-	pr := m.lanes[lane].PullRequests[card]
+	return m.clickedCard(m.lanes[lane].PullRequests[card])
+}
+
+// clickedCard opens the pull request when this click on its card follows
+// another quickly enough to make a double click.
+func (m Model) clickedCard(pr domain.PullRequest) (Model, tea.Cmd) {
 	now := m.opts.Now()
 	if m.lastClick.prID == pr.ID && now.Sub(m.lastClick.at) <= doubleClick {
 		m.lastClick = click{}

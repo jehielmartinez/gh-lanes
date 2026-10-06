@@ -39,13 +39,14 @@ func (m Model) lanesInView() int {
 	return max(1, (m.width+laneGap)/(m.laneWidth()+laneGap))
 }
 
-// boardHeight is the rows left for the board above the footer, or 0 while
-// the terminal's size is unknown.
+// boardHeight is the rows left for the board, or the review requests list,
+// between the tab bar and the footer, or 0 while the terminal's size is
+// unknown.
 func (m Model) boardHeight() int {
 	if m.height == 0 {
 		return 0
 	}
-	return max(0, m.height-lipgloss.Height(m.footerView()))
+	return max(0, m.height-tabBarLines-lipgloss.Height(m.footerView()))
 }
 
 // cardsInView is how many cards a lane shows at once; always at least one.
@@ -66,6 +67,7 @@ func (m Model) scrolled() Model {
 		offsets[i] = window(m.offsets[i], m.cursors[i], size, len(lane.PullRequests))
 	}
 	m.offsets = offsets
+	m.reviewOffset = window(m.reviewOffset, m.reviewCursor, m.reviewCardsInView(), len(m.reviews))
 	return m
 }
 
@@ -80,7 +82,8 @@ func window(offset, index, size, total int) int {
 
 // laneAt is the lane drawn at screen cell x, y.
 func (m Model) laneAt(x, y int) (int, bool) {
-	if board := m.boardHeight(); board > 0 && y >= board {
+	y -= tabBarLines
+	if board := m.boardHeight(); y < 0 || (board > 0 && y >= board) {
 		return 0, false
 	}
 	step := m.laneWidth() + laneGap
@@ -95,6 +98,7 @@ func (m Model) laneAt(x, y int) (int, bool) {
 // cardAt is the card drawn at screen cell x, y.
 func (m Model) cardAt(x, y int) (lane, card int, ok bool) {
 	lane, ok = m.laneAt(x, y)
+	y -= tabBarLines
 	row := (y - laneHeaderLines) / cardHeight
 	if !ok || y < laneHeaderLines || row >= m.cardsInView() {
 		return 0, 0, false
@@ -119,13 +123,7 @@ func (m Model) clicked(msg tea.MouseClickMsg) Model {
 // wheeled scrolls the lane under the pointer by one card, taking its
 // selection along so the selected card stays in view.
 func (m Model) wheeled(msg tea.MouseWheelMsg) Model {
-	var delta int
-	switch msg.Button {
-	case tea.MouseWheelUp:
-		delta = -1
-	case tea.MouseWheelDown:
-		delta = 1
-	}
+	delta := wheelDelta(msg)
 	lane, ok := m.laneAt(msg.X, msg.Y)
 	if !ok || delta == 0 {
 		return m
@@ -136,4 +134,15 @@ func (m Model) wheeled(msg tea.MouseWheelMsg) Model {
 	offsets[lane] = offset
 	m.offsets = offsets
 	return m.withCursor(lane, max(offset, min(m.cursors[lane], offset+size-1)))
+}
+
+// wheelDelta is how many cards a turn of the wheel scrolls by.
+func wheelDelta(msg tea.MouseWheelMsg) int {
+	switch msg.Button {
+	case tea.MouseWheelUp:
+		return -1
+	case tea.MouseWheelDown:
+		return 1
+	}
+	return 0
 }

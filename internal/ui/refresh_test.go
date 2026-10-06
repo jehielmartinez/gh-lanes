@@ -17,7 +17,7 @@ var spinnerFrames = strings.ReplaceAll(strings.Join(spinner.Dot.Frames, ""), " "
 
 func searches(h *harness) int {
 	n := 0
-	for _, r := range h.transport.Requests() {
+	for _, r := range h.requests() {
 		if r.Operation == "SearchPullRequests" {
 			n++
 		}

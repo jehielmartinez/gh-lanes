@@ -118,7 +118,7 @@ func (m Model) detailFetched(msg detailMsg) Model {
 	}
 	// The card takes the fresher copy too, so the snapshot taken of what the
 	// modal shows matches the card and leaves no marker behind.
-	return m.withBoardCopy(msg.pr)
+	return m.withFresherCopy(msg.pr)
 }
 
 // detailDue starts the modal's own refresh once an interval has passed since

@@ -121,8 +121,9 @@ func formatMap(m map[string]string) string {
 	return string(b)
 }
 
+// headerLine is the row of lane headers, under the tab bar.
 func headerLine(screen string) string {
-	return strings.SplitN(screen, "\n", 2)[0]
+	return strings.Split(screen, "\n")[1]
 }
 
 func TestFirstRunWritesDefaultTags(t *testing.T) {

@@ -41,15 +41,21 @@ func Assemble(prs []domain.PullRequest, tags []domain.Tag, assignments map[strin
 	for _, a := range archived {
 		hidden[a.ID] = true
 	}
-	sorted := slices.DeleteFunc(slices.Clone(prs), func(pr domain.PullRequest) bool { return hidden[pr.ID] })
-	slices.SortStableFunc(sorted, func(a, b domain.PullRequest) int {
-		return cmp.Compare(b.UpdatedAt.UnixNano(), a.UpdatedAt.UnixNano())
-	})
-	for _, pr := range sorted {
+	shown := slices.DeleteFunc(slices.Clone(prs), func(pr domain.PullRequest) bool { return hidden[pr.ID] })
+	for _, pr := range ByUpdated(shown) {
 		i := index[assignments[pr.ID]]
 		lanes[i].PullRequests = append(lanes[i].PullRequests, pr)
 	}
 	return lanes
+}
+
+// ByUpdated returns a copy of prs, most recently updated first.
+func ByUpdated(prs []domain.PullRequest) []domain.PullRequest {
+	sorted := slices.Clone(prs)
+	slices.SortStableFunc(sorted, func(a, b domain.PullRequest) int {
+		return cmp.Compare(b.UpdatedAt.UnixNano(), a.UpdatedAt.UnixNano())
+	})
+	return sorted
 }
 
 // Assign returns a copy of assignments with the pull request moved to the tag.

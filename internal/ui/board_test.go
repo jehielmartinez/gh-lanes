@@ -41,7 +41,7 @@ func TestBoardRunsTheAuthoredOpenPRSearch(t *testing.T) {
 	h := newHarness(t, transport)
 	h.waitForText("octo-org/sample-repo#7")
 
-	reqs := transport.Requests()
+	reqs := h.requests()
 	if len(reqs) != 1 {
 		t.Fatalf("want 1 request, got %d", len(reqs))
 	}
@@ -64,7 +64,7 @@ func TestBoardPagesThroughEverySearchResult(t *testing.T) {
 		t.Errorf("both pages should be on the board:\n%s", screen)
 	}
 
-	reqs := transport.Requests()
+	reqs := h.requests()
 	if len(reqs) != 2 {
 		t.Fatalf("want 2 requests, got %d", len(reqs))
 	}

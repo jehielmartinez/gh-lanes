@@ -18,11 +18,12 @@ type keyMap struct {
 	Tags      key.Binding
 	Open      key.Binding
 	Archive   key.Binding
-	// UpdateBranch, RebaseBranch and Draft act on the selected card, or on
-	// the pull request in the modal.
+	// UpdateBranch, RebaseBranch, Draft and Merge act on the selected card,
+	// or on the pull request in the modal.
 	UpdateBranch key.Binding
 	RebaseBranch key.Binding
 	Draft        key.Binding
+	Merge        key.Binding
 	Refresh      key.Binding
 	Help         key.Binding
 	Quit         key.Binding
@@ -60,6 +61,7 @@ func newKeyMap() keyMap {
 		UpdateBranch: key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "update branch")),
 		RebaseBranch: key.NewBinding(key.WithKeys("U"), key.WithHelp("U", "rebase branch")),
 		Draft:        key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "draft")),
+		Merge:        key.NewBinding(key.WithKeys("M"), key.WithHelp("M", "merge…")),
 		Refresh:      key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
 		Help:         key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:         key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
@@ -97,7 +99,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
 		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Archive},
-		{k.UpdateBranch, k.RebaseBranch, k.Draft},
+		{k.UpdateBranch, k.RebaseBranch, k.Draft, k.Merge},
 		{k.Refresh, k.Help, k.Quit},
 	}
 }
@@ -113,14 +115,14 @@ type modalHelp struct{ keys keyMap }
 
 func (h modalHelp) ShortHelp() []key.Binding {
 	m := h.keys.Modal
-	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, m.Close, h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Refresh, h.keys.Quit}
+	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, m.Close, h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit}
 }
 
 func (h modalHelp) FullHelp() [][]key.Binding {
 	m := h.keys.Modal
 	return [][]key.Binding{
 		{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.ExpandResolved, m.Close},
-		{h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Refresh, h.keys.Quit},
+		{h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit},
 	}
 }
 

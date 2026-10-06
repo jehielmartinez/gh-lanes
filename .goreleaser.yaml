@@ -1,0 +1,80 @@
+# Release build for the standalone `lanes` binary and its Homebrew formula.
+# The `gh lanes` extension assets come from .github/workflows/release.yml.
+version: 2
+
+project_name: lanes
+
+before:
+  hooks:
+    - go mod tidy -diff
+
+builds:
+  - id: lanes
+    main: .
+    binary: lanes
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: lanes
+    ids:
+      - lanes
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  prerelease: auto
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs"
+      - "^test"
+
+# GoReleaser no longer generates Homebrew formulae for prebuilt binaries
+# (`brews` is deprecated); a cask is its replacement on macOS and Linux, and
+# installs the same way: `brew install <owner>/tap/lanes`.
+homebrew_casks:
+  - name: lanes
+    ids:
+      - lanes
+    binaries:
+      - lanes
+    # The tap lives under whichever account publishes the release, so no
+    # owner is written into this file.
+    repository:
+      owner: "{{ .Env.HOMEBREW_TAP_OWNER }}"
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    # A pre-release tag such as v1.0.0-rc.1 still gets a GitHub release, but
+    # Homebrew users only move on a final one.
+    skip_upload: auto
+    homepage: "https://github.com/{{ .Env.HOMEBREW_TAP_OWNER }}/gh-lanes"
+    description: Terminal kanban board for the open pull requests you authored
+    caveats: |
+      lanes uses the GitHub CLI's login. Before the first run, sign in with:
+        gh auth login
+    # The binary is not notarized, so Gatekeeper would refuse to run it.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/lanes"]
+          end

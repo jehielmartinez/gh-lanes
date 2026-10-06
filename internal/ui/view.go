@@ -61,14 +61,23 @@ func (m Model) overlay(bg, fg string) string {
 	if termW == 0 || termH == 0 {
 		termW, termH = lipgloss.Width(bg), lipgloss.Height(bg)
 	}
-	x := max(0, (termW-lipgloss.Width(fg))/2)
-	y := max(0, (termH-lipgloss.Height(fg))/2)
+	x, y := centred(termW, termH, lipgloss.Width(fg), lipgloss.Height(fg))
 	canvas := lipgloss.NewCanvas(max(termW, lipgloss.Width(bg)), max(termH, lipgloss.Height(bg)))
 	canvas.Compose(lipgloss.NewCompositor(
 		lipgloss.NewLayer(bg),
 		lipgloss.NewLayer(fg).X(x).Y(y).Z(1),
 	))
 	return canvas.Render()
+}
+
+// overlayOrigin is the screen cell where an overlay of the given size is
+// drawn, its top-left corner.
+func (m Model) overlayOrigin(width, height int) (x, y int) {
+	return centred(m.width, m.height, width, height)
+}
+
+func centred(outerW, outerH, w, h int) (x, y int) {
+	return max(0, (outerW-w)/2), max(0, (outerH-h)/2)
 }
 
 // boardView draws the lanes in view, each scrolled to its own offset.
@@ -210,6 +219,12 @@ func (m Model) statusView() string {
 			updated = m.spinner.View() + " " + updated
 		}
 		parts = append(parts, updated)
+	}
+	if m.loadingLinks() {
+		parts = append(parts, m.spinner.View()+" "+muted.Render("Loading links…"))
+	}
+	if line := m.linkLine(); line != "" {
+		parts = append(parts, line)
 	}
 	if m.storeErr != nil {
 		parts = append(parts, errStyle.Render("Couldn't load tags: "+oneLine(m.storeErr.Error())))

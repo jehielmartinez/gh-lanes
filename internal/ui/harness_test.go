@@ -1,9 +1,11 @@
 package ui_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -35,7 +37,8 @@ const (
 var fixedZone = time.FixedZone("UTC-5", -5*60*60)
 
 // harness is the one test seam: the real root model under teatest, the fake
-// GraphQL transport, a temporary config directory and a controllable clock.
+// GraphQL transport, a temporary config directory, a controllable clock and
+// a fake URL opener.
 type harness struct {
 	t         *testing.T
 	tm        *teatest.TestModel
@@ -43,6 +46,7 @@ type harness struct {
 	configDir string
 	clock     *clock
 	screen    *screen
+	opener    *opener
 }
 
 type harnessOption func(*harnessConfig)
@@ -52,6 +56,12 @@ type harnessConfig struct {
 	configDir     string
 	config        string
 	width, height int
+	openErr       error
+}
+
+// withOpenError makes every attempt to open a URL fail with err.
+func withOpenError(err error) harnessOption {
+	return func(c *harnessConfig) { c.openErr = err }
 }
 
 // withTermSize starts the app in a terminal of the given size.
@@ -107,8 +117,9 @@ func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOp
 		configDir: cfg.configDir,
 		clock:     &clock{now: time.Date(2026, 3, 5, 12, 0, 0, 0, fixedZone)},
 		screen:    &screen{},
+		opener:    &opener{err: cfg.openErr},
 	}
-	root := ui.New(ui.Options{GitHub: client, ConfigDir: h.configDir, Now: h.clock.Now, After: h.clock.After})
+	root := ui.New(ui.Options{GitHub: client, ConfigDir: h.configDir, Now: h.clock.Now, After: h.clock.After, Open: h.opener.Open})
 	h.tm = teatest.NewTestModel(t, spy{inner: root, screen: h.screen}, teatest.WithInitialTermSize(cfg.width, cfg.height))
 	// Quitting the way a user does lets in-flight writes land before the
 	// config directory is removed.
@@ -367,4 +378,32 @@ func (c *clock) waiting() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return len(c.waiters) > 0
+}
+
+// opener is the fake URL opener: it records every URL the app asks to open.
+type opener struct {
+	mu   sync.Mutex
+	urls []string
+	err  error
+}
+
+func (o *opener) Open(url string) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.urls = append(o.urls, url)
+	return o.err
+}
+
+func (o *opener) opened() []string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return append([]string(nil), o.urls...)
+}
+
+// waitForOpened waits until the app has asked to open exactly want, in order.
+func (h *harness) waitForOpened(want ...string) {
+	h.t.Helper()
+	h.waitFor(fmt.Sprintf("the opener to receive %q", want), func() bool {
+		return slices.Equal(h.opener.opened(), want)
+	})
 }

@@ -18,6 +18,8 @@ type keyMap struct {
 	Tags      key.Binding
 	Open      key.Binding
 	Archive   key.Binding
+	Links     key.Binding
+	Browser   key.Binding
 	Refresh   key.Binding
 	Help      key.Binding
 	Quit      key.Binding
@@ -52,6 +54,8 @@ func newKeyMap() keyMap {
 		Tags:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tags")),
 		Open:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Archive:   key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "archive")),
+		Links:     key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "links")),
+		Browser:   key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "open in browser")),
 		Refresh:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
 		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:      key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
@@ -89,7 +93,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
 		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Archive},
-		{k.Refresh, k.Help, k.Quit},
+		{k.Links, k.Browser, k.Refresh, k.Help, k.Quit},
 	}
 }
 
@@ -104,12 +108,12 @@ type modalHelp struct{ keys keyMap }
 
 func (h modalHelp) ShortHelp() []key.Binding {
 	m := h.keys.Modal
-	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, m.Close, h.keys.Refresh, h.keys.Quit}
+	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.Refresh, h.keys.Quit}
 }
 
 func (h modalHelp) FullHelp() [][]key.Binding {
 	m := h.keys.Modal
-	return [][]key.Binding{{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.ExpandResolved, m.Close, h.keys.Refresh, h.keys.Quit}}
+	return [][]key.Binding{{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.Refresh, h.keys.Quit}}
 }
 
 // pickerKeys are the bindings inside a picker.

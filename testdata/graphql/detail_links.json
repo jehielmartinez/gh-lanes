@@ -1,0 +1,160 @@
+{
+  "data": {
+    "node": {
+      "id": "PR_node_links",
+      "number": 21,
+      "title": "Document the release steps",
+      "url": "https://github.com/octo-org/sample-repo/pull/21",
+      "isDraft": false,
+      "state": "OPEN",
+      "createdAt": "2026-03-01T10:00:00Z",
+      "updatedAt": "2026-03-05T11:00:00Z",
+      "mergedAt": null,
+      "closedAt": null,
+      "author": {
+        "login": "user-a"
+      },
+      "baseRefName": "main",
+      "headRefName": "release-docs",
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN",
+      "reviewDecision": "APPROVED",
+      "viewerCanUpdate": true,
+      "autoMergeRequest": null,
+      "repository": {
+        "nameWithOwner": "octo-org/sample-repo",
+        "mergeCommitAllowed": true,
+        "squashMergeAllowed": true,
+        "rebaseMergeAllowed": false,
+        "autoMergeAllowed": true,
+        "deleteBranchOnMerge": true
+      },
+      "comments": {
+        "totalCount": 1
+      },
+      "reviews": {
+        "totalCount": 1
+      },
+      "latestReviews": {
+        "nodes": [
+          {
+            "author": {
+              "login": "user-c"
+            },
+            "state": "APPROVED",
+            "submittedAt": "2026-03-04T10:00:00Z"
+          }
+        ]
+      },
+      "commits": {
+        "nodes": [
+          {
+            "commit": {
+              "id": "C_node_links",
+              "statusCheckRollup": {
+                "contexts": {
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": "Y3Vyc29yOjI="
+                  },
+                  "nodes": [
+                    {
+                      "__typename": "CheckRun",
+                      "name": "build",
+                      "status": "COMPLETED",
+                      "conclusion": "SUCCESS",
+                      "startedAt": "2026-03-05T10:00:00Z",
+                      "completedAt": "2026-03-05T10:03:00Z",
+                      "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/3/job/1",
+                      "checkSuite": {
+                        "workflowRun": {
+                          "workflow": {
+                            "name": "Build"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "__typename": "StatusContext",
+                      "context": "ci/external",
+                      "state": "SUCCESS",
+                      "targetUrl": "https://ci.example.com/octo-org/sample-repo/3",
+                      "createdAt": "2026-03-05T10:30:00Z"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "body": "See the [design doc](https://github.com/octo-org/sample-repo/wiki/Design) and https://github.com/octo-org/sample-repo/issues/7 for context.\n\nRelease notes: https://github.com/octo-org/sample-repo/blob/main/docs/release/steps-for-every-supported-platform.md\n\nNever follow [this one](javascript:alert(1)) or [that one](file:///etc/passwd).",
+      "conversationComments": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "author": {
+              "login": "user-b"
+            },
+            "body": "Logs are at https://ci.example.com/octo-org/sample-repo/build/9 if needed.",
+            "createdAt": "2026-03-02T10:00:00Z"
+          }
+        ]
+      },
+      "conversationReviews": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "author": {
+              "login": "user-c"
+            },
+            "state": "APPROVED",
+            "body": "Matches [the plan](https://github.com/octo-org/sample-repo/issues/1).",
+            "submittedAt": "2026-03-04T10:00:00Z"
+          }
+        ]
+      },
+      "reviewThreads": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "id": "RT_node_links",
+            "path": "docs/release.md",
+            "line": 4,
+            "originalLine": 4,
+            "isResolved": false,
+            "comments": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": [
+                {
+                  "author": {
+                    "login": "user-b"
+                  },
+                  "body": "Same fix as https://github.com/octo-org/sample-repo/pull/5 here.",
+                  "createdAt": "2026-03-03T10:00:00Z"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4980,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

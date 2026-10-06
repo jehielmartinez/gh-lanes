@@ -28,6 +28,9 @@ type Request struct {
 type Response struct {
 	Status int
 	Body   []byte
+	// Err, when set, fails the request without a response, the way a dropped
+	// connection or an unreachable host does.
+	Err error
 	// Release, when set, holds the response back until it is closed, so a
 	// test can see what the app shows while a request is in flight.
 	Release <-chan struct{}
@@ -109,6 +112,9 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		case <-req.Context().Done():
 			return nil, req.Context().Err()
 		}
+	}
+	if reply.Err != nil {
+		return nil, reply.Err
 	}
 	if !ok {
 		reply = Response{

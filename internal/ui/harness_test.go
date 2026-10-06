@@ -1,6 +1,7 @@
 package ui_test
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/jehielmartinez/gh-lanes/internal/github"
 	"github.com/jehielmartinez/gh-lanes/internal/github/githubtest"
+	"github.com/jehielmartinez/gh-lanes/internal/store"
 	"github.com/jehielmartinez/gh-lanes/internal/ui"
 )
 
@@ -38,12 +40,18 @@ type harness struct {
 type harnessOption func(*harnessConfig)
 
 type harnessConfig struct {
-	env map[string]string
+	env    map[string]string
+	config string
 }
 
 // withEnv sets an environment variable before the GitHub layer resolves auth.
 func withEnv(key, value string) harnessOption {
 	return func(c *harnessConfig) { c.env[key] = value }
+}
+
+// withConfig seeds the config file before the app starts.
+func withConfig(yaml string) harnessOption {
+	return func(c *harnessConfig) { c.config = yaml }
 }
 
 // newHarness starts the app. The transport must have its replies queued before
@@ -64,14 +72,20 @@ func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOp
 	if err != nil {
 		t.Fatalf("github.New: %v", err)
 	}
+	configDir := t.TempDir()
+	if cfg.config != "" {
+		if err := os.WriteFile(filepath.Join(configDir, store.ConfigFile), []byte(cfg.config), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 	h := &harness{
 		t:         t,
 		transport: transport,
-		configDir: t.TempDir(),
+		configDir: configDir,
 		clock:     &clock{now: time.Date(2026, 3, 5, 12, 0, 0, 0, fixedZone)},
 		screen:    &screen{},
 	}
-	root := ui.New(ui.Options{GitHub: client, ConfigDir: h.configDir, Now: h.clock.Now})
+	root := ui.New(ui.Options{GitHub: client, ConfigDir: h.configDir, Now: h.clock.Now, After: h.clock.After})
 	h.tm = teatest.NewTestModel(t, spy{inner: root, screen: h.screen}, teatest.WithInitialTermSize(100, 30))
 	t.Cleanup(func() { _ = h.tm.Quit() })
 	return h
@@ -176,13 +190,93 @@ func (s *screen) plain() string {
 	return strings.Join(lines, "\n")
 }
 
+// advance moves the clock forward once the app is waiting on it, so a tick
+// can't be missed by arriving before the app asked for it.
+func (h *harness) advance(d time.Duration) {
+	h.t.Helper()
+	deadline := time.Now().Add(waitTimeout)
+	for !h.clock.waiting() {
+		if time.Now().After(deadline) {
+			h.t.Fatalf("timed out waiting for the app to wait on the clock")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	h.clock.Advance(d)
+}
+
+// settle advances the clock a second at a time, letting the app handle each
+// tick, so everything due in d has happened by the time it returns.
+func (h *harness) settle(d time.Duration) {
+	h.t.Helper()
+	for range int(d / time.Second) {
+		h.advance(time.Second)
+	}
+}
+
+// waitForRequests waits until the transport has received n requests.
+func (h *harness) waitForRequests(n int) []githubtest.Request {
+	h.t.Helper()
+	deadline := time.Now().Add(waitTimeout)
+	for {
+		reqs := h.transport.Requests()
+		if len(reqs) >= n {
+			return reqs
+		}
+		if time.Now().After(deadline) {
+			h.t.Fatalf("timed out waiting for %d requests, got %d", n, len(reqs))
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// clock is the controllable clock: time moves only when a test advances it,
+// and After fires once it has moved far enough.
 type clock struct {
-	mu  sync.Mutex
-	now time.Time
+	mu      sync.Mutex
+	now     time.Time
+	waiters []waiter
+}
+
+type waiter struct {
+	at time.Time
+	ch chan time.Time
 }
 
 func (c *clock) Now() time.Time {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.now
+}
+
+func (c *clock) After(d time.Duration) <-chan time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ch := make(chan time.Time, 1)
+	if d <= 0 {
+		ch <- c.now
+		return ch
+	}
+	c.waiters = append(c.waiters, waiter{at: c.now.Add(d), ch: ch})
+	return ch
+}
+
+func (c *clock) Advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+	pending := c.waiters[:0]
+	for _, w := range c.waiters {
+		if w.at.After(c.now) {
+			pending = append(pending, w)
+			continue
+		}
+		w.ch <- c.now
+	}
+	c.waiters = pending
+}
+
+func (c *clock) waiting() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.waiters) > 0
 }

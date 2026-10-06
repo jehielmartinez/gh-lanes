@@ -1,0 +1,53 @@
+{
+  "data": {
+    "node": {
+      "statusCheckRollup": {
+        "contexts": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "Y3Vyc29yOjM="
+          },
+          "nodes": [
+            {
+              "__typename": "CheckRun",
+              "name": "unit-2",
+              "status": "COMPLETED",
+              "conclusion": "FAILURE",
+              "startedAt": "2026-03-05T13:00:00Z",
+              "completedAt": "2026-03-05T13:05:00Z",
+              "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1/job/96",
+              "checkSuite": {
+                "workflowRun": {
+                  "workflow": {
+                    "name": "CI"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "unit-3",
+              "status": "COMPLETED",
+              "conclusion": "TIMED_OUT",
+              "startedAt": "2026-03-05T13:00:00Z",
+              "completedAt": "2026-03-05T13:05:00Z",
+              "detailsUrl": "https://github.com/octo-org/sample-repo/actions/runs/1/job/621",
+              "checkSuite": {
+                "workflowRun": {
+                  "workflow": {
+                    "name": "CI"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4989,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

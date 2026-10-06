@@ -179,8 +179,16 @@ func (m Model) clickDetail(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	if col < 0 || col >= vp.Width() || row < 0 || row >= vp.Height() {
 		return m, nil
 	}
-	if url, ok := m.detail.links.At(row+vp.YOffset(), col); ok {
+	line := row + vp.YOffset()
+	if url, ok := m.detail.links.At(line, col); ok {
 		return m.open(url)
+	}
+	for s, at := range m.detail.headers {
+		if at == line {
+			d := m.detail.toggle(section(s))
+			m.detail = &d
+			return m, nil
+		}
 	}
 	return m, nil
 }

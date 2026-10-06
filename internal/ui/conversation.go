@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -15,23 +14,21 @@ import (
 // indentStep is how far each level of the conversation is indented.
 const indentStep = 2
 
-// descriptionLines is the modal's Description section.
+// descriptionLines is the body of the modal's Description section.
 func (m Model) descriptionLines(conv domain.Conversation, width int) page {
-	heading := text(m.sectionHeading("Description"))
 	if strings.TrimSpace(conv.Body) == "" {
-		return heading.then(text(indented(1, m.muted("No description provided."))))
+		return text(indented(1, m.muted("No description provided.")))
 	}
-	return heading.then(m.markdownLines(conv.Body, 1, width))
+	return m.markdownLines(conv.Body, 1, width)
 }
 
-// conversationLines is the modal's Conversation section: one timeline of
-// comments, reviews and review threads, oldest first.
-func (m Model) conversationLines(conv domain.Conversation, expandResolved bool, width int) page {
-	timeline := conv.Timeline()
-	p := text(m.sectionHeading("Conversation") + "  " + m.muted(strconv.Itoa(len(timeline))))
+// conversationLines is the body of the modal's Conversation section: one
+// timeline of comments, reviews and review threads, oldest first.
+func (m Model) conversationLines(timeline []domain.TimelineEntry, expandResolved bool, width int) page {
 	if len(timeline) == 0 {
-		return p.then(text(indented(1, m.muted("No comments yet."))))
+		return text(indented(1, m.muted("No comments yet.")))
 	}
+	var p page
 	for i, e := range timeline {
 		if i > 0 {
 			p = p.then(text(""))
@@ -90,9 +87,12 @@ func (m Model) threadLines(t domain.Thread, expandResolved bool, width int) page
 	}
 	header := m.muted(marker) + " " + m.bold(oneLine(t.Location())) + m.muted(statusSeparator) + state
 	if collapsed {
-		header += m.muted(statusSeparator + plural(len(t.Comments), "comment"))
+		header += m.muted(statusSeparator + plural(len(t.Comments), "comment") + statusSeparator + m.keys.Modal.ExpandResolved.Help().Key + " to expand")
 	} else {
 		header += m.muted(statusSeparator + m.timestamp(t.StartedAt()))
+		if t.Resolved {
+			header += m.muted(statusSeparator + m.keys.Modal.ExpandResolved.Help().Key + " to collapse")
+		}
 	}
 	p := text(indentedWrap(1, header, width))
 	if collapsed {

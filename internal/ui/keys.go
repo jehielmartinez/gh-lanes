@@ -48,6 +48,8 @@ type modalKeys struct {
 	Close    key.Binding
 	// ExpandResolved shows or hides the comments of resolved review threads.
 	ExpandResolved key.Binding
+	// Section opens or closes the section its number names.
+	Section key.Binding
 }
 
 func newKeyMap() keyMap {
@@ -83,6 +85,7 @@ func newKeyMap() keyMap {
 			Bottom:         key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G/end", "bottom")),
 			Close:          key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 			ExpandResolved: key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "resolved threads")),
+			Section:        key.NewBinding(key.WithKeys(sectionKeys()...), key.WithHelp(sectionKeysHelp(), "sections")),
 		},
 	}
 }
@@ -123,13 +126,13 @@ type modalHelp struct{ keys keyMap }
 
 func (h modalHelp) ShortHelp() []key.Binding {
 	m := h.keys.Modal
-	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit}
+	return []key.Binding{m.Up, m.Down, m.PageDown, m.Section, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit}
 }
 
 func (h modalHelp) FullHelp() [][]key.Binding {
 	m := h.keys.Modal
 	return [][]key.Binding{
-		{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close},
+		{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.Section, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close},
 		{h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit},
 	}
 }

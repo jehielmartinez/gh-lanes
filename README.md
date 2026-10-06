@@ -90,6 +90,8 @@ always current.
 | `u` / `U` | board, detail | update the branch by merge / by rebase |
 | `M` | board, detail | merge dialog |
 | `d` | board, detail | toggle draft and ready for review |
+| `1`–`4` | detail | open or close Status, Checks, Description, Conversation (or click the heading) |
+| `e` | detail | show or hide resolved review threads |
 | `esc` | detail, pickers | close |
 | `?` | everywhere | full help |
 | `q` / `ctrl+c` | everywhere | quit |

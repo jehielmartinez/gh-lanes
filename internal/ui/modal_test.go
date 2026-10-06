@@ -215,11 +215,12 @@ func TestModalChecksArePagedThrough(t *testing.T) {
 
 func TestModalScrollsAsOneViewport(t *testing.T) {
 	h := newModalHarness(t, "detail_conflict.json")
+	h.resize(120, 24)
 
 	h.doubleClickCard("octo-org/sample-repo#11")
 	screen := h.waitForText("retry-uploads → release-2")
 	if strings.Contains(screen, "coverage-report") {
-		t.Fatalf("a 30-line terminal should not fit every check:\n%s", screen)
+		t.Fatalf("a 24-line terminal should not fit every check:\n%s", screen)
 	}
 	h.press("end")
 	screen = h.waitForText("coverage-report")

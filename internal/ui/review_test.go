@@ -111,11 +111,11 @@ func TestReviewRequestsOpenInTheDetailModal(t *testing.T) {
 		t.Errorf("detail fetched for %v, want the selected review request", got)
 	}
 	screen := h.waitForText("export-pages → main")
-	assertContains(t, screen, "user-b", "Behind main. Update branch available.", "Merge status", "Checks")
+	assertContains(t, screen, "user-b", "Behind main. Update branch available.", "▾ Status", "Checks")
 
 	h.press("esc")
 	h.waitForScreen("the review requests again", func(s string) bool {
-		return !strings.Contains(s, "Merge status") && strings.Contains(s, openReviewRef)
+		return !strings.Contains(s, "▾ Status") && strings.Contains(s, openReviewRef)
 	})
 }
 

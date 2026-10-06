@@ -34,14 +34,23 @@ func linksTransport(t *testing.T) *githubtest.Transport {
 }
 
 // newLinksHarness opens the detail modal on the links fixture in a terminal
-// of the given size and waits for its description.
+// of the given size, with every section expanded.
 func newLinksHarness(t *testing.T, width, height int, opts ...harnessOption) *harness {
+	t.Helper()
+	h := openLinksHarness(t, width, height, opts...)
+	h.expandSections()
+	return h
+}
+
+// openLinksHarness opens the detail modal on the links fixture and waits for
+// the fresh copy, leaving the sections as the modal opens them.
+func openLinksHarness(t *testing.T, width, height int, opts ...harnessOption) *harness {
 	t.Helper()
 	h := newHarness(t, linksTransport(t), opts...)
 	h.waitForText("octo-org/sample-repo#12")
 	h.resize(width, height)
 	h.press("enter")
-	h.waitForText("Description")
+	h.waitForText(" Conversation")
 	return h
 }
 

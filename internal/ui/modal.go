@@ -43,6 +43,14 @@ type detail struct {
 	links links.Map
 	// seen is whether opening the modal has been recorded as a snapshot.
 	seen bool
+	// open is which sections are expanded. They start from defaultSections
+	// for the fresh copy, then change only when the viewer toggles one, so a
+	// refresh never folds away what they are reading.
+	open    sectionSet
+	toggled bool
+	// headers is the content line each section's heading is drawn on, or -1
+	// when the section isn't drawn, so a click on a heading can toggle it.
+	headers [sectionCount]int
 }
 
 type detailMsg struct {
@@ -58,7 +66,7 @@ type detailMsg struct {
 func (m Model) openDetail(pr domain.PullRequest) (Model, tea.Cmd) {
 	vp := viewport.New()
 	vp.KeyMap = m.keys.Modal.viewportKeys()
-	m.detail = &detail{pr: pr, viewport: vp}
+	m.detail = &detail{pr: pr, viewport: vp, open: defaultSections(pr)}
 	return m.fetchDetail()
 }
 
@@ -107,6 +115,9 @@ func (m Model) detailFetched(msg detailMsg) Model {
 	d.fetchedAt = msg.at
 	d.err = msg.err
 	if msg.err == nil {
+		if !d.fresh && !d.toggled {
+			d.open = defaultSections(msg.pr)
+		}
 		d.pr, d.fresh = msg.pr, true
 	}
 	if msg.rateLimit != (domain.RateLimit{}) {
@@ -141,11 +152,21 @@ func (m Model) detailKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		d.viewport.GotoBottom()
 	case key.Matches(msg, m.keys.Modal.ExpandResolved):
 		d.expandResolved = !d.expandResolved
+	case key.Matches(msg, m.keys.Modal.Section):
+		s, _ := sectionFromKey(msg.String())
+		d = d.toggle(s)
 	default:
 		d.viewport, _ = d.viewport.Update(msg)
 	}
 	m.detail = &d
 	return m, nil
+}
+
+// toggle opens or closes a section.
+func (d detail) toggle(s section) detail {
+	d.open[s] = !d.open[s]
+	d.toggled = true
+	return d
 }
 
 func (m Model) detailScroll(msg tea.MouseWheelMsg) Model {
@@ -171,9 +192,10 @@ func (m Model) syncDetail() Model {
 	d := *m.detail
 	d.viewport.SetWidth(inner)
 	d.viewport.SetHeight(max(height-2-lipgloss.Height(m.detailStatus(inner)), 1))
-	content := m.detailContent(inner)
+	content, headers := m.detailContent(inner)
 	d.viewport.SetContent(strings.Join(content.lines, "\n"))
 	d.links = content.links
+	d.headers = headers
 	m.detail = &d
 	return m
 }
@@ -213,42 +235,58 @@ func (m Model) detailStatus(width int) string {
 	return lipgloss.NewStyle().Width(width).Render(line)
 }
 
-// detailContent is everything the modal scrolls through.
-func (m Model) detailContent(width int) page {
-	pr := m.detail.pr
+// detailContent is everything the modal scrolls through, and the line each
+// section's heading landed on.
+func (m Model) detailContent(width int) (page, [sectionCount]int) {
+	d := m.detail
+	pr := d.pr
 	muted := lipgloss.NewStyle().Foreground(m.theme.muted)
 	wrap := lipgloss.NewStyle().Width(width)
 
-	author := authorName(pr.Author)
-	lines := []string{
-		muted.Render(ref(pr)) + "  " + m.stateBadge(pr),
+	content := text(
+		muted.Render(ref(pr))+"  "+m.stateBadge(pr),
 		wrap.Bold(true).Foreground(m.theme.text).Render(oneLine(pr.Title)),
-		wrap.Render(muted.Render(author + statusSeparator + pr.HeadRef + " → " + pr.BaseRef)),
-		wrap.Render(muted.Render("Created " + m.timestamp(pr.CreatedAt) + statusSeparator + "Updated " + m.timestamp(pr.UpdatedAt))),
-		"",
-		m.sectionHeading("Merge status"),
-		wrap.Render("  " + m.mergeLine(pr)),
-		"",
-		m.sectionHeading("Review"),
-		"  " + m.reviewLine(pr.ReviewDecision),
-		"",
-		m.sectionHeading("Auto-merge"),
-		wrap.Render("  " + m.autoMergeLine(pr.AutoMerge)),
-		"",
-		m.sectionHeading("Checks") + "  " + muted.Render(checkSummary(pr.Checks)),
+		wrap.Render(muted.Render(authorName(pr.Author)+statusSeparator+pr.HeadRef+" → "+pr.BaseRef)),
+		wrap.Render(muted.Render("Created "+m.timestamp(pr.CreatedAt)+statusSeparator+"Updated "+m.timestamp(pr.UpdatedAt))),
+	)
+	headers := [sectionCount]int{-1, -1, -1, -1}
+	add := func(s section, summary string, body func() page) {
+		headers[s] = len(content.lines) + 1
+		content = content.then(text("", m.sectionHeader(s, d.open[s], summary, width)))
+		if d.open[s] {
+			content = content.then(body())
+		}
 	}
-	content := text(lines...).then(m.checkLines(pr.Checks, width))
+
+	statusSummary := ""
+	if !d.open[sectionStatus] {
+		statusSummary = m.statusSummary(pr)
+	}
+	add(sectionStatus, statusSummary, func() page {
+		return text(
+			wrap.Render(indented(1, m.mergeLine(pr))),
+			wrap.Render(indented(1, m.reviewLine(pr.ReviewDecision)+muted.Render(statusSeparator)+"Auto-merge "+m.autoMergeLine(pr.AutoMerge))),
+		)
+	})
+	add(sectionChecks, checkSummary(pr.Checks), func() page { return m.checkLines(pr.Checks, width) })
 	// The board's copy carries no conversation, so these wait for the
 	// detail query rather than claiming there is nothing to show.
-	if m.detail.fresh {
-		content = content.then(
-			text(""),
-			m.descriptionLines(pr.Conversation, width),
-			text(""),
-			m.conversationLines(pr.Conversation, m.detail.expandResolved, width),
-		)
+	if !d.fresh {
+		return content, headers
 	}
-	return content
+	conv := pr.Conversation
+	bodyWidth := width - indentStep
+	add(sectionDescription, descriptionSummary(conv.Body, bodyWidth), func() page { return m.descriptionLines(conv, width) })
+	if !d.open[sectionDescription] {
+		if preview := descriptionPreview(conv.Body, bodyWidth-2); preview != "" {
+			content = content.then(text(indented(1, m.muted(preview))))
+		}
+	}
+	timeline := conv.Timeline()
+	add(sectionConversation, m.conversationSummary(timeline), func() page {
+		return m.conversationLines(timeline, d.expandResolved, width)
+	})
+	return content, headers
 }
 
 func (m Model) stateBadge(pr domain.PullRequest) string {

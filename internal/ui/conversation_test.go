@@ -7,9 +7,19 @@ import (
 	"github.com/jehielmartinez/gh-lanes/internal/github/githubtest"
 )
 
-// newConversationHarness starts the app with the conversation fixtures queued,
-// opens the most recently updated card and waits for its conversation.
+// newConversationHarness opens the conversation fixture with every section
+// expanded.
 func newConversationHarness(t *testing.T) *harness {
+	t.Helper()
+	h := openConversationHarness(t)
+	h.expandSections()
+	return h
+}
+
+// openConversationHarness starts the app with the conversation fixtures
+// queued, opens the most recently updated card and waits for the fresh copy,
+// leaving the sections as the modal opens them.
+func openConversationHarness(t *testing.T) *harness {
 	t.Helper()
 	transport := githubtest.New()
 	transport.ReplyFixture(t, "SearchPullRequests", fixture("search_status.json"))
@@ -23,7 +33,7 @@ func newConversationHarness(t *testing.T) *harness {
 	h.waitForText("octo-org/sample-repo#12")
 	h.resize(120, 120)
 	h.press("enter")
-	h.waitForText("Conversation")
+	h.waitForText(" Conversation")
 	return h
 }
 
@@ -192,6 +202,6 @@ func TestEmptyConversationSaysSo(t *testing.T) {
 	h.resize(120, 80)
 
 	h.press("enter")
-	screen := h.waitForText("No comments yet.")
+	screen := h.expandSections()
 	assertContains(t, screen, "Description", "No description provided.", "Conversation  0")
 }

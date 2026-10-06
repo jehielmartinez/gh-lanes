@@ -74,14 +74,14 @@ func (m Model) open(url string) (Model, tea.Cmd) {
 	return m, func() tea.Msg { return openedMsg{err: opener(url)} }
 }
 
-// openLinks opens the link picker on the modal's pull request, or, from the
-// board, fetches the selected one first, since the board's copy carries no
+// openLinks opens the link picker on the modal's pull request, or, from a
+// tab, fetches the selected one first, since a card's copy carries no
 // conversation.
 func (m Model) openLinks() (Model, tea.Cmd) {
 	if m.detail != nil {
 		return m.linkPicker(m.detail.pr), nil
 	}
-	pr, ok := m.selected()
+	pr, ok := m.current()
 	if !ok {
 		return m, nil
 	}
@@ -205,13 +205,10 @@ func (m Model) linkLine() string {
 // loadingLinks is whether a fetch for the board's link picker is in flight.
 func (m Model) loadingLinks() bool { return m.linksSeq != 0 }
 
-// openPullRequest opens the modal's pull request, or the selected card's, on
-// GitHub.
+// openPullRequest opens the modal's pull request, or the selected card's on
+// the tab in view, on GitHub.
 func (m Model) openPullRequest() (Model, tea.Cmd) {
-	if m.detail != nil {
-		return m.open(m.detail.pr.URL)
-	}
-	if pr, ok := m.selected(); ok {
+	if pr, ok := m.actionTarget(); ok {
 		return m.open(pr.URL)
 	}
 	return m, nil

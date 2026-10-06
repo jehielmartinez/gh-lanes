@@ -226,3 +226,38 @@ func TestOpeningAReviewRequestRecordsNoSnapshot(t *testing.T) {
 		t.Errorf("review requests should not count as new:\n%s", h.screen.plain())
 	}
 }
+
+func TestShiftOOpensTheSelectedReviewRequest(t *testing.T) {
+	h := newReviewHarness(t, nil)
+	h.press("tab")
+	h.waitForText(openReviewRef)
+
+	h.press("j")
+	h.press("O")
+	h.waitForOpened("https://github.com/octo-org/sample-repo/pull/31")
+}
+
+func TestLinkPickerLoadsTheSelectedReviewRequest(t *testing.T) {
+	h := newReviewHarness(t, func(tr *githubtest.Transport) {
+		tr.Reply("PullRequestDetail", githubtest.Response{Err: errors.New("connection reset")})
+	})
+	h.press("tab")
+	h.waitForText(openReviewRef)
+
+	h.press("j")
+	h.press("o")
+	reqs := h.waitForDetailRequests(1)
+	if got := reqs[0].Variables["id"]; got != "PR_node_review_open" {
+		t.Errorf("links loaded for %v, want the selected review request", got)
+	}
+}
+
+func TestReviewRequestsHelpListsTheLinkKeys(t *testing.T) {
+	h := newReviewHarness(t, nil)
+	h.press("tab")
+	h.waitForText(openReviewRef)
+
+	h.press("?")
+	h.waitForText("open in browser")
+	h.waitForText("links")
+}

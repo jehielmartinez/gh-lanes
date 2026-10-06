@@ -98,3 +98,12 @@ func TestAFailedArchivedFetchSaysWhy(t *testing.T) {
 	h.clickText("Archived 1")
 	h.waitForText("Couldn't load archived pull requests:")
 }
+
+func TestShiftOOpensTheSelectedArchivedPR(t *testing.T) {
+	h := startArchived(t, `[{"id":"PR_node_merged","open":false,"tag":"testing"}]`)
+
+	h.clickText("Archived 1")
+	h.waitForText("Ship the upload worker")
+	h.press("O")
+	h.waitForOpened("https://github.com/octo-org/sample-repo/pull/20")
+}

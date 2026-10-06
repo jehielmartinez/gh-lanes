@@ -13,6 +13,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
+	"github.com/jehielmartinez/gh-lanes/internal/links"
 )
 
 // modalScale is the share of the screen the detail modal covers, in tenths.
@@ -38,6 +39,8 @@ type detail struct {
 	// expandResolved shows the comments of resolved review threads, which
 	// are collapsed to one line by default.
 	expandResolved bool
+	// links is where each link is drawn in the viewport's content.
+	links links.Map
 	// seen is whether opening the modal has been recorded as a snapshot.
 	seen bool
 }
@@ -168,7 +171,9 @@ func (m Model) syncDetail() Model {
 	d := *m.detail
 	d.viewport.SetWidth(inner)
 	d.viewport.SetHeight(max(height-2-lipgloss.Height(m.detailStatus(inner)), 1))
-	d.viewport.SetContent(m.detailContent(inner))
+	content := m.detailContent(inner)
+	d.viewport.SetContent(strings.Join(content.lines, "\n"))
+	d.links = content.links
 	m.detail = &d
 	return m
 }
@@ -209,7 +214,7 @@ func (m Model) detailStatus(width int) string {
 }
 
 // detailContent is everything the modal scrolls through.
-func (m Model) detailContent(width int) string {
+func (m Model) detailContent(width int) page {
 	pr := m.detail.pr
 	muted := lipgloss.NewStyle().Foreground(m.theme.muted)
 	wrap := lipgloss.NewStyle().Width(width)
@@ -232,16 +237,18 @@ func (m Model) detailContent(width int) string {
 		"",
 		m.sectionHeading("Checks") + "  " + muted.Render(checkSummary(pr.Checks)),
 	}
-	lines = append(lines, m.checkLines(pr.Checks, width)...)
+	content := text(lines...).then(m.checkLines(pr.Checks, width))
 	// The board's copy carries no conversation, so these wait for the
 	// detail query rather than claiming there is nothing to show.
 	if m.detail.fresh {
-		lines = append(lines, "")
-		lines = append(lines, m.descriptionLines(pr.Conversation, width)...)
-		lines = append(lines, "")
-		lines = append(lines, m.conversationLines(pr.Conversation, m.detail.expandResolved, width)...)
+		content = content.then(
+			text(""),
+			m.descriptionLines(pr.Conversation, width),
+			text(""),
+			m.conversationLines(pr.Conversation, m.detail.expandResolved, width),
+		)
 	}
-	return strings.Join(lines, "\n")
+	return content
 }
 
 func (m Model) stateBadge(pr domain.PullRequest) string {
@@ -321,7 +328,9 @@ func checkSummary(checks []domain.Check) string {
 	return strings.Join(parts, statusSeparator)
 }
 
-func (m Model) checkLines(checks []domain.Check, width int) []string {
+// checkLines lists the checks by group, each check's name a link to its
+// details page.
+func (m Model) checkLines(checks []domain.Check, width int) page {
 	groups := domain.GroupChecks(checks)
 	nameWidth := 0
 	for _, ch := range checks {
@@ -329,17 +338,24 @@ func (m Model) checkLines(checks []domain.Check, width int) []string {
 	}
 	nameWidth = min(nameWidth, max(width/2, 10))
 	muted := lipgloss.NewStyle().Foreground(m.theme.muted)
-	var lines []string
+	var p page
 	for _, g := range groups {
-		lines = append(lines, "  "+lipgloss.NewStyle().Bold(true).Render(groupLabel(g)))
+		p.lines = append(p.lines, "  "+lipgloss.NewStyle().Bold(true).Render(groupLabel(g)))
 		for _, ch := range g.Checks {
 			name := truncate(oneLine(ch.Name), nameWidth)
-			name += strings.Repeat(" ", nameWidth-lipgloss.Width(name))
-			line := "    " + m.checkIcon(ch.Outcome) + " " + name + "  " + muted.Render(checkTiming(ch, m.now))
-			lines = append(lines, lipgloss.NewStyle().MaxWidth(width).Render(line))
+			pad := strings.Repeat(" ", nameWidth-lipgloss.Width(name))
+			prefix := "    " + m.checkIcon(ch.Outcome) + " "
+			if links.Openable(ch.DetailsURL) {
+				start := lipgloss.Width(prefix)
+				end := min(start+lipgloss.Width(name), width)
+				p.links = append(p.links, links.Region{Line: len(p.lines), Start: start, End: end, URL: ch.DetailsURL})
+				name = m.asLink(lipgloss.NewStyle()).Render(name)
+			}
+			line := prefix + name + pad + "  " + muted.Render(checkTiming(ch, m.now))
+			p.lines = append(p.lines, lipgloss.NewStyle().MaxWidth(width).Render(line))
 		}
 	}
-	return lines
+	return p
 }
 
 func groupLabel(g domain.CheckGroup) string {

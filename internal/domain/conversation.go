@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"slices"
 	"time"
 )
@@ -68,4 +69,13 @@ func (c Conversation) Timeline() []TimelineEntry {
 	}
 	slices.SortStableFunc(entries, func(a, b TimelineEntry) int { return a.At.Compare(b.At) })
 	return entries
+}
+
+// Location is the thread's file:line, or just the file for a comment on the
+// whole file.
+func (t Thread) Location() string {
+	if t.Line == 0 {
+		return t.Path
+	}
+	return fmt.Sprintf("%s:%d", t.Path, t.Line)
 }

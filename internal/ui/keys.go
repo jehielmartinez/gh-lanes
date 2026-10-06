@@ -18,6 +18,8 @@ type keyMap struct {
 	Tags      key.Binding
 	Open      key.Binding
 	Archive   key.Binding
+	Links     key.Binding
+	Browser   key.Binding
 	// UpdateBranch, RebaseBranch, Draft and Merge act on the selected card,
 	// or on the pull request in the modal.
 	UpdateBranch key.Binding
@@ -58,6 +60,8 @@ func newKeyMap() keyMap {
 		Tags:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tags")),
 		Open:         key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Archive:      key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "archive")),
+		Links:        key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "links")),
+		Browser:      key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "open in browser")),
 		UpdateBranch: key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "update branch")),
 		RebaseBranch: key.NewBinding(key.WithKeys("U"), key.WithHelp("U", "rebase branch")),
 		Draft:        key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "draft")),
@@ -99,7 +103,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
 		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Archive},
-		{k.UpdateBranch, k.RebaseBranch, k.Draft, k.Merge},
+		{k.Links, k.Browser, k.UpdateBranch, k.RebaseBranch, k.Draft, k.Merge},
 		{k.Refresh, k.Help, k.Quit},
 	}
 }
@@ -115,13 +119,13 @@ type modalHelp struct{ keys keyMap }
 
 func (h modalHelp) ShortHelp() []key.Binding {
 	m := h.keys.Modal
-	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, m.Close, h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit}
+	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit}
 }
 
 func (h modalHelp) FullHelp() [][]key.Binding {
 	m := h.keys.Modal
 	return [][]key.Binding{
-		{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.ExpandResolved, m.Close},
+		{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close},
 		{h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit},
 	}
 }

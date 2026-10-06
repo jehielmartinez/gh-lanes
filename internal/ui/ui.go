@@ -13,6 +13,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/jehielmartinez/gh-lanes/internal/activity"
 	"github.com/jehielmartinez/gh-lanes/internal/board"
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 	"github.com/jehielmartinez/gh-lanes/internal/store"
@@ -35,6 +36,9 @@ type GitHub interface {
 	SearchPullRequests(ctx context.Context, query string) ([]domain.PullRequest, domain.RateLimit, error)
 	PullRequestsByID(ctx context.Context, ids []string) ([]domain.PullRequest, domain.RateLimit, error)
 	PullRequest(ctx context.Context, id string) (domain.PullRequest, domain.RateLimit, error)
+	UpdateBranch(ctx context.Context, id string, method domain.UpdateMethod) error
+	MarkReadyForReview(ctx context.Context, id string) error
+	ConvertToDraft(ctx context.Context, id string) error
 }
 
 // Options are the boundaries the root model is given rather than reaching for
@@ -90,6 +94,10 @@ type Model struct {
 	tags        []domain.Tag
 	assignments map[string]string
 	archived    []domain.Archived
+	// snapshots is nil until the first successful board load has been
+	// recorded as seen; see store.State.
+	snapshots map[string]domain.Snapshot
+	markers   map[string]activity.Marker
 
 	// One state write is in flight at a time; a move made meanwhile queues
 	// another, so writes land in the order the moves were made.
@@ -124,6 +132,11 @@ type Model struct {
 	linksSeq int
 	// linkErr is why the last link couldn't be loaded or opened.
 	linkErr *linkFailure
+	// confirm is the open confirmation dialog, nil when none is.
+	confirm *confirmation
+	// acting is whether an action is waiting on GitHub; one runs at a time.
+	acting bool
+	toast  toast
 }
 
 // click is a left click that landed on a card.
@@ -251,7 +264,7 @@ func (m Model) saveState() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.saving = true
-	dir, state := m.opts.ConfigDir, store.State{Assignments: m.assignments, Archived: m.archived}
+	dir, state := m.opts.ConfigDir, store.State{Assignments: m.assignments, Archived: m.archived, Snapshots: m.snapshots}
 	return m, func() tea.Msg { return stateSavedMsg{err: store.SaveState(dir, state)} }
 }
 
@@ -286,7 +299,8 @@ func (m Model) Init() tea.Cmd {
 // that moved back into view.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
-	return next.scrolled().syncDetail(), cmd
+	next, save := next.observe()
+	return next.scrolled().syncDetail(), tea.Batch(cmd, save)
 }
 
 func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
@@ -316,8 +330,14 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.tagManager != nil {
 			return m.tagManagerUpdate(msg)
 		}
+		if m.confirm != nil {
+			return m.confirmKey(msg)
+		}
 		if key.Matches(msg, m.keys.Tags) {
 			return m.openTagManager(), nil
+		}
+		if next, cmd, ok := m.actionKey(msg); ok {
+			return next, cmd
 		}
 		if key.Matches(msg, m.keys.Refresh) {
 			m, board := m.refresh()
@@ -336,7 +356,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.boardKey(msg)
 	case tea.MouseClickMsg:
 		switch {
-		case m.picker != nil || m.tagManager != nil:
+		case m.picker != nil || m.tagManager != nil || m.confirm != nil:
 		case m.detail != nil:
 			return m.clickDetail(msg)
 		default:
@@ -346,7 +366,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.detail != nil {
 			return m.detailScroll(msg), nil
 		}
-		if m.picker == nil && m.tagManager == nil {
+		if m.picker == nil && m.tagManager == nil && m.confirm == nil {
 			return m.wheeled(msg), nil
 		}
 	case tickMsg:
@@ -359,7 +379,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		m, board := m.refresh()
 		return m, tea.Batch(next, detail, board)
 	case spinner.TickMsg:
-		if !m.refreshing && !m.loadingLinks() && (m.detail == nil || !m.detail.fetching) {
+		if !m.refreshing && !m.acting && !m.loadingLinks() && (m.detail == nil || !m.detail.fetching) {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -384,6 +404,10 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.err != nil {
 			m.linkErr = &linkFailure{action: openFailed, err: msg.err}
 		}
+	case actionDoneMsg:
+		return m.actionDone(msg)
+	case prRefreshedMsg:
+		return m.prRefreshed(msg), nil
 	case storeLoadedMsg:
 		m.refreshInterval = msg.config.RefreshInterval
 		var intervalErr *store.RefreshIntervalError
@@ -397,6 +421,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.tags = msg.config.Tags
 			m.assignments = msg.state.Assignments
 			m.archived = msg.state.Archived
+			m.snapshots = msg.state.Snapshots
 		}
 		return m.rebuild(), nil
 	case moveMsg:
@@ -576,12 +601,17 @@ func (m Model) move(prID, tagID string) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.assignments = board.Assign(m.assignments, prID, tagID)
-	m = m.rebuild()
+	m = m.rebuild().reselect(prID)
+	return m.saveState()
+}
+
+// reselect focuses the pull request's card wherever it now sits.
+func (m Model) reselect(prID string) Model {
 	if lane, card, ok := board.Locate(m.lanes, prID); ok {
 		m.focus = lane
 		m = m.withCursor(lane, card)
 	}
-	return m.saveState()
+	return m
 }
 
 // archiveSelected takes the selected card off the board until its pull

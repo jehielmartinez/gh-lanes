@@ -1,0 +1,67 @@
+{
+  "data": {
+    "node": {
+      "id": "PR_node_ready",
+      "number": 22,
+      "title": "Tidy the retry loop",
+      "url": "https://github.com/octo-org/sample-repo/pull/22",
+      "isDraft": false,
+      "state": "OPEN",
+      "createdAt": "2026-02-01T10:00:00Z",
+      "updatedAt": "2026-03-05T15:00:00Z",
+      "mergedAt": null,
+      "closedAt": null,
+      "author": {
+        "login": "user-a"
+      },
+      "baseRefName": "main",
+      "headRefName": "retry-loop",
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "reviewDecision": "REVIEW_REQUIRED",
+      "viewerCanUpdate": true,
+      "autoMergeRequest": null,
+      "repository": {
+        "nameWithOwner": "octo-org/sample-repo",
+        "mergeCommitAllowed": true,
+        "squashMergeAllowed": true,
+        "rebaseMergeAllowed": false,
+        "autoMergeAllowed": true,
+        "deleteBranchOnMerge": true
+      },
+      "comments": {
+        "totalCount": 2
+      },
+      "reviews": {
+        "totalCount": 1
+      },
+      "latestReviews": {
+        "nodes": [
+          {
+            "author": {
+              "login": "user-b"
+            },
+            "state": "COMMENTED",
+            "submittedAt": "2026-03-02T10:00:00Z"
+          }
+        ]
+      },
+      "commits": {
+        "nodes": [
+          {
+            "commit": {
+              "id": "C_PR_node_ready",
+              "statusCheckRollup": null
+            }
+          }
+        ]
+      },
+      "viewerCanUpdateBranch": true
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

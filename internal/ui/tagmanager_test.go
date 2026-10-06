@@ -198,8 +198,8 @@ func TestTypingATagNameDoesNotTriggerBoardKeys(t *testing.T) {
 		_, _, _, ok := tagByName(c, "quit LH rtm")
 		return ok
 	})
-	if _, ok := readState(h.configDir); ok {
-		t.Errorf("letters typed into a name must not move cards")
+	if s, _ := readState(h.configDir); len(s.Assignments) > 0 {
+		t.Errorf("letters typed into a name must not move cards, got %v", s.Assignments)
 	}
 }
 
@@ -436,7 +436,7 @@ func TestSavingTagsKeepsTheRestOfTheConfig(t *testing.T) {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	if want := []string{"config.yaml"}; !reflect.DeepEqual(names, want) {
+	if want := []string{"config.yaml", "state.json"}; !reflect.DeepEqual(names, want) {
 		t.Errorf("config dir holds %v, want %v (no temp files)", names, want)
 	}
 }

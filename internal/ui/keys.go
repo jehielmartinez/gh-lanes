@@ -20,9 +20,14 @@ type keyMap struct {
 	Archive   key.Binding
 	Links     key.Binding
 	Browser   key.Binding
-	Refresh   key.Binding
-	Help      key.Binding
-	Quit      key.Binding
+	// UpdateBranch, RebaseBranch and Draft act on the selected card, or on
+	// the pull request in the modal.
+	UpdateBranch key.Binding
+	RebaseBranch key.Binding
+	Draft        key.Binding
+	Refresh      key.Binding
+	Help         key.Binding
+	Quit         key.Binding
 	// Interrupt is the one way to quit while text is being typed, where q is
 	// just a letter.
 	Interrupt key.Binding
@@ -44,22 +49,25 @@ type modalKeys struct {
 
 func newKeyMap() keyMap {
 	return keyMap{
-		LaneLeft:  key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("←/h", "lane")),
-		LaneRight: key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("→/l", "lane")),
-		CardUp:    key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "card")),
-		CardDown:  key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "card")),
-		MoveLeft:  key.NewBinding(key.WithKeys("H", "<"), key.WithHelp("H/<", "move left")),
-		MoveRight: key.NewBinding(key.WithKeys("L", ">"), key.WithHelp("L/>", "move right")),
-		MoveTo:    key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "move to…")),
-		Tags:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tags")),
-		Open:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
-		Archive:   key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "archive")),
-		Links:     key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "links")),
-		Browser:   key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "open in browser")),
-		Refresh:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
-		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
-		Quit:      key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
-		Interrupt: key.NewBinding(key.WithKeys("ctrl+c")),
+		LaneLeft:     key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("←/h", "lane")),
+		LaneRight:    key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("→/l", "lane")),
+		CardUp:       key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "card")),
+		CardDown:     key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "card")),
+		MoveLeft:     key.NewBinding(key.WithKeys("H", "<"), key.WithHelp("H/<", "move left")),
+		MoveRight:    key.NewBinding(key.WithKeys("L", ">"), key.WithHelp("L/>", "move right")),
+		MoveTo:       key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "move to…")),
+		Tags:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tags")),
+		Open:         key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
+		Archive:      key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "archive")),
+		Links:        key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "links")),
+		Browser:      key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "open in browser")),
+		UpdateBranch: key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "update branch")),
+		RebaseBranch: key.NewBinding(key.WithKeys("U"), key.WithHelp("U", "rebase branch")),
+		Draft:        key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "draft")),
+		Refresh:      key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
+		Help:         key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
+		Quit:         key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
+		Interrupt:    key.NewBinding(key.WithKeys("ctrl+c")),
 		Modal: modalKeys{
 			Up:             key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
 			Down:           key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "down")),
@@ -93,7 +101,8 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
 		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Archive},
-		{k.Links, k.Browser, k.Refresh, k.Help, k.Quit},
+		{k.Links, k.Browser, k.UpdateBranch, k.RebaseBranch, k.Draft},
+		{k.Refresh, k.Help, k.Quit},
 	}
 }
 
@@ -108,12 +117,15 @@ type modalHelp struct{ keys keyMap }
 
 func (h modalHelp) ShortHelp() []key.Binding {
 	m := h.keys.Modal
-	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.Refresh, h.keys.Quit}
+	return []key.Binding{m.Up, m.Down, m.PageDown, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Refresh, h.keys.Quit}
 }
 
 func (h modalHelp) FullHelp() [][]key.Binding {
 	m := h.keys.Modal
-	return [][]key.Binding{{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.Refresh, h.keys.Quit}}
+	return [][]key.Binding{
+		{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close},
+		{h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Refresh, h.keys.Quit},
+	}
 }
 
 // pickerKeys are the bindings inside a picker.
@@ -198,4 +210,21 @@ func newDialogKeys() dialogKeys {
 		Confirm: key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "delete")),
 		Decline: key.NewBinding(key.WithKeys("n", "esc"), key.WithHelp("n/esc", "keep")),
 	}
+}
+
+// confirmKeys are the bindings inside a confirmation dialog.
+type confirmKeys struct {
+	Confirm key.Binding
+	Cancel  key.Binding
+}
+
+func newConfirmKeys() confirmKeys {
+	return confirmKeys{
+		Confirm: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "confirm")),
+		Cancel:  key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+	}
+}
+
+func (k confirmKeys) ShortHelp() []key.Binding {
+	return []key.Binding{k.Confirm, k.Cancel}
 }

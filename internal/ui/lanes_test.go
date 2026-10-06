@@ -150,8 +150,8 @@ func TestFirstRunWritesDefaultTags(t *testing.T) {
 	if want := []string{"In Progress", "Review", "Testing", "Demo", "Done"}; !slices.Equal(names, want) {
 		t.Errorf("default tags = %v, want %v", names, want)
 	}
-	if _, err := os.Stat(filepath.Join(h.configDir, "state.json")); err == nil {
-		t.Errorf("state file written before anything was moved")
+	if s, _ := readState(h.configDir); len(s.Assignments) > 0 {
+		t.Errorf("assignments %v written before anything was moved", s.Assignments)
 	}
 }
 
@@ -326,8 +326,8 @@ func TestMoveToPickerClosesOnEscWithoutMoving(t *testing.T) {
 
 	h.press("q")
 	h.waitFinished()
-	if _, ok := readState(h.configDir); ok {
-		t.Errorf("cancelling the picker must not write the state file")
+	if s, _ := readState(h.configDir); len(s.Assignments) > 0 {
+		t.Errorf("cancelling the picker must not move cards, got %v", s.Assignments)
 	}
 }
 
@@ -342,8 +342,8 @@ func TestPickerKeysDoNotReachTheBoard(t *testing.T) {
 	h.waitForScreen("the picker to close", func(s string) bool { return !strings.Contains(s, "Move to…") })
 	h.press("q")
 	h.waitFinished()
-	if _, ok := readState(h.configDir); ok {
-		t.Errorf("keys pressed in the picker must not move cards")
+	if s, _ := readState(h.configDir); len(s.Assignments) > 0 {
+		t.Errorf("keys pressed in the picker must not move cards, got %v", s.Assignments)
 	}
 }
 

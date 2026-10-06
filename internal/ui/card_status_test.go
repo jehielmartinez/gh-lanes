@@ -81,7 +81,7 @@ func TestListQueryFetchesStatusFields(t *testing.T) {
 	query := h.transport.Requests()[0].Query
 	for _, field := range []string{
 		"state", "isDraft", "baseRefName", "headRefName",
-		"mergeable", "mergeStateStatus", "reviewDecision", "autoMergeRequest", "viewerCanUpdate",
+		"mergeable", "mergeStateStatus", "reviewDecision", "autoMergeRequest", "viewerCanUpdate", "viewerCanUpdateBranch",
 		"mergeCommitAllowed", "squashMergeAllowed", "rebaseMergeAllowed", "autoMergeAllowed", "deleteBranchOnMerge",
 		"statusCheckRollup", "... on CheckRun", "... on StatusContext",
 		"comments { totalCount }", "reviews { totalCount }", "latestReviews",

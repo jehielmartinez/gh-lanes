@@ -122,6 +122,18 @@ func (m Map) At(line, col int) (string, bool) {
 	return "", false
 }
 
+// Indent returns the map with every region moved n columns right, for a page
+// drawn behind a prefix.
+func (m Map) Indent(n int) Map {
+	out := make(Map, len(m))
+	for i, r := range m {
+		r.Start += n
+		r.End += n
+		out[i] = r
+	}
+	return out
+}
+
 // Shift returns the map moved down by n lines, for a page placed below
 // another.
 func (m Map) Shift(n int) Map {

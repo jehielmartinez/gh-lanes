@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -23,11 +24,13 @@ func (m Model) descriptionLines(conv domain.Conversation, width int) page {
 }
 
 // conversationLines is the body of the modal's Conversation section: one
-// timeline of comments, reviews and review threads, oldest first.
+// timeline of comments, reviews and review threads, oldest first, each behind
+// a bar in its own colour so one entry reads apart from the next.
 func (m Model) conversationLines(timeline []domain.TimelineEntry, expandResolved bool, width int) page {
 	if len(timeline) == 0 {
 		return text(indented(1, m.muted("No comments yet.")))
 	}
+	inner := width - lipgloss.Width(entryGutter)
 	var p page
 	for i, e := range timeline {
 		if i > 0 {
@@ -35,14 +38,47 @@ func (m Model) conversationLines(timeline []domain.TimelineEntry, expandResolved
 		}
 		switch {
 		case e.Comment != nil:
-			p = p.then(m.commentLines(*e.Comment, "commented", 1, width))
+			p = p.then(m.gutter(m.commentLines(*e.Comment, "commented", 0, inner), m.theme.accent))
 		case e.Review != nil:
-			p = p.then(m.reviewLines(*e.Review, width))
+			p = p.then(m.gutter(m.reviewLines(*e.Review, inner), m.reviewColor(e.Review.State)))
 		case e.Thread != nil:
-			p = p.then(m.threadLines(*e.Thread, expandResolved, width))
+			p = p.then(m.gutter(m.threadLines(*e.Thread, expandResolved, inner), m.threadColor(*e.Thread)))
 		}
 	}
 	return p
+}
+
+// entryGutter is drawn left of every line of a timeline entry: an indent,
+// the entry's bar and a space.
+const entryGutter = "  ┃ "
+
+// gutter draws p behind the entry bar in colour c, moving its links with it.
+func (m Model) gutter(p page, c color.Color) page {
+	bar := lipgloss.NewStyle().Foreground(c).Render(entryGutter)
+	lines := make([]string, len(p.lines))
+	for i, l := range p.lines {
+		lines[i] = bar + l
+	}
+	return page{lines: lines, links: p.links.Indent(lipgloss.Width(entryGutter))}
+}
+
+func (m Model) reviewColor(state string) color.Color {
+	switch state {
+	case domain.ReviewStateApproved:
+		return m.theme.success
+	case domain.ReviewStateChangesRequested:
+		return m.theme.failure
+	}
+	return m.theme.muted
+}
+
+// threadColor marks open threads as needing attention and lets resolved ones
+// recede.
+func (m Model) threadColor(t domain.Thread) color.Color {
+	if t.Resolved {
+		return m.theme.muted
+	}
+	return m.theme.pending
 }
 
 func (m Model) commentLines(c domain.Comment, verb string, depth, width int) page {
@@ -51,13 +87,13 @@ func (m Model) commentLines(c domain.Comment, verb string, depth, width int) pag
 		header += " " + verb
 	}
 	header += m.muted(statusSeparator + m.timestamp(c.CreatedAt))
-	return text(indentedWrap(depth, header, width)).then(m.markdownLines(c.Body, depth+1, width))
+	return text(indentedWrap(depth, header, width)).then(m.markdownLines(c.Body, depth, width))
 }
 
 func (m Model) reviewLines(r domain.Review, width int) page {
 	header := m.bold(authorName(r.Author)) + " " + m.reviewBadge(r.State) +
 		m.muted(statusSeparator+m.timestamp(r.SubmittedAt))
-	return text(indentedWrap(1, header, width)).then(m.markdownLines(r.Body, 2, width))
+	return text(indentedWrap(0, header, width)).then(m.markdownLines(r.Body, 0, width))
 }
 
 func (m Model) reviewBadge(state string) string {
@@ -74,8 +110,8 @@ func (m Model) reviewBadge(state string) string {
 }
 
 // threadLines draws a review thread: where it is, whether it is resolved, and
-// its comments beneath, unless it is resolved and resolved threads are
-// collapsed.
+// its comments beneath, a blank line apart, unless it is resolved and
+// resolved threads are collapsed.
 func (m Model) threadLines(t domain.Thread, expandResolved bool, width int) page {
 	collapsed := t.Resolved && !expandResolved
 	marker, state := "▾", lipgloss.NewStyle().Foreground(m.theme.pending).Render("Unresolved")
@@ -94,12 +130,12 @@ func (m Model) threadLines(t domain.Thread, expandResolved bool, width int) page
 			header += m.muted(statusSeparator + m.keys.Modal.ExpandResolved.Help().Key + " to collapse")
 		}
 	}
-	p := text(indentedWrap(1, header, width))
+	p := text(indentedWrap(0, header, width))
 	if collapsed {
 		return p
 	}
 	for _, c := range t.Comments {
-		p = p.then(m.commentLines(c, "", 2, width))
+		p = p.then(text(""), m.commentLines(c, "", 1, width))
 	}
 	return p
 }

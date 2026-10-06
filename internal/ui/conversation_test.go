@@ -205,3 +205,32 @@ func TestEmptyConversationSaysSo(t *testing.T) {
 	screen := h.expandSections()
 	assertContains(t, screen, "Description", "No description provided.", "Conversation  0")
 }
+
+func TestEachTimelineEntryIsDrawnBehindItsOwnBar(t *testing.T) {
+	h := newConversationHarness(t)
+
+	screen := h.waitForText("Mention the new tag.")
+	assertContains(t, screen,
+		"┃ user-b commented",
+		"┃ Looks close. One question about the cache.",
+		"┃ user-b [Changes requested]",
+		"┃ ▾ Dockerfile:3 · Unresolved",
+	)
+	// Replies in a thread sit a blank barred line apart.
+	lines := strings.Split(screen, "\n")
+	for i, l := range lines {
+		if !strings.Contains(l, "Pin this to a digest.") {
+			continue
+		}
+		gap := lines[i+1]
+		at := strings.Index(gap, "┃")
+		if at < 0 || strings.TrimRight(gap[at+len("┃"):], " │") != "" {
+			t.Errorf("want a blank barred line between replies, got %q", gap)
+		}
+		if !strings.Contains(lines[i+2], "user-a · Mar 4, 2026 11:00") {
+			t.Errorf("want the next reply after the gap, got %q", lines[i+2])
+		}
+		return
+	}
+	t.Fatalf("no thread reply on screen:\n%s", screen)
+}

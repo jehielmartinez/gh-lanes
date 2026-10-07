@@ -6,7 +6,12 @@ type Grouping string
 
 // The groupings. None, the zero value, shows no groups.
 const (
-	GroupingNone       Grouping = ""
-	GroupingOwner      Grouping = "owner"
-	GroupingRepository Grouping = "repository"
+	GroupingNone         Grouping = ""
+	GroupingOwner        Grouping = "owner"
+	GroupingRepository   Grouping = "repository"
+	GroupingTitlePattern Grouping = "title_pattern"
 )
+
+// DefaultTitlePattern is the title pattern used when the config sets none,
+// or one that doesn't compile: a Jira-style key such as SUP-1234.
+const DefaultTitlePattern = `[A-Z][A-Z0-9]+-\d+`

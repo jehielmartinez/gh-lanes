@@ -2,6 +2,7 @@ package ui
 
 import (
 	"math"
+	"regexp"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -19,11 +20,12 @@ const listWidth = 2 * maxLaneWidth
 // into the groups of its grouping, with a selection and a scroll offset: the
 // review requests and archived tabs.
 type cardList struct {
-	prs      []domain.PullRequest
-	grouping domain.Grouping
-	groups   []board.Group
-	cursor   int
-	offset   int
+	prs          []domain.PullRequest
+	grouping     domain.Grouping
+	titlePattern *regexp.Regexp
+	groups       []board.Group
+	cursor       int
+	offset       int
 }
 
 func (l cardList) selected() (domain.PullRequest, bool) {
@@ -38,12 +40,13 @@ func (l cardList) withCursor(index int) cardList {
 	return l
 }
 
-// withPRs replaces the cards and the grouping, keeping the selection on the
-// pull request it was on.
-func (l cardList) withPRs(prs []domain.PullRequest, grouping domain.Grouping) cardList {
+// withPRs replaces the cards, the grouping and the title pattern, keeping the
+// selection on the pull request it was on.
+func (l cardList) withPRs(prs []domain.PullRequest, grouping domain.Grouping, titlePattern *regexp.Regexp) cardList {
 	selected, hadSelection := l.selected()
 	l.grouping = grouping
-	l.prs, l.groups = board.GroupCards(board.ByUpdated(prs), grouping)
+	l.titlePattern = titlePattern
+	l.prs, l.groups = board.GroupCards(board.ByUpdated(prs), grouping, titlePattern)
 	l = l.withCursor(l.cursor)
 	if !hadSelection {
 		return l
@@ -60,7 +63,7 @@ func (l cardList) withPRs(prs []domain.PullRequest, grouping domain.Grouping) ca
 func (l cardList) withCopy(pr domain.PullRequest) cardList {
 	for _, have := range l.prs {
 		if have.ID == pr.ID {
-			return l.withPRs(replaced(l.prs, pr), l.grouping)
+			return l.withPRs(replaced(l.prs, pr), l.grouping, l.titlePattern)
 		}
 	}
 	return l

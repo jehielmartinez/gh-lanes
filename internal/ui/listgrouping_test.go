@@ -254,3 +254,23 @@ func TestLongGroupedListScrollsWithTheSelection(t *testing.T) {
 	screen = h.waitForSelected(r1Ref)
 	assertContains(t, screen, "octo-org (3)")
 }
+
+func TestListsGroupByTitlePatternWithNoMatchLast(t *testing.T) {
+	config := titlePatternConfig(`title_pattern: '(?i)upload|cache'` + "\n")
+
+	t.Run("review requests", func(t *testing.T) {
+		h := startGroupedLists(t, config, "", groupingTermHeight)
+		h.press("tab")
+		screen := h.waitForSelected(r2Ref)
+
+		assertTopToBottom(t, screen, "upload (1)", r2Ref, "No match (4)", r1Ref, r3Ref, r4Ref, r5Ref)
+		assertContains(t, screen, "grouped by title pattern")
+	})
+
+	t.Run("archived", func(t *testing.T) {
+		h := startGroupedLists(t, config, groupingArchivedState, groupingTermHeight)
+		screen := h.openArchived()
+
+		assertTopToBottom(t, screen, "upload (1)", mergedArchivedRef, "cache (2)", closedArchivedRef, openArchivedRef)
+	})
+}

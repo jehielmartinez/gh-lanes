@@ -154,7 +154,8 @@ grouping: owner
 | `filter` | Optional. Hides PRs by owner and repository on Board, Review requests and Archived. Without it, everything is shown. |
 | `filter.excluded_owners` | Owners (orgs or users) whose repositories are hidden, including repositories `lanes` hasn't seen yet. |
 | `filter.repositories` | Per-repository choices, as `owner/name: included` or `owner/name: excluded`. A repository's choice always wins over its owner. |
-| `grouping` | Optional. Clusters the cards in each board lane, and in the Review requests and Archived lists, under a header per group: `owner` groups them by owner, `repository` by `owner/name`. `none`, a missing key or any other value shows no groups. |
+| `grouping` | Optional. Clusters the cards in each board lane, and in the Review requests and Archived lists, under a header per group: `owner` groups them by owner, `repository` by `owner/name`, `title_pattern` by what `title_pattern` matches in the title. `none`, a missing key or any other value shows no groups. |
+| `title_pattern` | Optional. The regular expression ([Go RE2 syntax](https://github.com/google/re2/wiki/Syntax)) that `title_pattern` grouping matches against PR titles. The default, `[A-Z][A-Z0-9]+-\d+`, matches Jira-style keys like `SUP-1234`. Quote it in single quotes, as in `title_pattern: '#\d+'`. |
 
 Filter names match whatever their capitalisation. Hiding a PR keeps its lane, archive state and
 activity: when it is shown again, it is where you left it, marked if it changed meanwhile. A
@@ -165,6 +166,12 @@ Grouping only changes how the cards look: each PR stays in its lane, and lane an
 don't change.
 Groups are ordered by their most recently updated PR, and names match whatever their
 capitalisation. The status bar says which grouping is on.
+
+With `title_pattern` grouping, the first match in a title names the PR's group, so
+`SUP-\d+|#\d+` puts `SUP-12 fixes #7` under `SUP-12`. PRs whose title doesn't match go in a
+**No match** group, always last. Add `(?i)` to the start of a pattern to match whatever the
+capitalisation. If the pattern doesn't compile, `lanes` uses the default, says why in the status
+bar and leaves the file as it is for you to fix.
 
 The filter screen (`f`) lists your own account first, then every org you belong to and every owner
 with an open PR or a stored choice, most PRs first. An org with no open PRs is listed too, so you can

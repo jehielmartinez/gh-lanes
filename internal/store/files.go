@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -51,6 +52,10 @@ type Config struct {
 	// Grouping clusters cards into groups. A config without one, or with a
 	// value this build doesn't know, groups nothing.
 	Grouping domain.Grouping
+	// TitlePattern is matched against titles when grouping by title pattern.
+	// It is never nil: a config without one, or with one that doesn't
+	// compile, has the default.
+	TitlePattern *regexp.Regexp
 }
 
 // State is what lanes records on its own about the pull requests it shows.
@@ -75,6 +80,9 @@ type configFile struct {
 	// Grouping is kept as written, so saving never rewrites a value this
 	// build doesn't know.
 	Grouping string `yaml:"grouping,omitempty"`
+	// TitlePattern is kept as written too, so a pattern that doesn't compile
+	// is still there to fix by hand.
+	TitlePattern string `yaml:"title_pattern,omitempty"`
 }
 
 type filterEntry struct {
@@ -117,11 +125,11 @@ type snapshotEntry struct {
 // LoadConfig reads the config file in dir. On first run, when there is no
 // file yet, it writes one with the default tags and returns that. A setting
 // the file leaves out means the default. Whenever it returns an error the
-// config still carries a usable refresh interval; a *RefreshIntervalError
-// leaves the rest of the config intact, any other error means the file
-// couldn't be used.
+// config still carries a usable refresh interval and title pattern; an error
+// Usable accepts leaves the rest of the config intact, any other error means
+// the file couldn't be used.
 func LoadConfig(dir string) (Config, error) {
-	failed := Config{RefreshInterval: DefaultRefreshInterval}
+	failed := Config{RefreshInterval: DefaultRefreshInterval, TitlePattern: defaultTitlePattern}
 	path := filepath.Join(dir, ConfigFile)
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -145,13 +153,15 @@ func LoadConfig(dir string) (Config, error) {
 	if err != nil {
 		return failed, fmt.Errorf("read config %s: %w", path, err)
 	}
-	interval, err := parseRefreshInterval(file.RefreshInterval)
-	return Config{Tags: tags, RefreshInterval: interval, Filter: filter, Grouping: groupingFromFile(file.Grouping)}, err
+	interval, intervalErr := parseRefreshInterval(file.RefreshInterval)
+	pattern, patternErr := parseTitlePattern(file.TitlePattern)
+	cfg := Config{Tags: tags, RefreshInterval: interval, Filter: filter, Grouping: groupingFromFile(file.Grouping), TitlePattern: pattern}
+	return cfg, errors.Join(intervalErr, patternErr)
 }
 
 func groupingFromFile(value string) domain.Grouping {
 	switch g := domain.Grouping(value); g {
-	case domain.GroupingOwner, domain.GroupingRepository:
+	case domain.GroupingOwner, domain.GroupingRepository, domain.GroupingTitlePattern:
 		return g
 	}
 	return domain.GroupingNone
@@ -202,12 +212,12 @@ func writeDefaultConfig(path string) (Config, error) {
 	}
 	raw, err := yaml.Marshal(file)
 	if err != nil {
-		return Config{RefreshInterval: DefaultRefreshInterval}, fmt.Errorf("encode default config: %w", err)
+		return Config{RefreshInterval: DefaultRefreshInterval, TitlePattern: defaultTitlePattern}, fmt.Errorf("encode default config: %w", err)
 	}
 	if err := writeAtomic(path, raw); err != nil {
-		return Config{RefreshInterval: DefaultRefreshInterval}, fmt.Errorf("write default config: %w", err)
+		return Config{RefreshInterval: DefaultRefreshInterval, TitlePattern: defaultTitlePattern}, fmt.Errorf("write default config: %w", err)
 	}
-	return Config{Tags: append([]domain.Tag(nil), defaultTags...), RefreshInterval: DefaultRefreshInterval}, nil
+	return Config{Tags: append([]domain.Tag(nil), defaultTags...), RefreshInterval: DefaultRefreshInterval, TitlePattern: defaultTitlePattern}, nil
 }
 
 func tagsFromFile(entries []tagEntry) ([]domain.Tag, error) {

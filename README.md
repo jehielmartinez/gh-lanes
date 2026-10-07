@@ -159,10 +159,13 @@ activity: when it is shown again, it is where you left it, marked if it changed 
 renamed or transferred repository falls back to its owner. `lanes` reads the filter on start, so
 restart it after editing by hand.
 
-The filter screen (`f`) lists your own account first, then every owner with an open PR or a stored
-exclusion, most PRs first. Each row counts the owner's open PRs on Board and Review requests,
-hidden ones included. `space` checks or unchecks an owner, which applies straight away and saves
-the config. Opening the screen asks GitHub which account you are signed in as.
+The filter screen (`f`) lists your own account first, then every org you belong to and every owner
+with an open PR or a stored exclusion, most PRs first. An org with no open PRs is listed too, so you
+can hide it before it causes noise. Each row counts the owner's open PRs on Board and Review
+requests, hidden ones included. `space` checks or unchecks an owner, which applies straight away and
+saves the config. Opening the screen asks GitHub which account you are signed in as and which orgs
+you belong to; an org that enforces SAML SSO may be missing until you authorise `gh` for it. If
+either request fails, the error shows at the foot of the screen and the other rows still work.
 
 Deleting a tag moves its PRs to Untagged.
 

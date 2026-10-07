@@ -48,10 +48,18 @@ func (h *harness) waitForExcludedOwners(want ...string) {
 // opens the filter screen once the first refresh is on screen.
 func startFilterScreen(t *testing.T, filter string, reply githubtest.Response) *harness {
 	t.Helper()
+	return startFilterScreenWith(t, filter, reply, organizationsReply(t))
+}
+
+// startFilterScreenWith is startFilterScreen with the organizations query
+// answered with orgs.
+func startFilterScreenWith(t *testing.T, filter string, viewer, orgs githubtest.Response) *harness {
+	t.Helper()
 	dir := t.TempDir()
 	seedFile(t, dir, "config.yaml", filterConfig(filter))
 	transport := filterTransport(t)
-	transport.Reply("Viewer", reply)
+	transport.Reply("Viewer", viewer)
+	transport.Reply("ViewerOrganizations", orgs)
 	h := newHarness(t, transport, withConfigDir(dir))
 	h.waitForScreen("the first refresh", reviewCount.MatchString)
 	h.waitForText(newerRef)
@@ -62,6 +70,17 @@ func startFilterScreen(t *testing.T, filter string, reply githubtest.Response) *
 func viewerReply(t *testing.T) githubtest.Response {
 	t.Helper()
 	body, err := os.ReadFile(fixture("viewer.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return githubtest.Response{Body: body}
+}
+
+// organizationsReply answers the organizations query with octo-org, which
+// has pull requests, and sample-org and test-org, which have none.
+func organizationsReply(t *testing.T) githubtest.Response {
+	t.Helper()
+	body, err := os.ReadFile(fixture("viewer_organizations.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,4 +227,95 @@ func TestFullHelpListsTheFilterKey(t *testing.T) {
 	h.waitForScreen("the filter key in the review requests' full help", func(s string) bool {
 		return strings.Contains(s, "No review requests.") && filterHelp.MatchString(s)
 	})
+}
+
+func TestFilterScreenListsTheViewersOrganizationsWithNoPullRequests(t *testing.T) {
+	h := startFilterScreen(t, "  excluded_owners: [old-org]\n", viewerReply(t))
+
+	h.waitForFirstRow("user-a")
+	screen := h.waitForRow("x", "sample-org", 0)
+	for _, row := range []*regexp.Regexp{ownerRow("x", "test-org", 0), ownerRow("x", "octo-org", 4)} {
+		if !row.MatchString(screen) {
+			t.Errorf("filter screen is missing %s:\n%s", row, screen)
+		}
+	}
+	if got := strings.Count(screen, "] octo-org"); got != 1 {
+		t.Errorf("an organization with pull requests should be one row, got %d:\n%s", got, screen)
+	}
+	assertOrder(t, screen, "[x] user-a", "[x] octo-org", "[ ] old-org", "[x] sample-org", "[x] test-org")
+	reqs := requestsFor(h, "ViewerOrganizations")
+	if len(reqs) != 1 {
+		t.Fatalf("sent %d organizations queries on opening the filter screen, want 1", len(reqs))
+	}
+	if !strings.Contains(reqs[0].Query, "viewer") || !strings.Contains(reqs[0].Query, "organizations(") {
+		t.Errorf("organizations query doesn't ask for the viewer's organizations:\n%s", reqs[0].Query)
+	}
+}
+
+func TestExcludingAnOrganizationWithNoPullRequestsSavesIt(t *testing.T) {
+	h := startFilterScreen(t, "", viewerReply(t))
+	h.waitForFirstRow("user-a")
+	h.waitForRow("x", "sample-org", 0)
+
+	h.press("j")
+	h.press("j")
+	h.press(" ")
+	h.waitForRow(" ", "sample-org", 0)
+	h.waitForExcludedOwners("sample-org")
+}
+
+func TestOrganizationsArePagedThrough(t *testing.T) {
+	dir := t.TempDir()
+	seedFile(t, dir, "config.yaml", filterConfig(""))
+	transport := filterTransport(t)
+	transport.Reply("Viewer", viewerReply(t))
+	transport.Reply("ViewerOrganizations", githubtest.Response{Body: []byte(`{"data":{"viewer":{"organizations":{
+		"pageInfo":{"hasNextPage":true,"endCursor":"page-2"},"nodes":[{"login":"sample-org"}]}}}}`)})
+	transport.ReplyWhen("ViewerOrganizations", "after", "page-2", githubtest.Response{Body: []byte(`{"data":{"viewer":{"organizations":{
+		"pageInfo":{"hasNextPage":false,"endCursor":"page-3"},"nodes":[{"login":"test-org"}]}}}}`)})
+	h := newHarness(t, transport, withConfigDir(dir))
+	h.waitForScreen("the first refresh", reviewCount.MatchString)
+	h.openFilter()
+
+	screen := h.waitForRow("x", "test-org", 0)
+	assertContains(t, screen, "[x] sample-org")
+	reqs := requestsFor(h, "ViewerOrganizations")
+	if len(reqs) != 2 {
+		t.Fatalf("sent %d organizations queries, want 2", len(reqs))
+	}
+	if reqs[0].Variables["after"] != nil || reqs[1].Variables["after"] != "page-2" {
+		t.Errorf("organizations pages were asked for after %v and %v, want nothing then page-2",
+			reqs[0].Variables["after"], reqs[1].Variables["after"])
+	}
+}
+
+func TestFailedOrganizationsQueryKeepsTheRowsUsable(t *testing.T) {
+	h := startFilterScreenWith(t, "", viewerReply(t), githubtest.Response{Err: errors.New("connection refused")})
+
+	h.waitForText("connection refused")
+	screen := h.waitForFirstRow("user-a")
+	assertContains(t, screen, "connection refused")
+	assertOrder(t, screen, "[x] user-a", "[x] octo-org")
+
+	h.press("j")
+	h.press(" ")
+	h.waitForRow(" ", "octo-org", 4)
+	h.waitForExcludedOwners("octo-org")
+}
+
+func TestRefreshSendsNoOrganizationsQuery(t *testing.T) {
+	h := startFiltered(t, t.TempDir(), "")
+	h.press("r")
+	h.waitFor("a second board search", func() bool {
+		n := 0
+		for _, r := range requestsFor(h, "SearchPullRequests") {
+			if !isReviewSearch(r) {
+				n++
+			}
+		}
+		return n >= 2
+	})
+	if got := len(requestsFor(h, "ViewerOrganizations")); got != 0 {
+		t.Errorf("sent %d organizations queries without opening the filter screen, want 0", got)
+	}
 }

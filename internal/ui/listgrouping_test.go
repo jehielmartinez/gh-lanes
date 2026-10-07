@@ -129,7 +129,7 @@ func TestListTabCountsAreTheSameWithAndWithoutGrouping(t *testing.T) {
 		screen := h.openArchived()
 
 		assertContains(t, tabLine(screen), "Review requests 5", "Archived 3")
-		if extra == "" && strings.Contains(screen, "(2)") {
+		if extra == "" && onScreen(screen, "octo-org (2)") {
 			t.Errorf("ungrouped archived list shows a group header:\n%s", screen)
 		}
 	}

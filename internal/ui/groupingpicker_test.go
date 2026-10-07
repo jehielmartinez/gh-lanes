@@ -165,7 +165,7 @@ func TestChoosingNoneUngroupsAndSavesIt(t *testing.T) {
 	h.press("k")
 	h.press("enter")
 	h.waitForSetting("grouping", "none")
-	screen = h.waitForScreen("the groups to go", func(s string) bool { return !strings.Contains(s, "octo-org (3)") })
+	screen = h.waitForScreen("the groups to go", func(s string) bool { return !onScreen(s, "octo-org (3)") })
 
 	assertTopToBottom(t, screen, g1Ref, g2Ref, g3Ref, g4Ref, g5Ref)
 	if strings.Contains(screen, "grouped by") {

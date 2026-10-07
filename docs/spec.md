@@ -352,7 +352,8 @@ Mutations are commands returning a result message, which triggers a single-PR re
 - One global **grouping** mode applies to Board, Review requests and Archived: **None** (the
   default), **Owner**, **Repository** or **Title pattern**. Only one applies at a time.
 - Grouping splits each lane, and the Review requests and Archived lists, into **groups** under a
-  header showing the group name and its card count (for example `SUP-1234 (2)`). Grouping never
+  header: a rule as wide as the cards, with the group name near its left end and its card count at
+  its right edge (for example `── SUP-1234 ───── 2`). Grouping never
   changes a PR's lane, and lane and tab counts are unchanged.
 - Groups are ordered by their most recently updated card, newest first. Cards inside a group keep
   the most-recently-updated order.

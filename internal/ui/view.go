@@ -137,10 +137,18 @@ func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) strin
 	return lipgloss.NewStyle().Width(width).MarginRight(laneGap).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
 
+// noMatchName heads the group of cards whose title the title pattern doesn't
+// match.
+const noMatchName = "No match"
+
 // groupHeader is a group's name and card count, as in "octo-org (3)".
 func (m Model) groupHeader(g board.Group, width int) string {
 	size := fmt.Sprintf(" (%d)", g.Size)
-	name := truncate(oneLine(g.Name), max(width-lipgloss.Width(size), 1))
+	name := g.Name
+	if g.NoMatch {
+		name = noMatchName
+	}
+	name = truncate(oneLine(name), max(width-lipgloss.Width(size), 1))
 	return lipgloss.NewStyle().Foreground(m.theme.muted).Bold(true).Render(name + size)
 }
 
@@ -284,7 +292,7 @@ func (m Model) statusView() string {
 		parts = append(parts, updated)
 	}
 	if m.grouping != domain.GroupingNone {
-		parts = append(parts, muted.Render("grouped by "+string(m.grouping)))
+		parts = append(parts, muted.Render("grouped by "+groupingName(m.grouping)))
 	}
 	if m.loadingLinks() {
 		parts = append(parts, m.spinner.View()+" "+muted.Render("Loading links…"))
@@ -315,6 +323,14 @@ func (m Model) statusView() string {
 		parts = append(parts, errStyle.Render(oneLine(m.configErr.Error())))
 	}
 	return strings.Join(parts, muted.Render(statusSeparator))
+}
+
+// groupingName is how the status bar names a grouping.
+func groupingName(g domain.Grouping) string {
+	if g == domain.GroupingTitlePattern {
+		return "title pattern"
+	}
+	return string(g)
 }
 
 // ago says how long ago something happened, to the second under a minute.

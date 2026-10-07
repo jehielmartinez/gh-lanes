@@ -38,3 +38,20 @@ _Avoid_: Disabled, muted, hidden
 
 **Owner default**:
 Whether an owner is excluded. It decides only for that owner's repositories you have never chosen for, including ones lanes has not seen yet. Your choice for a repository always overrides it.
+
+### Grouping
+
+**Grouping**:
+The one global mode that clusters cards into groups on every tab: None, Owner, Repository or Title pattern. Only one applies at a time. None shows no groups. Grouping never changes a pull request's lane.
+_Avoid_: Swimlanes, sorting
+
+**Group**:
+A cluster of cards under a header inside a lane, or inside the Review requests or Archived list, that share the same value for the current grouping. Group names compare case-insensitively.
+_Avoid_: Section (that names a part of the detail modal), sub-lane, swimlane
+
+**Title pattern**:
+The one regular expression that Title pattern grouping matches against pull request titles. The first match in a title names the pull request's group, so each pull request is in exactly one group.
+_Avoid_: Filter, key pattern
+
+**No match**:
+The group holding pull requests whose title doesn't match the title pattern. It always comes last.

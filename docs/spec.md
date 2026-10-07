@@ -108,6 +108,22 @@ means leaving the terminal and clicking through the web UI for each PR.
     use the mouse when it's easier.
 31. As a developer, I want a help footer and a full help screen, so that I can discover keys.
 
+### Grouping
+
+31a. As a developer, I want to group cards by owner, by repository or by a pattern in the title,
+    so that related PRs sit together inside each lane.
+31b. As a developer, I want grouping to apply to Board, Review requests and Archived at once, so
+    that I switch it in one place.
+31c. As a developer, I want to group by a regular expression such as `SUP-\d+`, so that PRs for the
+    same ticket cluster under that ticket's key.
+31d. As a developer, I want Title pattern grouping to work without setup, so that Jira-style keys
+    group out of the box.
+31e. As a developer, I want PRs whose title doesn't match to collect in a No match group at the
+    bottom, so that none disappear.
+31f. As a developer, I want grouping to never change a PR's lane, so that lanes stay my workflow.
+31g. As a developer, I want my grouping choice and pattern remembered across restarts, so that I
+    set them once.
+
 ### Merged and closed PRs
 
 32. As a developer, I want a tagged PR to stay on the board with a Merged or Closed badge after it
@@ -279,7 +295,7 @@ means leaving the terminal and clicking through the web UI for each PR.
   machine-written) in the config directory. Writes are atomic (temp file, then rename). Both files
   carry a schema `version`.
 - **Board assembly:** combines fetched PRs with tags, assignments, the archived list and snapshots
-  to produce lanes. Drops PRs from excluded repositories (see Filter) before building any tab. Implements the merged/closed retention rules.
+  to produce lanes. Drops PRs from excluded repositories (see Filter) before building any tab. Implements the merged/closed retention rules. Splits each lane and list into groups (see Grouping).
 - **Activity:** compares a PR's current data with its last-seen snapshot and decides whether it
   changed, or is new.
 - **Links:** extracts URLs (markdown links and bare URLs) from text, and records where they're drawn
@@ -331,6 +347,29 @@ Mutations are commands returning a result message, which triggers a single-PR re
   [ADR 0001](adr/0001-filter-keyed-by-name.md)). A renamed repository falls back to its owner
   default.
 
+### Grouping
+
+- One global **grouping** mode applies to Board, Review requests and Archived: **None** (the
+  default), **Owner**, **Repository** or **Title pattern**. Only one applies at a time.
+- Grouping splits each lane, and the Review requests and Archived lists, into **groups** under a
+  header showing the group name and its card count (for example `SUP-1234 (2)`). Grouping never
+  changes a PR's lane, and lane and tab counts are unchanged.
+- Groups are ordered by their most recently updated card, newest first. Cards inside a group keep
+  the most-recently-updated order.
+- **Title pattern** is one Go RE2 regular expression matched against the (already sanitized) title
+  only, never the branch or body. The default is `[A-Z][A-Z0-9]+-\d+`. The leftmost match names the
+  PR's group, so each PR is in exactly one group. Group names compare case-insensitively; the header
+  shows the spelling from the group's most recently updated card. Titles without a match go to a
+  **No match** group, always last.
+- Group headers are display-only: they can't be selected or collapsed, `j`/`k` skip them and clicks
+  on them do nothing. Moving a card to another lane puts it in that lane's matching group.
+- `g` opens a picker listing the four modes, with the current one marked. On Title pattern, `e`
+  edits the pattern in a text input that validates as you type; an invalid pattern can't be saved
+  and the previous one stays. Every choice saves the config atomically.
+- The status bar shows the active grouping when it isn't None.
+- If the config holds an invalid pattern (hand-edited), the app starts with the default pattern
+  and reports the error in the status bar.
+
 ### List query fields per PR
 
 - Identity and state: id, number, title, url, draft, state, merged, created/updated/merged/closed
@@ -367,7 +406,9 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
   list of tags, each with a stable `id`, `name`, `color` and optional `terminal` flag. Assignments
   reference the tag ID, so renames are safe. It also holds the `filter`: the excluded owners, and
   per-repository choices (`included` or `excluded`) stored only where they differ from the owner
-  default. The app reloads it on start and after saving from the tag manager or the filter screen.
+  default. It holds the `grouping` mode (`none`, `owner`, `repository` or `title_pattern`) and the
+  `title_pattern` regular expression. The app reloads it on start and after saving from the tag
+  manager, the filter screen or the grouping picker.
 - **State file** (machine-written JSON): `version`, assignments (PR node ID → tag ID), the archived
   PRs (node ID, whether it was in its origin's search when last seen, the tag it was archived
   from, and its origin: the board or review requests), and per-PR snapshots (seen-at time,
@@ -400,6 +441,7 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 | `x` | board, review requests | archive card |
 | `x` | archived | unarchive card, back to the tab it was archived from |
 | `t` | global | tag manager |
+| `g` | board, lists | grouping picker (`e` on Title pattern edits the pattern) |
 | `f` | global | filter screen (`space` toggle, `enter`/`l`/`h` expand or collapse, `a` load all repos of an owner) |
 | `r` | global | refresh now |
 | `o` | board, lists, modal | link picker |
@@ -425,7 +467,8 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
   - a **controllable clock**, so refresh ticks, relative ages and local-time formatting are
     deterministic (with a fixed timezone).
 - Everything is covered through that seam: response mapping, lane assembly, retention after
-  merge/close, archive behavior, activity markers, tag manager CRUD, action gating, confirmations,
+  merge/close, archive behavior, activity markers, grouping (modes, pattern matching, No match,
+  group order, invalid patterns), tag manager CRUD, action gating, confirmations,
   merge dialog options, link picker, and error and stale-data handling.
 - **Fixtures** are recorded GraphQL responses scrubbed of real data: placeholder owners, repos,
   logins, URLs and IDs only. No real org, company or person names, and no tokens, in fixtures or

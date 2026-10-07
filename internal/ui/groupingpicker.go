@@ -44,8 +44,8 @@ type groupingPicker struct {
 	// editing is whether the title pattern editor has the keys.
 	editing bool
 	input   textinput.Model
-	// compiled is the editor's pattern, or nil while invalid is why it can't
-	// be saved.
+	// compiled is the editor's pattern once it compiles. Until then it is
+	// nil, the pattern can't be saved, and invalid says why.
 	compiled *regexp.Regexp
 	invalid  error
 }

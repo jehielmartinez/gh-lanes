@@ -137,7 +137,9 @@ func TestChoosingAModeRegroupsEveryTabAndSavesOnlyTheGrouping(t *testing.T) {
 			}
 			h.press("enter")
 			h.waitForSetting("grouping", tc.written)
-			screen := h.waitForScreen("the picker to close", closedPicker)
+			screen := h.waitForScreen("the board regrouped", func(s string) bool {
+				return closedPicker(s) && onScreen(s, tc.board[0])
+			})
 
 			assertTopToBottom(t, screen, tc.board...)
 			assertContains(t, screen, "grouped by "+strings.ReplaceAll(tc.written, "_", " "))
@@ -287,7 +289,7 @@ func TestAnEmptyPatternCantBeSaved(t *testing.T) {
 	h.press("e")
 	h.waitForText(patternEditHint)
 	h.press("ctrl+u")
-	h.waitForText("Enter a pattern")
+	h.waitForText("The pattern is empty")
 	h.press("enter")
 	h.press("esc")
 	h.waitForText(pickerHint)

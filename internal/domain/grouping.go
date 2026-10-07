@@ -23,7 +23,7 @@ const DefaultTitlePattern = `[A-Z][A-Z0-9]+-\d+`
 
 // ErrEmptyTitlePattern is the error CompileTitlePattern gives an empty
 // pattern, which would match nothing a group header could show.
-var ErrEmptyTitlePattern = errors.New("enter a pattern")
+var ErrEmptyTitlePattern = errors.New("the pattern is empty")
 
 // CompileTitlePattern compiles a title pattern, refusing an empty one.
 func CompileTitlePattern(pattern string) (*regexp.Regexp, error) {

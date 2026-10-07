@@ -420,6 +420,8 @@ func TestUnreadableConfigIsReportedAndNothingIsWritten(t *testing.T) {
 		{name: "malformed config", file: "config.yaml", content: "tags: [\n", want: "read config"},
 		{name: "newer config", file: "config.yaml", content: "version: 2\ntags: []\n", want: "unsupported version 2"},
 		{name: "duplicate tag ids", file: "config.yaml", content: "version: 1\ntags:\n  - {id: x, name: A}\n  - {id: x, name: B}\n", want: `"x" is used more than once`},
+		{name: "unknown repository choice", file: "config.yaml", content: "version: 1\ntags: []\nfilter:\n  repositories:\n    octo-org/sample-repo: hidden\n", want: `"octo-org/sample-repo" is "hidden"`},
+		{name: "repository listed twice", file: "config.yaml", content: "version: 1\ntags: []\nfilter:\n  repositories:\n    octo-org/sample-repo: included\n    Octo-Org/Sample-Repo: excluded\n", want: "are the same repository"},
 		{name: "malformed state", file: "state.json", content: "{not json", want: "read state"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

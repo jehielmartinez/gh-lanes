@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jehielmartinez/gh-lanes/internal/activity"
+	"github.com/jehielmartinez/gh-lanes/internal/board"
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 )
 
@@ -14,7 +15,7 @@ import (
 func (m Model) observe() (Model, tea.Cmd) {
 	changed := false
 	if m.storeReady && m.loaded && m.snapshots == nil {
-		m.snapshots = activity.Baseline(m.prs, m.updatedAt)
+		m.snapshots = activity.Baseline(board.Visible(m.prs, m.filter), m.updatedAt)
 		changed = true
 	}
 	m, seen := m.markSeen()
@@ -43,6 +44,11 @@ func (m Model) markSeen() (Model, bool) {
 		return m, false
 	}
 	pr := m.prs[i]
+	// A hidden pull request's snapshot stays frozen, so its marker shows what
+	// changed while it was hidden once it is shown again.
+	if board.Excluded(m.filter, pr.Repository.NameWithOwner) {
+		return m, false
+	}
 	prev, had := m.snapshots[pr.ID]
 	next := activity.Take(pr, m.opts.Now(), prev, had)
 	if m.detail.seen && had && activity.Same(prev, next) {

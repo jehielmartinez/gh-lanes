@@ -111,7 +111,7 @@ link to open it in your browser. Hold Shift while dragging to select text.
 
 The directory holds two files:
 
-- **The config file** (YAML) is yours to edit. It holds the refresh interval and your tags. The
+- **The config file** (YAML) is yours to edit. It holds the refresh interval, your tags and the filter. The
   tag manager (`t`) writes it too, and `lanes` reads it again on every start.
 - **The state file** (JSON) is written by the app. It holds which PR is in which lane, the
   archived PRs, and what you last saw of each PR. Don't edit it by hand.
@@ -132,6 +132,12 @@ tags:
     name: Done
     color: "#10B981"
     terminal: true
+filter:
+  excluded_owners:
+    - octo-org
+  repositories:
+    octo-org/sample-repo: included
+    user-a/noisy-repo: excluded
 ```
 
 | Field | Meaning |
@@ -143,6 +149,14 @@ tags:
 | `tags[].name` | The lane's name. |
 | `tags[].color` | The lane's color. |
 | `tags[].terminal` | Optional. Marks a lane like Done: merged and closed PRs in it are dimmed. |
+| `filter` | Optional. Hides PRs by owner and repository on Board, Review requests and Archived. Without it, everything is shown. |
+| `filter.excluded_owners` | Owners (orgs or users) whose repositories are hidden, including repositories `lanes` hasn't seen yet. |
+| `filter.repositories` | Per-repository choices, as `owner/name: included` or `owner/name: excluded`. A repository's choice always wins over its owner. |
+
+Filter names match whatever their capitalisation. Hiding a PR keeps its lane, archive state and
+activity: when it is shown again, it is where you left it, marked if it changed meanwhile. A
+renamed or transferred repository falls back to its owner. `lanes` reads the filter on start, so
+restart it after editing.
 
 Deleting a tag moves its PRs to Untagged.
 

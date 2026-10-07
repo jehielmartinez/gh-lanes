@@ -108,6 +108,9 @@ type Model struct {
 	// recorded as seen; see store.State.
 	snapshots map[string]domain.Snapshot
 	markers   map[string]activity.Marker
+	// filter hides pull requests from every tab. It applies after retention,
+	// assignments and the archived list are worked out, so it only hides.
+	filter domain.Filter
 
 	// One state write is in flight at a time; a move made meanwhile queues
 	// another, so writes land in the order the moves were made.
@@ -129,8 +132,9 @@ type Model struct {
 	requested []domain.PullRequest
 	// reviews is the review requests tab: requested, less the archived.
 	reviews cardList
-	// archive is the archived pull requests, fetched while the archived tab
-	// is in view.
+	// archivePRs are the archived pull requests as last fetched, while the
+	// archived tab is in view, and archive the ones the filter shows.
+	archivePRs      []domain.PullRequest
 	archive         cardList
 	archiveSeq      int
 	archiveFetching bool
@@ -498,6 +502,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.assignments = msg.state.Assignments
 			m.archived = msg.state.Archived
 			m.snapshots = msg.state.Snapshots
+			m.filter = msg.config.Filter
 		}
 		if m.tab == tabArchived {
 			return m.rebuild().fetchArchived()
@@ -543,6 +548,7 @@ func (m Model) configSaved(msg configSavedMsg) Model {
 	}
 	m.configErr = msg.loadErr
 	m.tags = msg.config.Tags
+	m.filter = msg.config.Filter
 	m.refreshInterval = msg.config.RefreshInterval
 	return m.rebuild()
 }
@@ -721,11 +727,13 @@ func (m Model) withCursor(lane, index int) Model {
 	return m
 }
 
-// rebuild reassembles the lanes and the review requests. The focus and each
-// lane's cursor and scroll offset stay with their tag when tags are
-// reordered, and the cursors are kept inside the lanes.
+// rebuild reassembles the lanes, the review requests and the archived tab,
+// leaving out what the filter hides. The focus and each lane's cursor and
+// scroll offset stay with their tag when tags are reordered, and the cursors
+// are kept inside the lanes.
 func (m Model) rebuild() Model {
-	m.reviews = m.reviews.withPRs(board.Unarchived(m.requested, m.archived))
+	m.reviews = m.reviews.withPRs(board.Unarchived(board.Visible(m.requested, m.filter), m.archived))
+	m.archive = m.archive.withPRs(board.Visible(m.archivePRs, m.filter))
 	cursorOf, offsetOf := map[string]int{}, map[string]int{}
 	for i, lane := range m.lanes {
 		if i < len(m.cursors) {
@@ -738,7 +746,7 @@ func (m Model) rebuild() Model {
 		focused = m.lanes[m.focus].Tag.ID
 	}
 
-	m.lanes = board.Assemble(m.prs, m.tags, m.assignments, m.archived)
+	m.lanes = board.Assemble(board.Visible(m.prs, m.filter), m.tags, m.assignments, m.archived)
 	cursors := make([]int, len(m.lanes))
 	offsets := make([]int, len(m.lanes))
 	for i, lane := range m.lanes {

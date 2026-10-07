@@ -91,6 +91,7 @@ func (m Model) withList(t tab, l cardList) Model {
 func (m Model) withListCopies(pr domain.PullRequest) Model {
 	m.requested = replaced(m.requested, pr)
 	m.reviews = m.reviews.withCopy(pr)
+	m.archivePRs = replaced(m.archivePRs, pr)
 	m.archive = m.archive.withCopy(pr)
 	return m
 }

@@ -125,7 +125,7 @@ func (m Model) laneHeader(lane board.Lane, focused bool) string {
 // laneView draws a lane's header and its rows in view from row offset.
 func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) string {
 	width := m.laneWidth()
-	rows := []string{m.laneHeader(lane, focused)}
+	rows := []string{m.laneHeader(lane, focused), ""}
 	if lane.Untagged() && m.loaded && !board.HasOpen(m.lanes) {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}

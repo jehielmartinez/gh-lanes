@@ -30,7 +30,7 @@ const (
 // aren't about scrolling see the whole board.
 const (
 	defaultTermWidth  = 240
-	defaultTermHeight = 30
+	defaultTermHeight = 31
 	// tabBarRows is how many rows the tab bar takes at the top of the screen.
 	tabBarRows = 3
 )

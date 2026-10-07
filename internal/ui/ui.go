@@ -163,7 +163,7 @@ type Model struct {
 	// owners are the filter screen's rows.
 	owners []board.Owner
 
-	// firstLane is the leftmost lane in view, and offsets the first card in
+	// firstLane is the leftmost lane in view, and offsets the first row in
 	// view in each lane.
 	firstLane int
 	offsets   []int

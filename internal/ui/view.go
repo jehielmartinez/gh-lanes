@@ -119,16 +119,16 @@ func (m Model) laneHeader(lane board.Lane, focused bool) string {
 	return name + " " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
 }
 
-// laneView draws a lane's header and the cards in view from offset.
+// laneView draws a lane's header and its rows in view from row offset.
 func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) string {
 	width := m.laneWidth()
 	rows := []string{m.laneHeader(lane, focused)}
 	if lane.Untagged() && m.loaded && !board.HasOpen(m.lanes) {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}
-	last := min(len(lane.PullRequests), offset+m.cardsInView())
-	for i := offset; i < last; i++ {
-		rows = append(rows, m.cardView(lane.PullRequests[i], width, focused && i == cursor, lane.Dimmed(lane.PullRequests[i])))
+	for _, r := range inView(laneRows(lane), offset, m.laneSpace()) {
+		pr := lane.PullRequests[r.card]
+		rows = append(rows, m.cardView(pr, width, focused && r.card == cursor, lane.Dimmed(pr)))
 	}
 	return lipgloss.NewStyle().Width(width).MarginRight(laneGap).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }

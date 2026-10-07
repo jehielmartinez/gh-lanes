@@ -177,8 +177,8 @@ type filterNotice struct {
 
 func (fs filterScreen) notices() []filterNotice {
 	var notices []filterNotice
-	for _, key := range slices.Sorted(maps.Keys(fs.loading)) {
-		notices = append(notices, filterNotice{text: "Loading " + fs.loading[key] + "'s repositories…"})
+	for _, lower := range slices.Sorted(maps.Keys(fs.loading)) {
+		notices = append(notices, filterNotice{text: "Loading " + fs.loading[lower] + "'s repositories…"})
 	}
 	for _, err := range []error{fs.viewerErr, fs.organizationsErr, fs.repositoriesErr} {
 		if err != nil {
@@ -310,8 +310,8 @@ func (m Model) organizationsFetched(msg organizationsMsg) Model {
 	return m.rebuild()
 }
 
-// filterScreenKey hands a key press to the filter screen, and applies and
-// saves the toggle it asks for.
+// filterScreenKey hands a key press to the filter screen, and starts the load
+// or applies and saves the toggle it asks for.
 func (m Model) filterScreenKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	var action *filterAction
 	m.filterScreen, action = m.filterScreen.update(msg, m.owners, m.height)
@@ -350,11 +350,16 @@ func (m Model) loadOwnerRepositories(owner string) (Model, tea.Cmd) {
 	}
 }
 
-// ownerRepositoriesFetched lists the owner's loaded repositories and expands
-// the owner to show them. A failed load keeps the rows as they were.
+// ownerRepositoriesFetched lists the owner's loaded repositories in place of
+// any loaded before, and expands the owner to show them. A failed load keeps
+// the rows as they were.
 func (m Model) ownerRepositoriesFetched(msg ownerRepositoriesMsg) Model {
 	if msg.err == nil {
-		m.ownerRepositories = slices.Concat(m.ownerRepositories, msg.repos)
+		others := slices.DeleteFunc(slices.Clone(m.ownerRepositories), func(repo string) bool {
+			owner, _, _ := strings.Cut(repo, "/")
+			return strings.EqualFold(owner, msg.owner)
+		})
+		m.ownerRepositories = slices.Concat(others, msg.repos)
 	}
 	if m.filterScreen != nil {
 		fs := m.filterScreen.withLoading(msg.owner, false)

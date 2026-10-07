@@ -167,3 +167,22 @@ func TestFilterScreenScrollsToKeepTheSelectedRowInView(t *testing.T) {
 		t.Errorf("the list scrolled back to the top should not show its last rows:\n%s", screen)
 	}
 }
+
+func TestLoadingAnOwnerAgainReplacesItsLoadedRepositories(t *testing.T) {
+	page := func(repos string) githubtest.Response {
+		return githubtest.Response{Body: []byte(`{"data":{"repositoryOwner":{"repositories":{
+			"pageInfo":{"hasNextPage":false,"endCursor":"Y3Vyc29yOjI="},"nodes":[` + repos + `]}}}}`)}
+	}
+	h := startLoadingFilterScreen(t, "", func(tr *githubtest.Transport) {
+		tr.Reply("OwnerRepositories", page(`{"nameWithOwner":"user-a/dotfiles"},{"nameWithOwner":"user-a/notes"}`))
+		tr.Reply("OwnerRepositories", page(`{"nameWithOwner":"user-a/notes"}`))
+	})
+
+	h.press("a")
+	h.waitForRow("x", "dotfiles", 0)
+	h.press("a")
+	screen := h.waitForScreen("dotfiles to be gone after the second load", func(s string) bool { return !rowShown(s, "dotfiles") })
+	if got := strings.Count(screen, "] notes "); got != 1 {
+		t.Errorf("a repository loaded twice should be one row, got %d:\n%s", got, screen)
+	}
+}

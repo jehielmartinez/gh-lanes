@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -44,6 +45,9 @@ type Config struct {
 	Tags []domain.Tag
 	// RefreshInterval is how often the board refreshes.
 	RefreshInterval time.Duration
+	// Filter hides repositories' pull requests. A config without one hides
+	// nothing.
+	Filter domain.Filter
 }
 
 // State is what lanes records on its own about the pull requests it shows.
@@ -63,6 +67,13 @@ type configFile struct {
 	Version         int        `yaml:"version"`
 	RefreshInterval string     `yaml:"refresh_interval,omitempty"`
 	Tags            []tagEntry `yaml:"tags"`
+	// Filter is a pointer so a file without one is saved without one.
+	Filter *filterEntry `yaml:"filter,omitempty"`
+}
+
+type filterEntry struct {
+	ExcludedOwners []string          `yaml:"excluded_owners,omitempty"`
+	Repositories   map[string]string `yaml:"repositories,omitempty"`
 }
 
 type tagEntry struct {
@@ -124,8 +135,36 @@ func LoadConfig(dir string) (Config, error) {
 	if err != nil {
 		return failed, fmt.Errorf("read config %s: %w", path, err)
 	}
+	filter, err := filterFromFile(file.Filter)
+	if err != nil {
+		return failed, fmt.Errorf("read config %s: %w", path, err)
+	}
 	interval, err := parseRefreshInterval(file.RefreshInterval)
-	return Config{Tags: tags, RefreshInterval: interval}, err
+	return Config{Tags: tags, RefreshInterval: interval, Filter: filter}, err
+}
+
+func filterFromFile(entry *filterEntry) (domain.Filter, error) {
+	if entry == nil {
+		return domain.Filter{}, nil
+	}
+	f := domain.Filter{ExcludedOwners: entry.ExcludedOwners, Repositories: map[string]domain.RepoChoice{}}
+	seen := map[string]string{}
+	for repo, choice := range entry.Repositories {
+		switch c := domain.RepoChoice(choice); c {
+		case domain.RepoIncluded, domain.RepoExcluded:
+			f.Repositories[repo] = c
+		default:
+			return domain.Filter{}, fmt.Errorf("filter: repository %q is %q, want %q or %q", repo, choice, domain.RepoIncluded, domain.RepoExcluded)
+		}
+		// Names match case-insensitively, so two spellings of one repository
+		// would leave its choice to map order.
+		key := strings.ToLower(repo)
+		if other, dup := seen[key]; dup {
+			return domain.Filter{}, fmt.Errorf("filter: repositories %q and %q are the same repository", min(other, repo), max(other, repo))
+		}
+		seen[key] = repo
+	}
+	return f, nil
 }
 
 func writeDefaultConfig(path string) (Config, error) {

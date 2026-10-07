@@ -27,7 +27,7 @@ func (m Model) fetchArchived() (Model, tea.Cmd) {
 		return m, nil
 	}
 	if len(m.archived) == 0 {
-		m.archive, m.archiveLoaded, m.archiveErr = cardList{}, true, nil
+		m.archivePRs, m.archive, m.archiveLoaded, m.archiveErr = nil, cardList{}, true, nil
 		return m, nil
 	}
 	ids := make([]string, len(m.archived))
@@ -61,11 +61,11 @@ func (m Model) archivedFetched(msg archivedMsg) Model {
 	if msg.err != nil {
 		return m
 	}
-	prs := slices.DeleteFunc(slices.Clone(msg.prs), func(pr domain.PullRequest) bool {
+	m.archivePRs = slices.DeleteFunc(slices.Clone(msg.prs), func(pr domain.PullRequest) bool {
 		return !board.IsArchived(m.archived, pr.ID)
 	})
-	m.archive, m.archiveLoaded = m.archive.withPRs(prs), true
-	return m
+	m.archiveLoaded = true
+	return m.rebuild()
 }
 
 // archivedView is the archived tab: the archived pull requests, or why there
@@ -104,10 +104,14 @@ func (m Model) archiveReviewRequest() (Model, tea.Cmd) {
 // list, if that list has been loaded; otherwise its next fetch brings it.
 func (m Model) withArchivedCard(pr domain.PullRequest) Model {
 	if m.archiveLoaded {
-		others := slices.DeleteFunc(slices.Clone(m.archive.prs), func(p domain.PullRequest) bool { return p.ID == pr.ID })
-		m.archive = m.archive.withPRs(append(others, pr))
+		m.archivePRs = append(withoutPR(m.archivePRs, pr.ID), pr)
 	}
 	return m
+}
+
+// withoutPR returns a copy of prs without the pull request of the given ID.
+func withoutPR(prs []domain.PullRequest, id string) []domain.PullRequest {
+	return slices.DeleteFunc(slices.Clone(prs), func(p domain.PullRequest) bool { return p.ID == id })
 }
 
 // unarchiveSelected puts the selected archived pull request back where it was
@@ -122,7 +126,7 @@ func (m Model) unarchiveSelected() (Model, tea.Cmd) {
 	}
 	var tagID string
 	m.assignments, m.archived, tagID = board.Unarchive(m.assignments, m.archived, m.tags, pr.ID)
-	m.archive = m.archive.withPRs(slices.DeleteFunc(slices.Clone(m.archive.prs), func(p domain.PullRequest) bool { return p.ID == pr.ID }))
+	m.archivePRs = withoutPR(m.archivePRs, pr.ID)
 	// A finished pull request in Untagged is never kept, so it doesn't come
 	// back; anything else waits on the board for the next refresh to update.
 	onBoard := tagID != "" || !pr.Finished()
@@ -141,7 +145,7 @@ func (m Model) unarchiveSelected() (Model, tea.Cmd) {
 // requests, or, when the last search no longer holds it, lets it go.
 func (m Model) unarchiveReviewRequest(pr domain.PullRequest) (Model, tea.Cmd) {
 	m.archived = slices.DeleteFunc(slices.Clone(m.archived), func(a domain.Archived) bool { return a.ID == pr.ID })
-	m.archive = m.archive.withPRs(slices.DeleteFunc(slices.Clone(m.archive.prs), func(p domain.PullRequest) bool { return p.ID == pr.ID }))
+	m.archivePRs = withoutPR(m.archivePRs, pr.ID)
 	text := ref(pr) + ": restored to Review requests"
 	switch {
 	case pr.Finished():

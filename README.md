@@ -83,6 +83,7 @@ always current.
 | `x` | board | archive the card |
 | `x` | archived | unarchive: put the card back in the lane it was archived from |
 | `t` | everywhere | manage tags |
+| `f` | board, lists | filter: `space` hides or shows an owner's PRs everywhere |
 | `r` | everywhere | refresh now |
 | `o` | board, detail | pick a link to open |
 | `O` | board, detail | open the PR in the browser |
@@ -91,7 +92,7 @@ always current.
 | `d` | board, detail | toggle draft and ready for review |
 | `1`–`4` | detail | open or close Status, Checks, Description, Conversation (or click the heading) |
 | `e` | detail | show or hide resolved review threads |
-| `esc` | detail, pickers | close |
+| `esc` | detail, pickers, filter | close |
 | `?` | everywhere | full help |
 | `q` / `ctrl+c` | everywhere | quit |
 
@@ -112,7 +113,7 @@ link to open it in your browser. Hold Shift while dragging to select text.
 The directory holds two files:
 
 - **The config file** (YAML) is yours to edit. It holds the refresh interval, your tags and the filter. The
-  tag manager (`t`) writes it too, and `lanes` reads it again on every start.
+  tag manager (`t`) and the filter screen (`f`) write it too, and `lanes` reads it again on every start.
 - **The state file** (JSON) is written by the app. It holds which PR is in which lane, the
   archived PRs, and what you last saw of each PR. Don't edit it by hand.
 
@@ -156,7 +157,12 @@ filter:
 Filter names match whatever their capitalisation. Hiding a PR keeps its lane, archive state and
 activity: when it is shown again, it is where you left it, marked if it changed meanwhile. A
 renamed or transferred repository falls back to its owner. `lanes` reads the filter on start, so
-restart it after editing.
+restart it after editing by hand.
+
+The filter screen (`f`) lists your own account first, then every owner with an open PR or a stored
+exclusion, most PRs first. Each row counts the owner's open PRs on Board and Review requests,
+hidden ones included. `space` checks or unchecks an owner, which applies straight away and saves
+the config. Opening the screen asks GitHub which account you are signed in as.
 
 Deleting a tag moves its PRs to Untagged.
 

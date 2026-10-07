@@ -49,6 +49,7 @@ type GitHub interface {
 	DeleteBranch(ctx context.Context, refID string) error
 	EnableAutoMerge(ctx context.Context, id string, method domain.MergeMethod) error
 	DisableAutoMerge(ctx context.Context, id string) error
+	Viewer(ctx context.Context) (string, error)
 }
 
 // Options are the boundaries the root model is given rather than reaching for
@@ -117,12 +118,12 @@ type Model struct {
 	saving     bool
 	saveQueued bool
 	saveErr    error
-	// Config writes are serialised the same way; each one writes the tags as
-	// they stand when it starts.
-	savingConfig bool
-	configQueued bool
-	tagSaveErr   error
-	quitting     bool
+	// Config writes are serialised the same way; each one writes the tags and
+	// the filter as they stand when it starts.
+	savingConfig  bool
+	configQueued  bool
+	configSaveErr error
+	quitting      bool
 
 	// tab is the view in the tab bar that has the screen.
 	tab tab
@@ -142,11 +143,15 @@ type Model struct {
 	archiveLoaded   bool
 	archiveErr      error
 
-	lanes      []board.Lane
-	focus      int
-	cursors    []int
-	picker     *picker
-	tagManager *tagManager
+	lanes        []board.Lane
+	focus        int
+	cursors      []int
+	picker       *picker
+	tagManager   *tagManager
+	filterScreen *filterScreen
+	// viewer is the login lanes is authenticated as, empty until the filter
+	// screen has first loaded it.
+	viewer string
 
 	// firstLane is the leftmost lane in view, and offsets the first card in
 	// view in each lane.
@@ -334,9 +339,9 @@ func (m Model) saveConfig() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.savingConfig = true
-	dir, tags := m.opts.ConfigDir, m.tags
+	dir, tags, filter := m.opts.ConfigDir, m.tags, m.filter
 	return m, func() tea.Msg {
-		if err := store.SaveTags(dir, tags); err != nil {
+		if err := store.SaveConfig(dir, tags, filter); err != nil {
 			return configSavedMsg{err: err}
 		}
 		cfg, err := store.LoadConfig(dir)
@@ -396,6 +401,9 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.mergeDialog != nil {
 			return m.mergeDialogKey(msg)
 		}
+		if m.filterScreen != nil {
+			return m.filterScreenKey(msg)
+		}
 		if key.Matches(msg, m.keys.Tags) {
 			return m.openTagManager(), nil
 		}
@@ -421,6 +429,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			return m.switchTab(1)
 		case key.Matches(msg, m.keys.PrevTab):
 			return m.switchTab(-1)
+		case key.Matches(msg, m.keys.Filter):
+			return m.openFilterScreen()
 		case key.Matches(msg, m.keys.Help):
 			m.help.ShowAll = !m.help.ShowAll
 			m.keys = m.keys.withFullHelp(m.help.ShowAll)
@@ -479,6 +489,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.archivedFetched(msg), nil
 	case linksMsg:
 		return m.linksFetched(msg), nil
+	case viewerMsg:
+		return m.viewerFetched(msg), nil
 	case openMsg:
 		return m.open(msg.url)
 	case openedMsg:
@@ -538,13 +550,13 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 // configSaved takes up the config as it was read back after a write, which
 // also picks up any setting edited by hand since the app started.
 func (m Model) configSaved(msg configSavedMsg) Model {
-	m.tagSaveErr = msg.err
+	m.configSaveErr = msg.err
 	if msg.err != nil {
 		return m
 	}
 	var intervalErr *store.RefreshIntervalError
 	if msg.loadErr != nil && !errors.As(msg.loadErr, &intervalErr) {
-		m.tagSaveErr = msg.loadErr
+		m.configSaveErr = msg.loadErr
 		return m
 	}
 	m.configErr = msg.loadErr
@@ -646,10 +658,10 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// dialogOpen reports whether a picker, the tag manager or a dialog has the
-// keys.
+// dialogOpen reports whether a picker, the tag manager, the filter screen or
+// a dialog has the keys.
 func (m Model) dialogOpen() bool {
-	return m.picker != nil || m.tagManager != nil || m.confirm != nil || m.mergeDialog != nil
+	return m.picker != nil || m.tagManager != nil || m.filterScreen != nil || m.confirm != nil || m.mergeDialog != nil
 }
 
 func (m Model) selected() (domain.PullRequest, bool) {

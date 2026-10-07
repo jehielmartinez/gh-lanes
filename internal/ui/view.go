@@ -21,8 +21,8 @@ const cardPadding = 4
 const statusSeparator = " · "
 
 // View draws the tab bar, the board or one of the card lists, the status bar
-// and the help footer, with the detail modal, the tag manager or any open
-// picker over them.
+// and the help footer, with the detail modal, the tag manager, the filter
+// screen or any open picker over them.
 func (m Model) View() tea.View {
 	body := lipgloss.NewStyle()
 	if height := m.boardHeight(); height > 0 {
@@ -50,6 +50,9 @@ func (m Model) View() tea.View {
 	}
 	if m.tagManager != nil {
 		screen = m.overlay(screen, m.tagManager.view(m.theme, m.help, m.lanes))
+	}
+	if m.filterScreen != nil {
+		screen = m.overlay(screen, m.filterScreen.view(m.theme, m.help, m.owners()))
 	}
 	if m.picker != nil {
 		screen = m.overlay(screen, m.picker.view(m.theme, m.help))
@@ -288,8 +291,8 @@ func (m Model) statusView() string {
 	if m.saveErr != nil {
 		parts = append(parts, errStyle.Render("Couldn't save lanes: "+oneLine(m.saveErr.Error())))
 	}
-	if m.tagSaveErr != nil {
-		parts = append(parts, errStyle.Render("Couldn't save tags: "+oneLine(m.tagSaveErr.Error())))
+	if m.configSaveErr != nil {
+		parts = append(parts, errStyle.Render("Couldn't save the config: "+oneLine(m.configSaveErr.Error())))
 	}
 	if m.rateLimit.Low() {
 		parts = append(parts, errStyle.Render(fmt.Sprintf("rate limit %d/%d left", m.rateLimit.Remaining, m.rateLimit.Limit)))

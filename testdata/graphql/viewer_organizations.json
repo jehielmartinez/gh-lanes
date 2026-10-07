@@ -1,0 +1,14 @@
+{
+  "data": {
+    "viewer": {
+      "organizations": {
+        "pageInfo": { "hasNextPage": false, "endCursor": "Y3Vyc29yOjM=" },
+        "nodes": [
+          { "login": "octo-org" },
+          { "login": "test-org" },
+          { "login": "sample-org" }
+        ]
+      }
+    }
+  }
+}

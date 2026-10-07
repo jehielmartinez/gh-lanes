@@ -18,6 +18,7 @@ type keyMap struct {
 	MoveRight key.Binding
 	MoveTo    key.Binding
 	Tags      key.Binding
+	Filter    key.Binding
 	Open      key.Binding
 	Archive   key.Binding
 	Unarchive key.Binding
@@ -65,6 +66,7 @@ func newKeyMap() keyMap {
 		MoveRight:    key.NewBinding(key.WithKeys("L", ">"), key.WithHelp("L/>", "move right")),
 		MoveTo:       key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "move to…")),
 		Tags:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tags")),
+		Filter:       key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "filter")),
 		Open:         key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Archive:      key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "archive")),
 		Unarchive:    key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "unarchive")),
@@ -111,7 +113,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.NextTab, k.PrevTab, k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
-		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Archive},
+		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Filter, k.Archive},
 		{k.Links, k.Browser, k.UpdateBranch, k.RebaseBranch, k.Draft, k.Merge},
 		{k.Refresh, k.Help, k.Quit},
 	}
@@ -199,6 +201,42 @@ func (k tagManagerKeys) ShortHelp() []key.Binding {
 
 func (k tagManagerKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{k.Up, k.Down}, k.ShortHelp()}
+}
+
+// filterKeys are the bindings in the filter screen.
+type filterKeys struct {
+	Up     key.Binding
+	Down   key.Binding
+	Toggle key.Binding
+	// Fold expands or collapses an owner. Its help covers Expand and
+	// Collapse too, which have none of their own.
+	Fold     key.Binding
+	Expand   key.Binding
+	Collapse key.Binding
+	// Load loads every repository of the selected row's owner.
+	Load  key.Binding
+	Close key.Binding
+}
+
+func newFilterKeys() filterKeys {
+	return filterKeys{
+		Up:       key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
+		Down:     key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "down")),
+		Toggle:   key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "toggle")),
+		Fold:     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter/l/h", "expand/collapse")),
+		Expand:   key.NewBinding(key.WithKeys("l", "right")),
+		Collapse: key.NewBinding(key.WithKeys("h", "left")),
+		Load:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "load all repos")),
+		Close:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
+	}
+}
+
+func (k filterKeys) ShortHelp() []key.Binding {
+	return []key.Binding{k.Up, k.Down, k.Toggle, k.Fold, k.Load, k.Close}
+}
+
+func (k filterKeys) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
 }
 
 // dialogKeys are the bindings while a tag's name or colour is being edited, or

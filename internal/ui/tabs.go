@@ -2,12 +2,14 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/jehielmartinez/gh-lanes/internal/board"
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 )
 
@@ -32,7 +34,8 @@ func (m Model) tabLabels() []string {
 		review += fmt.Sprintf(" %d", len(m.reviews.prs))
 	}
 	if m.storeReady {
-		archived += fmt.Sprintf(" %d", len(m.archived))
+		seen := slices.Concat(m.prs, m.requested, m.archivePRs)
+		archived += fmt.Sprintf(" %d", board.ArchivedShown(m.archived, seen, m.filter))
 	}
 	return []string{"Board", review, archived}
 }
@@ -149,6 +152,6 @@ func (h listHelp) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		move,
 		{k.Links, k.Browser, k.UpdateBranch, k.RebaseBranch, k.Draft, k.Merge},
-		{k.Tags, k.Refresh, k.Help, k.Quit},
+		{k.Tags, k.Filter, k.Refresh, k.Help, k.Quit},
 	}
 }

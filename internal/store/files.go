@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -44,6 +45,9 @@ type Config struct {
 	Tags []domain.Tag
 	// RefreshInterval is how often the board refreshes.
 	RefreshInterval time.Duration
+	// Filter hides repositories' pull requests. A config without one hides
+	// nothing.
+	Filter domain.Filter
 }
 
 // State is what lanes records on its own about the pull requests it shows.
@@ -63,6 +67,13 @@ type configFile struct {
 	Version         int        `yaml:"version"`
 	RefreshInterval string     `yaml:"refresh_interval,omitempty"`
 	Tags            []tagEntry `yaml:"tags"`
+	// Filter is a pointer so a file without one is saved without one.
+	Filter *filterEntry `yaml:"filter,omitempty"`
+}
+
+type filterEntry struct {
+	ExcludedOwners []string          `yaml:"excluded_owners,omitempty"`
+	Repositories   map[string]string `yaml:"repositories,omitempty"`
 }
 
 type tagEntry struct {
@@ -124,8 +135,50 @@ func LoadConfig(dir string) (Config, error) {
 	if err != nil {
 		return failed, fmt.Errorf("read config %s: %w", path, err)
 	}
+	filter, err := filterFromFile(file.Filter)
+	if err != nil {
+		return failed, fmt.Errorf("read config %s: %w", path, err)
+	}
 	interval, err := parseRefreshInterval(file.RefreshInterval)
-	return Config{Tags: tags, RefreshInterval: interval}, err
+	return Config{Tags: tags, RefreshInterval: interval, Filter: filter}, err
+}
+
+func filterFromFile(entry *filterEntry) (domain.Filter, error) {
+	if entry == nil {
+		return domain.Filter{}, nil
+	}
+	f := domain.Filter{ExcludedOwners: entry.ExcludedOwners, Repositories: map[string]domain.RepoChoice{}}
+	seen := map[string]string{}
+	for repo, choice := range entry.Repositories {
+		switch c := domain.RepoChoice(choice); c {
+		case domain.RepoIncluded, domain.RepoExcluded:
+			f.Repositories[repo] = c
+		default:
+			return domain.Filter{}, fmt.Errorf("filter: repository %q is %q, want %q or %q", repo, choice, domain.RepoIncluded, domain.RepoExcluded)
+		}
+		// Names match case-insensitively, so two spellings of one repository
+		// would leave its choice to map order.
+		key := strings.ToLower(repo)
+		if other, dup := seen[key]; dup {
+			return domain.Filter{}, fmt.Errorf("filter: repositories %q and %q are the same repository", min(other, repo), max(other, repo))
+		}
+		seen[key] = repo
+	}
+	return f, nil
+}
+
+func filterToFile(f domain.Filter) *filterEntry {
+	if len(f.ExcludedOwners) == 0 && len(f.Repositories) == 0 {
+		return nil
+	}
+	entry := &filterEntry{ExcludedOwners: f.ExcludedOwners}
+	if len(f.Repositories) > 0 {
+		entry.Repositories = make(map[string]string, len(f.Repositories))
+		for repo, choice := range f.Repositories {
+			entry.Repositories[repo] = string(choice)
+		}
+	}
+	return entry
 }
 
 func writeDefaultConfig(path string) (Config, error) {
@@ -161,10 +214,11 @@ func tagsFromFile(entries []tagEntry) ([]domain.Tag, error) {
 	return tags, nil
 }
 
-// SaveTags replaces the tags in the config file in dir, atomically, and keeps
-// every other setting as the file has it. It refuses to touch a file it can't
+// SaveConfig replaces the tags and the filter in the config file in dir,
+// atomically, and keeps every other setting as the file has it. A filter that
+// hides nothing is left out of the file. It refuses to touch a file it can't
 // read, so a hand edit it doesn't understand is never overwritten.
-func SaveTags(dir string, tags []domain.Tag) error {
+func SaveConfig(dir string, tags []domain.Tag, filter domain.Filter) error {
 	path := filepath.Join(dir, ConfigFile)
 	file := configFile{Version: configVersion}
 	raw, err := os.ReadFile(path)
@@ -187,6 +241,7 @@ func SaveTags(dir string, tags []domain.Tag) error {
 	if _, err := tagsFromFile(file.Tags); err != nil {
 		return fmt.Errorf("save tags: %w", err)
 	}
+	file.Filter = filterToFile(filter)
 	out, err := yaml.Marshal(file)
 	if err != nil {
 		return fmt.Errorf("encode config: %w", err)

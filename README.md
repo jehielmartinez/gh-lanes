@@ -83,6 +83,7 @@ always current.
 | `x` | board | archive the card |
 | `x` | archived | unarchive: put the card back in the lane it was archived from |
 | `t` | everywhere | manage tags |
+| `f` | board, lists | filter: `space` hides or shows an owner's or a repository's PRs everywhere, `enter` `l` `h` expand or collapse an owner, `a` loads all of an owner's repositories |
 | `r` | everywhere | refresh now |
 | `o` | board, detail | pick a link to open |
 | `O` | board, detail | open the PR in the browser |
@@ -91,7 +92,7 @@ always current.
 | `d` | board, detail | toggle draft and ready for review |
 | `1`–`4` | detail | open or close Status, Checks, Description, Conversation (or click the heading) |
 | `e` | detail | show or hide resolved review threads |
-| `esc` | detail, pickers | close |
+| `esc` | detail, pickers, filter | close |
 | `?` | everywhere | full help |
 | `q` / `ctrl+c` | everywhere | quit |
 
@@ -111,8 +112,8 @@ link to open it in your browser. Hold Shift while dragging to select text.
 
 The directory holds two files:
 
-- **The config file** (YAML) is yours to edit. It holds the refresh interval and your tags. The
-  tag manager (`t`) writes it too, and `lanes` reads it again on every start.
+- **The config file** (YAML) is yours to edit. It holds the refresh interval, your tags and the filter. The
+  tag manager (`t`) and the filter screen (`f`) write it too, and `lanes` reads it again on every start.
 - **The state file** (JSON) is written by the app. It holds which PR is in which lane, the
   archived PRs, and what you last saw of each PR. Don't edit it by hand.
 
@@ -132,6 +133,12 @@ tags:
     name: Done
     color: "#10B981"
     terminal: true
+filter:
+  excluded_owners:
+    - octo-org
+  repositories:
+    octo-org/sample-repo: included
+    user-a/noisy-repo: excluded
 ```
 
 | Field | Meaning |
@@ -143,6 +150,29 @@ tags:
 | `tags[].name` | The lane's name. |
 | `tags[].color` | The lane's color. |
 | `tags[].terminal` | Optional. Marks a lane like Done: merged and closed PRs in it are dimmed. |
+| `filter` | Optional. Hides PRs by owner and repository on Board, Review requests and Archived. Without it, everything is shown. |
+| `filter.excluded_owners` | Owners (orgs or users) whose repositories are hidden, including repositories `lanes` hasn't seen yet. |
+| `filter.repositories` | Per-repository choices, as `owner/name: included` or `owner/name: excluded`. A repository's choice always wins over its owner. |
+
+Filter names match whatever their capitalisation. Hiding a PR keeps its lane, archive state and
+activity: when it is shown again, it is where you left it, marked if it changed meanwhile. A
+renamed or transferred repository falls back to its owner. `lanes` reads the filter on start, so
+restart it after editing by hand.
+
+The filter screen (`f`) lists your own account first, then every org you belong to and every owner
+with an open PR or a stored choice, most PRs first. An org with no open PRs is listed too, so you can
+hide it before it causes noise. Under each owner are its repositories with an open PR or a stored
+choice, sorted by name; `enter`, `l` and `h` expand and collapse it. Each row counts its open PRs on
+Board and Review requests, hidden ones included. `space` checks or unchecks the selected row, which
+applies straight away and saves the config. A repository's check always wins over its owner's, and
+an owner whose repositories are mixed shows as `[~]` and starts expanded. Checking or unchecking an
+owner sets all its repositories to match, so the config keeps only the exceptions. Opening the
+screen asks GitHub which account you are signed in as and which orgs you belong to; an org that
+enforces SAML SSO may be missing until you authorise `gh` for it. `a` on an owner, or on one of its
+repositories, loads every repository that owner has from GitHub, so you can hide one before you have
+a PR in it; loaded repositories follow the owner's check unless you have chosen for them. A long list
+scrolls with the selection. If a request fails, the error shows at the foot of the screen and the
+other rows still work.
 
 Deleting a tag moves its PRs to Untagged.
 

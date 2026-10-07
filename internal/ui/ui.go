@@ -132,8 +132,9 @@ type Model struct {
 	requested []domain.PullRequest
 	// reviews is the review requests tab: requested, less the archived.
 	reviews cardList
-	// archivePRs are the archived pull requests as last fetched, while the
-	// archived tab is in view, and archive the ones the filter shows.
+	// archivePRs are the archived pull requests as last fetched, which
+	// happens while the archived tab is in view. archive is the tab itself:
+	// the ones the filter shows.
 	archivePRs      []domain.PullRequest
 	archive         cardList
 	archiveSeq      int

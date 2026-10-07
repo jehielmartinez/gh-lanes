@@ -17,7 +17,9 @@ const (
 )
 
 const (
-	laneHeaderLines = 1
+	// laneHeaderLines is a lane's name and count, and a blank line that
+	// sets them apart from the lane's first group or card.
+	laneHeaderLines = 2
 	cardLines       = 4
 	// cardHeight is a card's lines plus its top and bottom border.
 	cardHeight = cardLines + 2

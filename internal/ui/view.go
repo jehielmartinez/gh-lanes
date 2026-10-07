@@ -125,7 +125,7 @@ func (m Model) laneHeader(lane board.Lane, focused bool) string {
 // laneView draws a lane's header and its rows in view from row offset.
 func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) string {
 	width := m.laneWidth()
-	rows := []string{m.laneHeader(lane, focused)}
+	rows := []string{m.laneHeader(lane, focused), ""}
 	if lane.Untagged() && m.loaded && !board.HasOpen(m.lanes) {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}
@@ -144,15 +144,24 @@ func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) strin
 // match.
 const noMatchName = "No match"
 
-// groupHeader is a group's name and card count, as in "octo-org (3)".
+// groupHeader is a rule across the column with the group's name near its
+// left end and its card count at its right edge, as in
+// "── octo-org ─────── 3".
 func (m Model) groupHeader(g board.Group, width int) string {
-	size := fmt.Sprintf(" (%d)", g.Size)
+	const lead = "── "
+	size := fmt.Sprint(g.Size)
+	nameStyle := lipgloss.NewStyle().Bold(true).Foreground(m.theme.text)
 	name := g.Name
 	if g.NoMatch {
 		name = noMatchName
+		nameStyle = nameStyle.Foreground(m.theme.muted)
 	}
-	name = truncate(oneLine(name), max(width-lipgloss.Width(size), 1))
-	return lipgloss.NewStyle().Foreground(m.theme.muted).Bold(true).Render(name + size)
+	// The rule keeps at least one dash between the name and the count.
+	name = truncate(oneLine(name), max(width-len(lead)-lipgloss.Width(size)-3, 1))
+	fill := max(width-len(lead)-lipgloss.Width(name)-lipgloss.Width(size)-2, 1)
+	rule := lipgloss.NewStyle().Foreground(m.theme.border)
+	return rule.Render(lead) + nameStyle.Render(name) + rule.Render(" "+strings.Repeat("─", fill)+" ") +
+		lipgloss.NewStyle().Foreground(m.theme.muted).Render(size)
 }
 
 func laneColor(t theme, lane board.Lane) color.Color {

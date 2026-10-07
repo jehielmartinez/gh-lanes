@@ -30,7 +30,7 @@ const (
 // aren't about scrolling see the whole board.
 const (
 	defaultTermWidth  = 240
-	defaultTermHeight = 30
+	defaultTermHeight = 31
 	// tabBarRows is how many rows the tab bar takes at the top of the screen.
 	tabBarRows = 3
 )
@@ -219,6 +219,9 @@ func locate(screen, text string) (x, y int, ok bool) {
 	if x, y, ok := locateCard(screen, text); ok {
 		return x, y, true
 	}
+	if x, y, ok := locateGroupHeader(screen, text); ok {
+		return x, y, true
+	}
 	for row, line := range strings.Split(screen, "\n") {
 		if i := strings.Index(line, text); i >= 0 {
 			return utf8.RuneCountInString(line[:i]), row, true
@@ -231,6 +234,26 @@ func locate(screen, text string) (x, y int, ok bool) {
 func onScreen(screen, text string) bool {
 	_, _, ok := locate(screen, text)
 	return ok
+}
+
+var groupRef = regexp.MustCompile(`^(.+) \(([0-9]+)\)$`)
+
+// locateGroupHeader finds the group header for a reference like
+// "octo-org (3)": a rule with the name near its left end and the count at
+// its right edge, as in "── octo-org ─────── 3". It returns where the name
+// starts.
+func locateGroupHeader(screen, ref string) (x, y int, ok bool) {
+	parts := groupRef.FindStringSubmatch(ref)
+	if parts == nil {
+		return 0, 0, false
+	}
+	header := regexp.MustCompile(`── (` + regexp.QuoteMeta(parts[1]) + `) ─+ ` + parts[2] + `(?:[^0-9]|$)`)
+	for row, line := range strings.Split(screen, "\n") {
+		if m := header.FindStringSubmatchIndex(line); m != nil {
+			return utf8.RuneCountInString(line[:m[2]]), row, true
+		}
+	}
+	return 0, 0, false
 }
 
 var cardRef = regexp.MustCompile(`^([^/\s]+)/([^#\s]+)(#[0-9]+)$`)

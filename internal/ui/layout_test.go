@@ -10,12 +10,13 @@ import (
 	"github.com/jehielmartinez/gh-lanes/internal/github/githubtest"
 )
 
-// Cards are four lines inside a border, so a terminal 9 rows tall, plus the
-// tab bar's rows beyond the first, leaves room for the lane header and a
-// single card above the two footer lines, and 16 for two cards.
+// Cards are four lines inside a border, so a terminal 10 rows tall, plus the
+// tab bar's rows beyond the first, leaves room for the lane header, the blank
+// line under it and a single card above the two footer lines, and 17 for two
+// cards.
 const (
-	oneCardHeight  = 9 + tabBarRows - 1
-	twoCardsHeight = 16 + tabBarRows - 1
+	oneCardHeight  = 10 + tabBarRows - 1
+	twoCardsHeight = 17 + tabBarRows - 1
 	narrowWidth    = 70
 )
 
@@ -51,8 +52,12 @@ func TestNarrowTerminalScrollsLanesToKeepTheFocusedOneVisible(t *testing.T) {
 func TestLanesKeepTheirMinimumWidthInANarrowTerminal(t *testing.T) {
 	h := startBoard(t, withTermSize(narrowWidth, 30))
 
-	// Under the tab bar and the lane headers.
-	border := strings.Split(h.screen.plain(), "\n")[tabBarRows+1]
+	// A blank line under the lane headers, then the first cards' borders.
+	lines := strings.Split(h.screen.plain(), "\n")
+	if gap := strings.TrimSpace(lines[tabBarRows+1]); gap != "" {
+		t.Errorf("the line under the lane headers is %q, want it blank:\n%s", gap, h.screen.plain())
+	}
+	border := lines[tabBarRows+2]
 	first := strings.Fields(border)[0]
 	if got := len([]rune(first)); got != 32 {
 		t.Errorf("card is %d columns wide, want 32:\n%s", got, h.screen.plain())

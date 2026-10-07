@@ -93,7 +93,7 @@ func assertLaneTopToBottom(t *testing.T, screen string, lane int, texts ...strin
 		for ; row < len(lines) && !found; row++ {
 			line := []rune(lines[row])
 			from, to := min(lane*(maxLaneWidth+1), len(line)), min((lane+1)*(maxLaneWidth+1), len(line))
-			found = strings.Contains(string(line[from:to]), text)
+			found = onScreen(string(line[from:to]), text)
 		}
 		if !found {
 			t.Fatalf("lane %d doesn't show %q, in order, among %q:\n%s", lane, text, texts, screen)
@@ -141,7 +141,7 @@ func TestOwnerGroupingClustersCardsNewestGroupFirst(t *testing.T) {
 			t.Errorf("%q is in lane %d, want Untagged:\n%s", header, lane, screen)
 		}
 	}
-	if strings.Contains(screen, "Octo-Org (") {
+	if onScreen(screen, "Octo-Org (3)") {
 		t.Errorf("the header should use the newest card's spelling, octo-org:\n%s", screen)
 	}
 	assertContains(t, headerLine(screen), "Untagged 5")
@@ -342,5 +342,17 @@ func TestGroupingSendsTheSameRequests(t *testing.T) {
 	}
 	if queries[""] != queries["grouping: owner\n"] {
 		t.Errorf("grouping changed the board's query")
+	}
+}
+
+func TestGroupHeaderIsARuleAsWideAsTheCards(t *testing.T) {
+	h := startGrouped(t, groupingConfig("grouping: owner\n"))
+	screen := h.waitForText("octo-org (3)")
+
+	_, row, _ := locate(screen, "octo-org (3)")
+	line := []rune(strings.Split(screen, "\n")[row])
+	header := strings.TrimRight(string(line[:min(maxLaneWidth, len(line))]), " ")
+	if want := "── octo-org " + strings.Repeat("─", maxLaneWidth-len("── octo-org ")-2) + " 3"; header != want {
+		t.Errorf("header is %q, want %q:\n%s", header, want, screen)
 	}
 }

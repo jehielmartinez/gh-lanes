@@ -208,20 +208,28 @@ type filterKeys struct {
 	Up     key.Binding
 	Down   key.Binding
 	Toggle key.Binding
-	Close  key.Binding
+	// Fold expands or collapses an owner. Its help covers Expand and
+	// Collapse too, which have none of their own.
+	Fold     key.Binding
+	Expand   key.Binding
+	Collapse key.Binding
+	Close    key.Binding
 }
 
 func newFilterKeys() filterKeys {
 	return filterKeys{
-		Up:     key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
-		Down:   key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "down")),
-		Toggle: key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "toggle")),
-		Close:  key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
+		Up:       key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
+		Down:     key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "down")),
+		Toggle:   key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "toggle")),
+		Fold:     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter/l/h", "expand/collapse")),
+		Expand:   key.NewBinding(key.WithKeys("l", "right")),
+		Collapse: key.NewBinding(key.WithKeys("h", "left")),
+		Close:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 	}
 }
 
 func (k filterKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Toggle, k.Close}
+	return []key.Binding{k.Up, k.Down, k.Toggle, k.Fold, k.Close}
 }
 
 func (k filterKeys) FullHelp() [][]key.Binding {

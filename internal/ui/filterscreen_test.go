@@ -81,6 +81,18 @@ func ownerRow(check, owner string, count int) *regexp.Regexp {
 	return regexp.MustCompile(regexp.QuoteMeta("["+check+"] "+owner) + `\s+` + strconv.Itoa(count) + `(\s|$)`)
 }
 
+var checkbox = regexp.MustCompile(`\[[x ~]\] (\S+)`)
+
+// waitForFirstRow waits until the filter screen's first row is the owner's,
+// which for the viewer means its account has been loaded.
+func (h *harness) waitForFirstRow(owner string) string {
+	h.t.Helper()
+	return h.waitForScreen(owner+" as the first row", func(s string) bool {
+		first := checkbox.FindStringSubmatch(s)
+		return first != nil && first[1] == owner
+	})
+}
+
 // waitForRow waits until the filter screen shows the owner's row.
 func (h *harness) waitForRow(check, owner string, count int) string {
 	h.t.Helper()
@@ -110,6 +122,7 @@ func TestFilterScreenOpensFromEveryTabAndEscClosesIt(t *testing.T) {
 func TestFilterScreenListsTheViewerFirstThenOwnersByCount(t *testing.T) {
 	h := startFilterScreen(t, "  excluded_owners: [old-org]\n", viewerReply(t))
 
+	h.waitForFirstRow("user-a")
 	screen := h.waitForRow("x", "user-a", 1)
 	assertContains(t, screen, "Filter")
 	for _, row := range []*regexp.Regexp{ownerRow("x", "octo-org", 4), ownerRow(" ", "old-org", 0)} {
@@ -132,7 +145,7 @@ func TestFilterScreenListsTheViewerWithNoPullRequests(t *testing.T) {
 
 func TestTogglingAnOwnerHidesItsCardsAndSavesOnlyTheExclusion(t *testing.T) {
 	h := startFilterScreen(t, "", viewerReply(t))
-	h.waitForRow("x", "user-a", 1)
+	h.waitForFirstRow("user-a")
 
 	h.press("j")
 	h.press(" ")
@@ -159,6 +172,7 @@ func TestTogglingAnOwnerHidesItsCardsAndSavesOnlyTheExclusion(t *testing.T) {
 func TestStoredExclusionInAnotherCaseIsOneRowAndCanBeUndone(t *testing.T) {
 	h := startFilterScreen(t, "  excluded_owners: [OCTO-ORG]\n", viewerReply(t))
 
+	h.waitForFirstRow("user-a")
 	screen := h.waitForRow(" ", "octo-org", 4)
 	if got := strings.Count(strings.ToLower(screen), "] octo-org"); got != 1 {
 		t.Errorf("one owner in two spellings should be one row, got %d:\n%s", got, screen)

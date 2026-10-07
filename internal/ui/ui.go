@@ -4,8 +4,8 @@ package ui
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"time"
 
@@ -116,6 +116,8 @@ type Model struct {
 	filter domain.Filter
 	// grouping clusters each lane's cards into groups, after the filter.
 	grouping domain.Grouping
+	// titlePattern names the groups when grouping by title pattern.
+	titlePattern *regexp.Regexp
 
 	// One state write is in flight at a time; a move made meanwhile queues
 	// another, so writes land in the order the moves were made.
@@ -323,8 +325,7 @@ func (m Model) loadStore() tea.Cmd {
 	dir := m.opts.ConfigDir
 	return func() tea.Msg {
 		cfg, err := store.LoadConfig(dir)
-		var intervalErr *store.RefreshIntervalError
-		if err != nil && !errors.As(err, &intervalErr) {
+		if !store.Usable(err) {
 			return storeLoadedMsg{config: cfg, err: err}
 		}
 		st, stateErr := store.LoadState(dir)
@@ -519,8 +520,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.prRefreshed(msg), nil
 	case storeLoadedMsg:
 		m.refreshInterval = msg.config.RefreshInterval
-		var intervalErr *store.RefreshIntervalError
-		if errors.As(msg.err, &intervalErr) {
+		if store.Usable(msg.err) {
 			m.configErr = msg.err
 		} else {
 			m.storeErr = msg.err
@@ -533,6 +533,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.snapshots = msg.state.Snapshots
 			m.filter = msg.config.Filter
 			m.grouping = msg.config.Grouping
+			m.titlePattern = msg.config.TitlePattern
 		}
 		if m.tab == tabArchived {
 			return m.rebuild().fetchArchived()
@@ -571,8 +572,7 @@ func (m Model) configSaved(msg configSavedMsg) Model {
 	if msg.err != nil {
 		return m
 	}
-	var intervalErr *store.RefreshIntervalError
-	if msg.loadErr != nil && !errors.As(msg.loadErr, &intervalErr) {
+	if !store.Usable(msg.loadErr) {
 		m.configSaveErr = msg.loadErr
 		return m
 	}
@@ -580,6 +580,7 @@ func (m Model) configSaved(msg configSavedMsg) Model {
 	m.tags = msg.config.Tags
 	m.filter = msg.config.Filter
 	m.grouping = msg.config.Grouping
+	m.titlePattern = msg.config.TitlePattern
 	m.refreshInterval = msg.config.RefreshInterval
 	return m.rebuild()
 }
@@ -786,7 +787,7 @@ func (m Model) rebuild() Model {
 		focused = m.lanes[m.focus].Tag.ID
 	}
 
-	m.lanes = board.Grouped(board.Assemble(board.Visible(m.prs, m.filter), m.tags, m.assignments, m.archived), m.grouping)
+	m.lanes = board.Grouped(board.Assemble(board.Visible(m.prs, m.filter), m.tags, m.assignments, m.archived), m.grouping, m.titlePattern)
 	cursors := make([]int, len(m.lanes))
 	offsets := make([]int, len(m.lanes))
 	for i, lane := range m.lanes {

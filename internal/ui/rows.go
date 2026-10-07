@@ -10,9 +10,15 @@ type row struct {
 	// card is the index of the card the row draws, in its lane or list, or
 	// noCard for a display-only row that clicks and the selection pass over.
 	card int
+	// group is the index of the group whose header a noCard row draws.
+	group int
 }
 
-const noCard = -1
+const (
+	noCard = -1
+	// groupHeaderHeight is the one line of a group's name and size.
+	groupHeaderHeight = 1
+)
 
 // cardRows lays out n cards, one row each.
 func cardRows(n int) []row {
@@ -23,8 +29,21 @@ func cardRows(n int) []row {
 	return rows
 }
 
+// laneRows lays out a lane's cards, each group's under its header.
 func laneRows(lane board.Lane) []row {
-	return cardRows(len(lane.PullRequests))
+	if len(lane.Groups) == 0 {
+		return cardRows(len(lane.PullRequests))
+	}
+	rows := make([]row, 0, len(lane.Groups)+len(lane.PullRequests))
+	card := 0
+	for g, group := range lane.Groups {
+		rows = append(rows, row{height: groupHeaderHeight, card: noCard, group: g})
+		for range group.Size {
+			rows = append(rows, row{height: cardHeight, card: card})
+			card++
+		}
+	}
+	return rows
 }
 
 func (l cardList) rows() []row {
@@ -79,13 +98,18 @@ func rowOf(rows []row, card int) int {
 
 // scrollTo returns the first row in view, starting from first and moved as
 // little as possible to show card in full in space lines, and never so far
-// down that space is left empty under the last row.
+// down that space is left empty under the last row. Scrolling up to a card
+// also brings the header row just above it into view.
 func scrollTo(rows []row, first, card, space int) int {
 	if len(rows) == 0 {
 		return 0
 	}
 	target := rowOf(rows, card)
-	first = min(first, target)
+	top := target
+	if top > 0 && rows[top-1].card == noCard {
+		top--
+	}
+	first = min(first, top)
 	for first < target && target >= first+rowsInView(rows, first, space) {
 		first++
 	}

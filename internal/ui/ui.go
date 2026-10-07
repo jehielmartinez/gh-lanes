@@ -114,6 +114,8 @@ type Model struct {
 	// filter hides pull requests from every tab. It applies after retention,
 	// assignments and the archived list are worked out, so it only hides.
 	filter domain.Filter
+	// grouping clusters each lane's cards into groups, after the filter.
+	grouping domain.Grouping
 
 	// One state write is in flight at a time; a move made meanwhile queues
 	// another, so writes land in the order the moves were made.
@@ -530,6 +532,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.archived = msg.state.Archived
 			m.snapshots = msg.state.Snapshots
 			m.filter = msg.config.Filter
+			m.grouping = msg.config.Grouping
 		}
 		if m.tab == tabArchived {
 			return m.rebuild().fetchArchived()
@@ -576,6 +579,7 @@ func (m Model) configSaved(msg configSavedMsg) Model {
 	m.configErr = msg.loadErr
 	m.tags = msg.config.Tags
 	m.filter = msg.config.Filter
+	m.grouping = msg.config.Grouping
 	m.refreshInterval = msg.config.RefreshInterval
 	return m.rebuild()
 }
@@ -757,7 +761,8 @@ func (m Model) withCursor(lane, index int) Model {
 // rebuild reassembles the lanes, the review requests and the archived tab,
 // leaving out what the filter hides, and the filter screen's rows. The focus
 // and each lane's cursor and scroll offset stay with their tag when tags are
-// reordered, and the cursors are kept inside the lanes.
+// reordered, each cursor stays on its pull request while the lane still holds
+// it, and the cursors are kept inside the lanes.
 func (m Model) rebuild() Model {
 	m.reviews = m.reviews.withPRs(board.Unarchived(board.Visible(m.requested, m.filter), m.archived))
 	m.archive = m.archive.withPRs(board.Visible(m.archivePRs, m.filter))
@@ -766,11 +771,14 @@ func (m Model) rebuild() Model {
 		fs := m.filterScreen.withOwners(m.owners)
 		m.filterScreen = &fs
 	}
-	cursorOf, offsetOf := map[string]int{}, map[string]int{}
+	cursorOf, offsetOf, selectedOf := map[string]int{}, map[string]int{}, map[string]string{}
 	for i, lane := range m.lanes {
 		if i < len(m.cursors) {
 			cursorOf[lane.Tag.ID] = m.cursors[i]
 			offsetOf[lane.Tag.ID] = m.offsets[i]
+			if m.cursors[i] < len(lane.PullRequests) {
+				selectedOf[lane.Tag.ID] = lane.PullRequests[m.cursors[i]].ID
+			}
 		}
 	}
 	focused, hadFocus := "", m.focus < len(m.lanes)
@@ -778,11 +786,14 @@ func (m Model) rebuild() Model {
 		focused = m.lanes[m.focus].Tag.ID
 	}
 
-	m.lanes = board.Assemble(board.Visible(m.prs, m.filter), m.tags, m.assignments, m.archived)
+	m.lanes = board.Grouped(board.Assemble(board.Visible(m.prs, m.filter), m.tags, m.assignments, m.archived), m.grouping)
 	cursors := make([]int, len(m.lanes))
 	offsets := make([]int, len(m.lanes))
 	for i, lane := range m.lanes {
 		cursors[i] = max(0, min(cursorOf[lane.Tag.ID], len(lane.PullRequests)-1))
+		if card := slices.IndexFunc(lane.PullRequests, func(pr domain.PullRequest) bool { return pr.ID == selectedOf[lane.Tag.ID] }); card >= 0 {
+			cursors[i] = card
+		}
 		offsets[i] = offsetOf[lane.Tag.ID]
 		if hadFocus && lane.Tag.ID == focused {
 			m.focus = i

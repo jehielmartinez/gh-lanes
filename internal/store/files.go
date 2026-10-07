@@ -48,6 +48,9 @@ type Config struct {
 	// Filter hides repositories' pull requests. A config without one hides
 	// nothing.
 	Filter domain.Filter
+	// Grouping clusters cards into groups. A config without one, or with a
+	// value this build doesn't know, groups nothing.
+	Grouping domain.Grouping
 }
 
 // State is what lanes records on its own about the pull requests it shows.
@@ -69,6 +72,9 @@ type configFile struct {
 	Tags            []tagEntry `yaml:"tags"`
 	// Filter is a pointer so a file without one is saved without one.
 	Filter *filterEntry `yaml:"filter,omitempty"`
+	// Grouping is kept as written, so saving never rewrites a value this
+	// build doesn't know.
+	Grouping string `yaml:"grouping,omitempty"`
 }
 
 type filterEntry struct {
@@ -140,7 +146,15 @@ func LoadConfig(dir string) (Config, error) {
 		return failed, fmt.Errorf("read config %s: %w", path, err)
 	}
 	interval, err := parseRefreshInterval(file.RefreshInterval)
-	return Config{Tags: tags, RefreshInterval: interval, Filter: filter}, err
+	return Config{Tags: tags, RefreshInterval: interval, Filter: filter, Grouping: groupingFromFile(file.Grouping)}, err
+}
+
+func groupingFromFile(value string) domain.Grouping {
+	switch g := domain.Grouping(value); g {
+	case domain.GroupingOwner, domain.GroupingRepository:
+		return g
+	}
+	return domain.GroupingNone
 }
 
 func filterFromFile(entry *filterEntry) (domain.Filter, error) {

@@ -22,6 +22,8 @@ import (
 type filterScreen struct {
 	keys   filterKeys
 	cursor int
+	// offset is the first row in view when the rows outgrow the screen.
+	offset int
 	// expanded says, by lowercased login, whether each owner the screen has
 	// listed shows its repositories.
 	expanded map[string]bool
@@ -29,6 +31,11 @@ type filterScreen struct {
 	viewerErr error
 	// organizationsErr is why the viewer's organizations couldn't be loaded.
 	organizationsErr error
+	// loading holds, by lowercased login, the owners whose repositories are
+	// being loaded.
+	loading map[string]string
+	// repositoriesErr is why an owner's repositories couldn't be loaded.
+	repositoriesErr error
 }
 
 // filterRow is one row of the filter screen: an owner, or, when repo is set,
@@ -38,10 +45,12 @@ type filterRow struct {
 	repo  *board.Repository
 }
 
-// filterToggle is the check the filter screen asks to flip: a repository's
-// when repo is set, otherwise the owner's.
-type filterToggle struct {
+// filterAction is what the filter screen asks the root model to do: load
+// every repository of owner when load is set, or else flip a check, the
+// repository's when repo is set and otherwise the owner's.
+type filterAction struct {
 	owner, repo string
+	load        bool
 }
 
 // viewerMsg is the result of asking GitHub which account lanes is
@@ -99,9 +108,10 @@ type organizationsMsg struct {
 	err    error
 }
 
-// update handles a key press while the screen is open. It returns the screen
-// as it now stands, or nil once it has closed, and the check to flip, if any.
-func (fs filterScreen) update(msg tea.KeyPressMsg, owners []board.Owner) (*filterScreen, *filterToggle) {
+// update handles a key press while the screen is open, in a terminal
+// termHeight rows tall. It returns the screen as it now stands, or nil once it
+// has closed, and what it asks of the root model, if anything.
+func (fs filterScreen) update(msg tea.KeyPressMsg, owners []board.Owner, termHeight int) (*filterScreen, *filterAction) {
 	rows := fs.rows(owners)
 	fs.cursor = max(0, min(fs.cursor, len(rows)-1))
 	if key.Matches(msg, fs.keys.Close) {
@@ -111,15 +121,18 @@ func (fs filterScreen) update(msg tea.KeyPressMsg, owners []board.Owner) (*filte
 		return &fs, nil
 	}
 	row := rows[fs.cursor]
+	var action *filterAction
 	switch {
 	case key.Matches(msg, fs.keys.Up):
 		fs.cursor = max(0, fs.cursor-1)
 	case key.Matches(msg, fs.keys.Down):
 		fs.cursor = min(len(rows)-1, fs.cursor+1)
 	case key.Matches(msg, fs.keys.Toggle) && row.repo != nil:
-		return &fs, &filterToggle{owner: row.owner.Login, repo: row.repo.NameWithOwner}
+		action = &filterAction{owner: row.owner.Login, repo: row.repo.NameWithOwner}
 	case key.Matches(msg, fs.keys.Toggle):
-		return &fs, &filterToggle{owner: row.owner.Login}
+		action = &filterAction{owner: row.owner.Login}
+	case key.Matches(msg, fs.keys.Load):
+		action = &filterAction{owner: row.owner.Login, load: true}
 	case row.repo != nil && key.Matches(msg, fs.keys.Collapse):
 		fs = fs.withExpanded(row.owner.Login, false)
 		fs.cursor = slices.IndexFunc(rows, func(r filterRow) bool { return r.repo == nil && r.owner.Login == row.owner.Login })
@@ -132,13 +145,66 @@ func (fs filterScreen) update(msg tea.KeyPressMsg, owners []board.Owner) (*filte
 	case key.Matches(msg, fs.keys.Collapse):
 		fs = fs.withExpanded(row.owner.Login, false)
 	}
-	return &fs, nil
+	if size := fs.listHeight(termHeight); size > 0 {
+		fs.offset = window(fs.offset, fs.cursor, size, len(fs.rows(owners)))
+	}
+	return &fs, action
+}
+
+// filterChrome is how many lines the screen takes besides its rows and
+// notices: the border, the title, the help line and the blank lines between.
+const filterChrome = 6
+
+// listHeight is how many rows fit in a terminal termHeight rows tall, or 0
+// when the height isn't known and every row is shown.
+func (fs filterScreen) listHeight(termHeight int) int {
+	if termHeight == 0 {
+		return 0
+	}
+	used := filterChrome
+	if n := len(fs.notices()); n > 0 {
+		used += 1 + n
+	}
+	return max(termHeight-used, 1)
+}
+
+// filterNotice is one line under the screen's rows: a load in flight, or why
+// one failed.
+type filterNotice struct {
+	text string
+	err  bool
+}
+
+func (fs filterScreen) notices() []filterNotice {
+	var notices []filterNotice
+	for _, key := range slices.Sorted(maps.Keys(fs.loading)) {
+		notices = append(notices, filterNotice{text: "Loading " + fs.loading[key] + "'s repositories…"})
+	}
+	for _, err := range []error{fs.viewerErr, fs.organizationsErr, fs.repositoriesErr} {
+		if err != nil {
+			notices = append(notices, filterNotice{text: err.Error(), err: true})
+		}
+	}
+	return notices
+}
+
+func (fs filterScreen) withLoading(login string, loading bool) filterScreen {
+	fs.loading = maps.Clone(fs.loading)
+	if fs.loading == nil {
+		fs.loading = map[string]string{}
+	}
+	if loading {
+		fs.loading[strings.ToLower(login)] = login
+	} else {
+		delete(fs.loading, strings.ToLower(login))
+	}
+	return fs
 }
 
 // repoIndent sets a repository row in under its owner.
 const repoIndent = "    "
 
-func (fs filterScreen) view(t theme, h help.Model, owners []board.Owner) string {
+func (fs filterScreen) view(t theme, h help.Model, owners []board.Owner, termHeight int) string {
 	rows := []string{lipgloss.NewStyle().Bold(true).Foreground(t.text).Render("Filter"), ""}
 	type line struct {
 		indent, check, name string
@@ -163,7 +229,13 @@ func (fs filterScreen) view(t theme, h help.Model, owners []board.Owner) string 
 		nameWidth = max(nameWidth, len(l.indent)+lipgloss.Width(l.name))
 	}
 	muted := lipgloss.NewStyle().Foreground(t.muted)
-	for i, l := range lines {
+	first, last := 0, len(lines)
+	if size := fs.listHeight(termHeight); size > 0 {
+		first = window(fs.offset, fs.cursor, size, len(lines))
+		last = min(last, first+size)
+	}
+	for i := first; i < last; i++ {
+		l := lines[i]
 		marker, style := "  ", lipgloss.NewStyle().Foreground(t.text)
 		if i == fs.cursor {
 			marker, style = "› ", style.Bold(true).Foreground(t.accent)
@@ -171,14 +243,16 @@ func (fs filterScreen) view(t theme, h help.Model, owners []board.Owner) string 
 		pad := strings.Repeat(" ", nameWidth-len(l.indent)-lipgloss.Width(l.name))
 		rows = append(rows, marker+l.indent+style.Render(l.check+" "+l.name+pad)+"  "+muted.Render(fmt.Sprint(l.count)))
 	}
-	errStyle := lipgloss.NewStyle().Foreground(t.errText)
-	if fs.viewerErr != nil || fs.organizationsErr != nil {
+	notices := fs.notices()
+	if len(notices) > 0 {
 		rows = append(rows, "")
 	}
-	for _, err := range []error{fs.viewerErr, fs.organizationsErr} {
-		if err != nil {
-			rows = append(rows, errStyle.Render(oneLine(err.Error())))
+	for _, n := range notices {
+		style := muted
+		if n.err {
+			style = lipgloss.NewStyle().Foreground(t.errText)
 		}
+		rows = append(rows, style.Render(oneLine(n.text)))
 	}
 	rows = append(rows, "", h.ShortHelpView(fs.keys.ShortHelp()))
 	return modal(t, rows)
@@ -239,17 +313,58 @@ func (m Model) organizationsFetched(msg organizationsMsg) Model {
 // filterScreenKey hands a key press to the filter screen, and applies and
 // saves the toggle it asks for.
 func (m Model) filterScreenKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	var toggle *filterToggle
-	m.filterScreen, toggle = m.filterScreen.update(msg, m.owners)
+	var action *filterAction
+	m.filterScreen, action = m.filterScreen.update(msg, m.owners, m.height)
 	switch {
-	case toggle == nil:
+	case action == nil:
 		return m, nil
-	case toggle.repo != "":
-		m.filter = board.ToggleRepository(m.filter, toggle.repo)
+	case action.load:
+		return m.loadOwnerRepositories(action.owner)
+	case action.repo != "":
+		m.filter = board.ToggleRepository(m.filter, action.repo)
 	default:
-		m.filter = board.ToggleOwner(m.filter, toggle.owner)
+		m.filter = board.ToggleOwner(m.filter, action.owner)
 	}
 	return m.rebuild().saveConfig()
+}
+
+// ownerRepositoriesMsg is the result of asking GitHub for every repository of
+// an owner.
+type ownerRepositoriesMsg struct {
+	owner string
+	repos []string
+	err   error
+}
+
+// loadOwnerRepositories asks GitHub for every repository of owner, so one can
+// be excluded before it has a pull request.
+func (m Model) loadOwnerRepositories(owner string) (Model, tea.Cmd) {
+	fs := m.filterScreen.withLoading(owner, true)
+	m.filterScreen = &fs
+	gh := m.opts.GitHub
+	return m, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+		defer cancel()
+		repos, err := gh.OwnerRepositories(ctx, owner)
+		return ownerRepositoriesMsg{owner: owner, repos: repos, err: err}
+	}
+}
+
+// ownerRepositoriesFetched lists the owner's loaded repositories and expands
+// the owner to show them. A failed load keeps the rows as they were.
+func (m Model) ownerRepositoriesFetched(msg ownerRepositoriesMsg) Model {
+	if msg.err == nil {
+		m.ownerRepositories = slices.Concat(m.ownerRepositories, msg.repos)
+	}
+	if m.filterScreen != nil {
+		fs := m.filterScreen.withLoading(msg.owner, false)
+		fs.repositoriesErr = msg.err
+		if msg.err == nil {
+			fs = fs.withExpanded(msg.owner, true)
+		}
+		m.filterScreen = &fs
+	}
+	return m.rebuild()
 }
 
 // ownerRows are the filter screen's rows. Their counts cover the open pull
@@ -257,5 +372,5 @@ func (m Model) filterScreenKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // they include what the filter hides.
 func (m Model) ownerRows() []board.Owner {
 	open := slices.DeleteFunc(slices.Clone(m.prs), domain.PullRequest.Finished)
-	return board.Owners(m.viewer, m.organizations, slices.Concat(open, m.requested), m.filter)
+	return board.Owners(m.viewer, m.organizations, m.ownerRepositories, slices.Concat(open, m.requested), m.filter)
 }

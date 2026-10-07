@@ -83,7 +83,7 @@ always current.
 | `x` | board | archive the card |
 | `x` | archived | unarchive: put the card back in the lane it was archived from |
 | `t` | everywhere | manage tags |
-| `f` | board, lists | filter: `space` hides or shows an owner's or a repository's PRs everywhere, `enter` `l` `h` expand or collapse an owner |
+| `f` | board, lists | filter: `space` hides or shows an owner's or a repository's PRs everywhere, `enter` `l` `h` expand or collapse an owner, `a` loads all of an owner's repositories |
 | `r` | everywhere | refresh now |
 | `o` | board, detail | pick a link to open |
 | `O` | board, detail | open the PR in the browser |
@@ -168,8 +168,11 @@ applies straight away and saves the config. A repository's check always wins ove
 an owner whose repositories are mixed shows as `[~]` and starts expanded. Checking or unchecking an
 owner sets all its repositories to match, so the config keeps only the exceptions. Opening the
 screen asks GitHub which account you are signed in as and which orgs you belong to; an org that
-enforces SAML SSO may be missing until you authorise `gh` for it. If either request fails, the error
-shows at the foot of the screen and the other rows still work.
+enforces SAML SSO may be missing until you authorise `gh` for it. `a` on an owner, or on one of its
+repositories, loads every repository that owner has from GitHub, so you can hide one before you have
+a PR in it; loaded repositories follow the owner's check unless you have chosen for them. A long list
+scrolls with the selection. If a request fails, the error shows at the foot of the screen and the
+other rows still work.
 
 Deleting a tag moves its PRs to Untagged.
 

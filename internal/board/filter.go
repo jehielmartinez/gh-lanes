@@ -114,11 +114,12 @@ func (r Repository) Name() string {
 }
 
 // Owners lists the viewer's own account, the viewer's organizations, the
-// owner of every pull request in prs and every owner the filter names, each
-// once whatever its capitalisation, with the repositories of those pull
-// requests and those the filter names. The viewer comes first, when known; the
-// rest sort by pull request count, most first, then by name.
-func Owners(viewer string, organizations []string, prs []domain.PullRequest, f domain.Filter) []Owner {
+// owner of every pull request in prs, of every repository in repositories
+// (owner/name) and every owner the filter names, each once whatever its
+// capitalisation, with the repositories of those pull requests, those in
+// repositories and those the filter names. The viewer comes first, when known;
+// the rest sort by pull request count, most first, then by name.
+func Owners(viewer string, organizations, repositories []string, prs []domain.PullRequest, f domain.Filter) []Owner {
 	var owners []Owner
 	index := map[string]int{}
 	add := func(login string, prs int) int {
@@ -154,6 +155,9 @@ func Owners(viewer string, organizations []string, prs []domain.PullRequest, f d
 	}
 	for _, pr := range prs {
 		addRepo(pr.Repository.NameWithOwner, 1)
+	}
+	for _, repo := range repositories {
+		addRepo(repo, 0)
 	}
 	for _, o := range f.ExcludedOwners {
 		add(o, 0)

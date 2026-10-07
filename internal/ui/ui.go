@@ -51,6 +51,7 @@ type GitHub interface {
 	DisableAutoMerge(ctx context.Context, id string) error
 	Viewer(ctx context.Context) (string, error)
 	ViewerOrganizations(ctx context.Context) ([]string, error)
+	OwnerRepositories(ctx context.Context, login string) ([]string, error)
 }
 
 // Options are the boundaries the root model is given rather than reaching for
@@ -156,6 +157,9 @@ type Model struct {
 	// organizations are the logins of the viewer's organizations, as the
 	// filter screen last loaded them.
 	organizations []string
+	// ownerRepositories are the repositories, as owner/name, that the filter
+	// screen has loaded with every repository of their owner.
+	ownerRepositories []string
 	// owners are the filter screen's rows.
 	owners []board.Owner
 
@@ -499,6 +503,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.viewerFetched(msg), nil
 	case organizationsMsg:
 		return m.organizationsFetched(msg), nil
+	case ownerRepositoriesMsg:
+		return m.ownerRepositoriesFetched(msg), nil
 	case openMsg:
 		return m.open(msg.url)
 	case openedMsg:

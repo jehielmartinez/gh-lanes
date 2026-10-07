@@ -1,0 +1,16 @@
+{
+  "data": {
+    "repositoryOwner": {
+      "repositories": {
+        "pageInfo": { "hasNextPage": true, "endCursor": "Y3Vyc29yOjU=" },
+        "nodes": [
+          { "nameWithOwner": "octo-org/alpha-repo" },
+          { "nameWithOwner": "octo-org/beta-repo" },
+          { "nameWithOwner": "octo-org/delta-repo" },
+          { "nameWithOwner": "octo-org/gamma-repo" },
+          { "nameWithOwner": "octo-org/sample-repo" }
+        ]
+      }
+    }
+  }
+}

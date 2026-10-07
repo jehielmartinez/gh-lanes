@@ -112,7 +112,7 @@ link to open it in your browser. Hold Shift while dragging to select text.
 
 The directory holds two files:
 
-- **The config file** (YAML) is yours to edit. It holds the refresh interval, your tags and the filter. The
+- **The config file** (YAML) is yours to edit. It holds the refresh interval, your tags, the filter and the grouping. The
   tag manager (`t`) and the filter screen (`f`) write it too, and `lanes` reads it again on every start.
 - **The state file** (JSON) is written by the app. It holds which PR is in which lane, the
   archived PRs, and what you last saw of each PR. Don't edit it by hand.
@@ -139,6 +139,7 @@ filter:
   repositories:
     octo-org/sample-repo: included
     user-a/noisy-repo: excluded
+grouping: owner
 ```
 
 | Field | Meaning |
@@ -153,11 +154,16 @@ filter:
 | `filter` | Optional. Hides PRs by owner and repository on Board, Review requests and Archived. Without it, everything is shown. |
 | `filter.excluded_owners` | Owners (orgs or users) whose repositories are hidden, including repositories `lanes` hasn't seen yet. |
 | `filter.repositories` | Per-repository choices, as `owner/name: included` or `owner/name: excluded`. A repository's choice always wins over its owner. |
+| `grouping` | Optional. Clusters the cards in each board lane under a header per group: `owner` groups them by owner, `repository` by `owner/name`. `none`, a missing key or any other value shows no groups. |
 
 Filter names match whatever their capitalisation. Hiding a PR keeps its lane, archive state and
 activity: when it is shown again, it is where you left it, marked if it changed meanwhile. A
 renamed or transferred repository falls back to its owner. `lanes` reads the filter on start, so
 restart it after editing by hand.
+
+Grouping only changes how a lane looks: each PR stays in its lane, and lane counts don't change.
+Groups are ordered by their most recently updated PR, and names match whatever their
+capitalisation. The status bar says which grouping is on.
 
 The filter screen (`f`) lists your own account first, then every org you belong to and every owner
 with an open PR or a stored choice, most PRs first. An org with no open PRs is listed too, so you can

@@ -57,6 +57,9 @@ func (m Model) View() tea.View {
 	if m.picker != nil {
 		screen = m.overlay(screen, m.picker.view(m.theme, m.help))
 	}
+	if m.groupingPicker != nil {
+		screen = m.overlay(screen, m.groupingPicker.view(m.theme, m.help))
+	}
 	if m.mergeDialog != nil {
 		screen = m.overlay(screen, m.mergeDialogView())
 	}
@@ -327,10 +330,7 @@ func (m Model) statusView() string {
 
 // groupingName is how the status bar names a grouping.
 func groupingName(g domain.Grouping) string {
-	if g == domain.GroupingTitlePattern {
-		return "title pattern"
-	}
-	return string(g)
+	return strings.ToLower(groupingLabel(g))
 }
 
 // ago says how long ago something happened, to the second under a minute.

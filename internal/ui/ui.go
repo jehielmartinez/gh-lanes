@@ -119,6 +119,11 @@ type Model struct {
 	grouping domain.Grouping
 	// titlePattern names the groups when grouping by title pattern.
 	titlePattern *regexp.Regexp
+	// groupingEdit and titlePatternEdit are what the grouping picker set and
+	// the config file may not hold yet. Every config write carries them until
+	// one succeeds; until then the file's own values are kept as written.
+	groupingEdit     *domain.Grouping
+	titlePatternEdit *string
 
 	// One state write is in flight at a time; a move made meanwhile queues
 	// another, so writes land in the order the moves were made.
@@ -150,12 +155,13 @@ type Model struct {
 	archiveLoaded   bool
 	archiveErr      error
 
-	lanes        []board.Lane
-	focus        int
-	cursors      []int
-	picker       *picker
-	tagManager   *tagManager
-	filterScreen *filterScreen
+	lanes          []board.Lane
+	focus          int
+	cursors        []int
+	picker         *picker
+	groupingPicker *groupingPicker
+	tagManager     *tagManager
+	filterScreen   *filterScreen
 	// viewer is the login lanes is authenticated as, empty until the filter
 	// screen has first loaded it.
 	viewer string
@@ -353,9 +359,10 @@ func (m Model) saveConfig() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.savingConfig = true
-	dir, tags, filter := m.opts.ConfigDir, m.tags, m.filter
+	dir := m.opts.ConfigDir
+	edit := store.ConfigEdit{Tags: m.tags, Filter: m.filter, Grouping: m.groupingEdit, TitlePattern: m.titlePatternEdit}
 	return m, func() tea.Msg {
-		if err := store.SaveConfig(dir, tags, filter); err != nil {
+		if err := store.SaveConfig(dir, edit); err != nil {
 			return configSavedMsg{err: err}
 		}
 		cfg, err := store.LoadConfig(dir)
@@ -394,9 +401,15 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.tagManager != nil {
 			return m.tagManagerUpdate(msg)
 		}
+		if m.groupingPicker != nil {
+			return m.groupingPickerUpdate(msg)
+		}
 	case tea.KeyPressMsg:
 		if m.tagManager != nil && m.tagManager.typing() && !key.Matches(msg, m.keys.Interrupt) {
 			return m.tagManagerUpdate(msg)
+		}
+		if m.groupingPicker != nil && m.groupingPicker.typing() && !key.Matches(msg, m.keys.Interrupt) {
+			return m.groupingPickerUpdate(msg)
 		}
 		if key.Matches(msg, m.keys.Quit) {
 			return m.quit()
@@ -405,6 +418,9 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.picker, cmd = m.picker.update(msg)
 			return m, cmd
+		}
+		if m.groupingPicker != nil {
+			return m.groupingPickerUpdate(msg)
 		}
 		if m.tagManager != nil {
 			return m.tagManagerUpdate(msg)
@@ -445,6 +461,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			return m.switchTab(-1)
 		case key.Matches(msg, m.keys.Filter):
 			return m.openFilterScreen()
+		case key.Matches(msg, m.keys.Grouping):
+			return m.openGroupingPicker(), nil
 		case key.Matches(msg, m.keys.Help):
 			m.help.ShowAll = !m.help.ShowAll
 			m.keys = m.keys.withFullHelp(m.help.ShowAll)
@@ -542,6 +560,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.rebuild(), nil
 	case moveMsg:
 		return m.move(msg.prID, msg.tagID)
+	case groupingChosenMsg:
+		return m.chooseGrouping(msg.grouping)
 	case stateSavedMsg:
 		m.saving = false
 		m.saveErr = msg.err
@@ -578,11 +598,15 @@ func (m Model) configSaved(msg configSavedMsg) Model {
 		return m
 	}
 	m.configErr = msg.loadErr
+	m.groupingEdit, m.titlePatternEdit = nil, nil
 	m.tags = msg.config.Tags
 	m.filter = msg.config.Filter
 	m.grouping = msg.config.Grouping
 	m.titlePattern = msg.config.TitlePattern
 	m.refreshInterval = msg.config.RefreshInterval
+	if m.groupingPicker != nil {
+		m.groupingPicker = m.groupingPicker.withSettings(m.grouping, m.titlePattern)
+	}
 	return m.rebuild()
 }
 
@@ -681,7 +705,7 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // dialogOpen reports whether a picker, the tag manager, the filter screen or
 // a dialog has the keys.
 func (m Model) dialogOpen() bool {
-	return m.picker != nil || m.tagManager != nil || m.filterScreen != nil || m.confirm != nil || m.mergeDialog != nil
+	return m.picker != nil || m.groupingPicker != nil || m.tagManager != nil || m.filterScreen != nil || m.confirm != nil || m.mergeDialog != nil
 }
 
 func (m Model) selected() (domain.PullRequest, bool) {

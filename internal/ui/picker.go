@@ -14,6 +14,8 @@ type pickerItem struct {
 	label string
 	// note is shown dimmed after the label, such as "(current)".
 	note string
+	// detail is shown dimmed on its own line under the label.
+	detail string
 }
 
 // picker is a small modal list: the user moves a cursor and chooses one item,
@@ -27,6 +29,9 @@ type picker struct {
 	rows   int
 	offset int
 	keys   pickerKeys
+	// hints are keys the picker's owner handles, listed in its help line
+	// after the picker's own.
+	hints []key.Binding
 	// empty is what the picker says when it has nothing to choose from.
 	empty string
 	// choose turns the chosen index into the message the root model acts on.
@@ -83,11 +88,14 @@ func (p picker) view(t theme, h help.Model) string {
 			row += " " + lipgloss.NewStyle().Foreground(t.muted).Render(item.note)
 		}
 		rows = append(rows, row)
+		if item.detail != "" {
+			rows = append(rows, "    "+lipgloss.NewStyle().Foreground(t.muted).Render(oneLine(item.detail)))
+		}
 	}
 	if len(p.items) == 0 && p.empty != "" {
 		rows = append(rows, lipgloss.NewStyle().Foreground(t.muted).Render(p.empty))
 	}
-	rows = append(rows, "", h.ShortHelpView(p.keys.ShortHelp()))
+	rows = append(rows, "", h.ShortHelpView(append(p.keys.ShortHelp(), p.hints...)))
 	return modal(t, rows)
 }
 

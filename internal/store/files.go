@@ -159,6 +159,15 @@ func LoadConfig(dir string) (Config, error) {
 	return cfg, errors.Join(intervalErr, patternErr)
 }
 
+// groupingToFile is how the file spells g. None is spelled out, so a saved
+// choice of None reads as one.
+func groupingToFile(g domain.Grouping) string {
+	if g == domain.GroupingNone {
+		return "none"
+	}
+	return string(g)
+}
+
 func groupingFromFile(value string) domain.Grouping {
 	switch g := domain.Grouping(value); g {
 	case domain.GroupingOwner, domain.GroupingRepository, domain.GroupingTitlePattern:
@@ -238,11 +247,23 @@ func tagsFromFile(entries []tagEntry) ([]domain.Tag, error) {
 	return tags, nil
 }
 
-// SaveConfig replaces the tags and the filter in the config file in dir,
-// atomically, and keeps every other setting as the file has it. A filter that
-// hides nothing is left out of the file. It refuses to touch a file it can't
-// read, so a hand edit it doesn't understand is never overwritten.
-func SaveConfig(dir string, tags []domain.Tag, filter domain.Filter) error {
+// ConfigEdit is what SaveConfig writes. Tags and Filter always replace the
+// file's. Grouping and TitlePattern replace the file's only when set, so a
+// setting the user never changed is kept as written, even one that doesn't
+// read back.
+type ConfigEdit struct {
+	Tags         []domain.Tag
+	Filter       domain.Filter
+	Grouping     *domain.Grouping
+	TitlePattern *string
+}
+
+// SaveConfig writes edit to the config file in dir, atomically, and keeps
+// every other setting as the file has it. A filter that hides nothing is left
+// out of the file. It refuses to touch a file it can't read, so a hand edit it
+// doesn't understand is never overwritten, and to save a title pattern that
+// doesn't compile.
+func SaveConfig(dir string, edit ConfigEdit) error {
 	path := filepath.Join(dir, ConfigFile)
 	file := configFile{Version: configVersion}
 	raw, err := os.ReadFile(path)
@@ -258,14 +279,23 @@ func SaveConfig(dir string, tags []domain.Tag, filter domain.Filter) error {
 			return fmt.Errorf("read config %s: unsupported version %d (want %d)", path, file.Version, configVersion)
 		}
 	}
-	file.Tags = make([]tagEntry, len(tags))
-	for i, t := range tags {
+	if edit.TitlePattern != nil {
+		if _, err := domain.CompileTitlePattern(*edit.TitlePattern); err != nil {
+			return fmt.Errorf("save title_pattern: %w", err)
+		}
+		file.TitlePattern = *edit.TitlePattern
+	}
+	if edit.Grouping != nil {
+		file.Grouping = groupingToFile(*edit.Grouping)
+	}
+	file.Tags = make([]tagEntry, len(edit.Tags))
+	for i, t := range edit.Tags {
 		file.Tags[i] = tagEntry(t)
 	}
 	if _, err := tagsFromFile(file.Tags); err != nil {
 		return fmt.Errorf("save tags: %w", err)
 	}
-	file.Filter = filterToFile(filter)
+	file.Filter = filterToFile(edit.Filter)
 	out, err := yaml.Marshal(file)
 	if err != nil {
 		return fmt.Errorf("encode config: %w", err)

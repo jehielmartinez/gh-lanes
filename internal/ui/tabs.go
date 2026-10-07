@@ -136,9 +136,9 @@ type listHelp struct {
 func (h listHelp) ShortHelp() []key.Binding {
 	k := h.keys
 	if h.archived {
-		return []key.Binding{k.CardUp, k.CardDown, k.Open, k.Unarchive, k.NextTab, k.Help, k.Quit}
+		return []key.Binding{k.CardUp, k.CardDown, k.Open, k.Unarchive, k.Grouping, k.NextTab, k.Help, k.Quit}
 	}
-	return []key.Binding{k.CardUp, k.CardDown, k.Open, k.Archive, k.NextTab, k.UpdateBranch, k.Draft, k.Help, k.Quit}
+	return []key.Binding{k.CardUp, k.CardDown, k.Open, k.Archive, k.Grouping, k.NextTab, k.UpdateBranch, k.Draft, k.Help, k.Quit}
 }
 
 func (h listHelp) FullHelp() [][]key.Binding {
@@ -152,6 +152,6 @@ func (h listHelp) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		move,
 		{k.Links, k.Browser, k.UpdateBranch, k.RebaseBranch, k.Draft, k.Merge},
-		{k.Tags, k.Filter, k.Refresh, k.Help, k.Quit},
+		{k.Tags, k.Filter, k.Grouping, k.Refresh, k.Help, k.Quit},
 	}
 }

@@ -57,6 +57,9 @@ func (m Model) View() tea.View {
 	if m.picker != nil {
 		screen = m.overlay(screen, m.picker.view(m.theme, m.help))
 	}
+	if m.groupingPicker != nil {
+		screen = m.overlay(screen, m.groupingPicker.view(m.theme, m.help))
+	}
 	if m.mergeDialog != nil {
 		screen = m.overlay(screen, m.mergeDialogView())
 	}

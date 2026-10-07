@@ -84,6 +84,7 @@ always current.
 | `x` | archived | unarchive: put the card back in the lane it was archived from |
 | `t` | everywhere | manage tags |
 | `f` | board, lists | filter: `space` hides or shows an owner's or a repository's PRs everywhere, `enter` `l` `h` expand or collapse an owner, `a` loads all of an owner's repositories |
+| `g` | board, lists | grouping: pick None, Owner, Repository or Title pattern for every tab at once; `e` on Title pattern edits the pattern |
 | `r` | everywhere | refresh now |
 | `o` | board, detail | pick a link to open |
 | `O` | board, detail | open the PR in the browser |
@@ -113,7 +114,7 @@ link to open it in your browser. Hold Shift while dragging to select text.
 The directory holds two files:
 
 - **The config file** (YAML) is yours to edit. It holds the refresh interval, your tags, the filter and the grouping. The
-  tag manager (`t`) and the filter screen (`f`) write it too, and `lanes` reads it again on every start.
+  tag manager (`t`), the filter screen (`f`) and the grouping picker (`g`) write it too, and `lanes` reads it again on every start.
 - **The state file** (JSON) is written by the app. It holds which PR is in which lane, the
   archived PRs, and what you last saw of each PR. Don't edit it by hand.
 
@@ -171,7 +172,8 @@ With `title_pattern` grouping, the first match in a title names the PR's group, 
 `SUP-\d+|#\d+` puts `SUP-12 fixes #7` under `SUP-12`. PRs whose title doesn't match go in a
 **No match** group, always last. Add `(?i)` to the start of a pattern to match whatever the
 capitalisation. If the pattern doesn't compile, `lanes` uses the default, says why in the status
-bar and leaves the file as it is for you to fix.
+bar and leaves the file as it is for you to fix, or to replace from the grouping picker (`g`,
+then `e` on Title pattern), which won't save a pattern that doesn't compile.
 
 The filter screen (`f`) lists your own account first, then every org you belong to and every owner
 with an open PR or a stored choice, most PRs first. An org with no open PRs is listed too, so you can

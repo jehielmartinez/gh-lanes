@@ -29,14 +29,23 @@ func cardRows(n int) []row {
 	return rows
 }
 
-// laneRows lays out a lane's cards, each group's under its header.
 func laneRows(lane board.Lane) []row {
-	if len(lane.Groups) == 0 {
-		return cardRows(len(lane.PullRequests))
+	return groupedRows(lane.Groups, len(lane.PullRequests))
+}
+
+func (l cardList) rows() []row {
+	return groupedRows(l.groups, len(l.prs))
+}
+
+// groupedRows lays out n cards, each group's under its header, or one row
+// per card when there are no groups.
+func groupedRows(groups []board.Group, n int) []row {
+	if len(groups) == 0 {
+		return cardRows(n)
 	}
-	rows := make([]row, 0, len(lane.Groups)+len(lane.PullRequests))
+	rows := make([]row, 0, len(groups)+n)
 	card := 0
-	for g, group := range lane.Groups {
+	for g, group := range groups {
 		rows = append(rows, row{height: groupHeaderHeight, card: noCard, group: g})
 		for range group.Size {
 			rows = append(rows, row{height: cardHeight, card: card})
@@ -44,10 +53,6 @@ func laneRows(lane board.Lane) []row {
 		}
 	}
 	return rows
-}
-
-func (l cardList) rows() []row {
-	return cardRows(len(l.prs))
 }
 
 // rowsInView is how many rows from first fit in space lines; always at

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"math"
+	"regexp"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -15,12 +16,16 @@ import (
 // than this is harder to read, not easier.
 const listWidth = 2 * maxLaneWidth
 
-// cardList is one column of cards, most recently updated first, with a
-// selection and a scroll offset: the review requests and archived tabs.
+// cardList is one column of cards, most recently updated first or clustered
+// into the groups of its grouping, with a selection and a scroll offset: the
+// review requests and archived tabs.
 type cardList struct {
-	prs    []domain.PullRequest
-	cursor int
-	offset int
+	prs          []domain.PullRequest
+	grouping     domain.Grouping
+	titlePattern *regexp.Regexp
+	groups       []board.Group
+	cursor       int
+	offset       int
 }
 
 func (l cardList) selected() (domain.PullRequest, bool) {
@@ -35,11 +40,13 @@ func (l cardList) withCursor(index int) cardList {
 	return l
 }
 
-// withPRs replaces the cards, most recently updated first, keeping the
+// withPRs replaces the cards, the grouping and the title pattern, keeping the
 // selection on the pull request it was on.
-func (l cardList) withPRs(prs []domain.PullRequest) cardList {
+func (l cardList) withPRs(prs []domain.PullRequest, grouping domain.Grouping, titlePattern *regexp.Regexp) cardList {
 	selected, hadSelection := l.selected()
-	l.prs = board.ByUpdated(prs)
+	l.grouping = grouping
+	l.titlePattern = titlePattern
+	l.prs, l.groups = board.GroupCards(board.ByUpdated(prs), grouping, titlePattern)
 	l = l.withCursor(l.cursor)
 	if !hadSelection {
 		return l
@@ -56,7 +63,7 @@ func (l cardList) withPRs(prs []domain.PullRequest) cardList {
 func (l cardList) withCopy(pr domain.PullRequest) cardList {
 	for _, have := range l.prs {
 		if have.ID == pr.ID {
-			return l.withPRs(replaced(l.prs, pr))
+			return l.withPRs(replaced(l.prs, pr), l.grouping, l.titlePattern)
 		}
 	}
 	return l
@@ -140,6 +147,10 @@ func (m Model) listView(l cardList, note string) string {
 	width := m.listColumnWidth()
 	var lines []string
 	for _, r := range inView(l.rows(), l.offset, m.listSpace()) {
+		if r.card == noCard {
+			lines = append(lines, m.groupHeader(l.groups[r.group], width))
+			continue
+		}
 		lines = append(lines, m.cardView(l.prs[r.card], width, r.card == l.cursor, false))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)

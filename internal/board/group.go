@@ -7,8 +7,8 @@ import (
 	"github.com/jehielmartinez/gh-lanes/internal/domain"
 )
 
-// Group is a run of cards in a lane that share a value for the grouping,
-// shown under a header with its name and size.
+// Group is a run of cards in a lane or list that share a value for the
+// grouping, shown under a header with its name and size.
 type Group struct {
 	Name string
 	Size int
@@ -27,13 +27,16 @@ type Group struct {
 func Grouped(lanes []Lane, grouping domain.Grouping, titlePattern *regexp.Regexp) []Lane {
 	grouped := make([]Lane, len(lanes))
 	for i, lane := range lanes {
-		lane.PullRequests, lane.Groups = groupCards(lane.PullRequests, grouping, titlePattern)
+		lane.PullRequests, lane.Groups = GroupCards(lane.PullRequests, grouping, titlePattern)
 		grouped[i] = lane
 	}
 	return grouped
 }
 
-func groupCards(prs []domain.PullRequest, grouping domain.Grouping, titlePattern *regexp.Regexp) ([]domain.PullRequest, []Group) {
+// GroupCards returns prs ordered into the groups of grouping, and those
+// groups, by the same rules as Grouped. With no grouping it returns prs as
+// given and no groups.
+func GroupCards(prs []domain.PullRequest, grouping domain.Grouping, titlePattern *regexp.Regexp) ([]domain.PullRequest, []Group) {
 	if grouping == domain.GroupingNone || len(prs) == 0 {
 		return prs, nil
 	}

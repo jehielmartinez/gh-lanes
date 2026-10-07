@@ -1,0 +1,57 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjU="
+      },
+      "nodes": [
+        {
+          "id": "PR_node_r1",
+          "number": 11,
+          "title": "Speed up the docs build",
+          "updatedAt": "2026-03-04T10:00:00Z",
+          "repository": {
+            "nameWithOwner": "octo-org/review-repo"
+          }
+        },
+        {
+          "id": "PR_node_r2",
+          "number": 12,
+          "title": "Add a retry to the uploader",
+          "updatedAt": "2026-03-04T08:00:00Z",
+          "repository": {
+            "nameWithOwner": "user-b/sample-repo"
+          }
+        },
+        {
+          "id": "PR_node_r3",
+          "number": 13,
+          "title": "Fix the flaky login test",
+          "updatedAt": "2026-03-03T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo"
+          }
+        },
+        {
+          "id": "PR_node_r4",
+          "number": 14,
+          "title": "Bump the linter",
+          "updatedAt": "2026-03-02T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "user-b/tools-repo"
+          }
+        },
+        {
+          "id": "PR_node_r5",
+          "number": 15,
+          "title": "Trim the export payload",
+          "updatedAt": "2026-03-01T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "octo-org/review-repo"
+          }
+        }
+      ]
+    }
+  }
+}

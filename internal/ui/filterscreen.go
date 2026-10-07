@@ -27,6 +27,8 @@ type filterScreen struct {
 	expanded map[string]bool
 	// viewerErr is why the viewer's own account couldn't be loaded.
 	viewerErr error
+	// organizationsErr is why the viewer's organizations couldn't be loaded.
+	organizationsErr error
 }
 
 // filterRow is one row of the filter screen: an owner, or, when repo is set,
@@ -88,6 +90,13 @@ func (fs filterScreen) rows(owners []board.Owner) []filterRow {
 		}
 	}
 	return rows
+}
+
+// organizationsMsg is the result of asking GitHub which organizations the
+// viewer belongs to.
+type organizationsMsg struct {
+	logins []string
+	err    error
 }
 
 // update handles a key press while the screen is open. It returns the screen
@@ -162,15 +171,22 @@ func (fs filterScreen) view(t theme, h help.Model, owners []board.Owner) string 
 		pad := strings.Repeat(" ", nameWidth-len(l.indent)-lipgloss.Width(l.name))
 		rows = append(rows, marker+l.indent+style.Render(l.check+" "+l.name+pad)+"  "+muted.Render(fmt.Sprint(l.count)))
 	}
-	if fs.viewerErr != nil {
-		rows = append(rows, "", lipgloss.NewStyle().Foreground(t.errText).Render(oneLine(fs.viewerErr.Error())))
+	errStyle := lipgloss.NewStyle().Foreground(t.errText)
+	if fs.viewerErr != nil || fs.organizationsErr != nil {
+		rows = append(rows, "")
+	}
+	for _, err := range []error{fs.viewerErr, fs.organizationsErr} {
+		if err != nil {
+			rows = append(rows, errStyle.Render(oneLine(err.Error())))
+		}
 	}
 	rows = append(rows, "", h.ShortHelpView(fs.keys.ShortHelp()))
 	return modal(t, rows)
 }
 
 // openFilterScreen opens the filter screen and asks GitHub for the viewer's
-// account, which it lists first. It stays shut while the config couldn't be
+// account, which it lists first, and the viewer's organizations, which it
+// lists even with no pull requests. It stays shut while the config couldn't be
 // read, since saving would overwrite it.
 func (m Model) openFilterScreen() (Model, tea.Cmd) {
 	if !m.storeReady {
@@ -179,12 +195,19 @@ func (m Model) openFilterScreen() (Model, tea.Cmd) {
 	fs := filterScreen{keys: newFilterKeys()}.withOwners(m.owners)
 	m.filterScreen = &fs
 	gh := m.opts.GitHub
-	return m, func() tea.Msg {
+	viewer := func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 		defer cancel()
 		login, err := gh.Viewer(ctx)
 		return viewerMsg{login: login, err: err}
 	}
+	organizations := func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+		defer cancel()
+		logins, err := gh.ViewerOrganizations(ctx)
+		return organizationsMsg{logins: logins, err: err}
+	}
+	return m, tea.Batch(viewer, organizations)
 }
 
 func (m Model) viewerFetched(msg viewerMsg) Model {
@@ -194,6 +217,20 @@ func (m Model) viewerFetched(msg viewerMsg) Model {
 	if m.filterScreen != nil {
 		fs := *m.filterScreen
 		fs.viewerErr = msg.err
+		m.filterScreen = &fs
+	}
+	return m.rebuild()
+}
+
+// organizationsFetched lists the viewer's organizations. A failed load keeps
+// the organizations last loaded, if any.
+func (m Model) organizationsFetched(msg organizationsMsg) Model {
+	if msg.err == nil {
+		m.organizations = msg.logins
+	}
+	if m.filterScreen != nil {
+		fs := *m.filterScreen
+		fs.organizationsErr = msg.err
 		m.filterScreen = &fs
 	}
 	return m.rebuild()
@@ -220,5 +257,5 @@ func (m Model) filterScreenKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // they include what the filter hides.
 func (m Model) ownerRows() []board.Owner {
 	open := slices.DeleteFunc(slices.Clone(m.prs), domain.PullRequest.Finished)
-	return board.Owners(m.viewer, slices.Concat(open, m.requested), m.filter)
+	return board.Owners(m.viewer, m.organizations, slices.Concat(open, m.requested), m.filter)
 }

@@ -7,9 +7,12 @@ import "github.com/jehielmartinez/gh-lanes/internal/board"
 // rows, so rows of different heights can share a lane.
 type row struct {
 	height int
-	// card is the index of the card the row draws, in its lane or list.
+	// card is the index of the card the row draws, in its lane or list, or
+	// noCard for a display-only row that clicks and the selection pass over.
 	card int
 }
+
+const noCard = -1
 
 // cardRows lays out n cards, one row each.
 func cardRows(n int) []row {
@@ -49,9 +52,9 @@ func inView(rows []row, first, space int) []row {
 	return rows[first : first+rowsInView(rows, first, space)]
 }
 
-// lastFirst is the lowest a run of rows scrolls: the first row in view once
-// the last row is, with as many rows above it as space allows.
-func lastFirst(rows []row, space int) int {
+// maxFirst is the furthest a run of rows scrolls: the first row in view
+// once the last row is, with as many rows above it as space allows.
+func maxFirst(rows []row, space int) int {
 	first, used := len(rows), 0
 	for first > 0 && used+rows[first-1].height <= space {
 		first--
@@ -86,7 +89,7 @@ func scrollTo(rows []row, first, card, space int) int {
 	for first < target && target >= first+rowsInView(rows, first, space) {
 		first++
 	}
-	return min(first, lastFirst(rows, space))
+	return min(first, maxFirst(rows, space))
 }
 
 // cardAtLine is the card drawn at line y of rows laid out in space lines
@@ -97,7 +100,7 @@ func cardAtLine(rows []row, first, space, y int) (int, bool) {
 	}
 	for _, r := range inView(rows, first, space) {
 		if y < r.height {
-			return r.card, true
+			return r.card, r.card != noCard
 		}
 		y -= r.height
 	}
@@ -107,11 +110,19 @@ func cardAtLine(rows []row, first, space, y int) (int, bool) {
 // wheel scrolls rows laid out in space lines by delta rows from first, and
 // moves cursor, a card index, just enough to keep it on a card in view.
 func wheel(rows []row, first, cursor, space, delta int) (newFirst, newCursor int) {
-	first = max(0, min(first+delta, lastFirst(rows, space)))
-	visible := inView(rows, first, space)
-	if len(visible) == 0 {
+	first = max(0, min(first+delta, maxFirst(rows, space)))
+	top, bottom := noCard, noCard
+	for _, r := range inView(rows, first, space) {
+		if r.card == noCard {
+			continue
+		}
+		if top == noCard {
+			top = r.card
+		}
+		bottom = r.card
+	}
+	if top == noCard {
 		return first, cursor
 	}
-	top, bottom := visible[0].card, visible[len(visible)-1].card
 	return first, max(top, min(cursor, bottom))
 }

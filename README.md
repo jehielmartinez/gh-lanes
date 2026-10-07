@@ -83,7 +83,7 @@ always current.
 | `x` | board | archive the card |
 | `x` | archived | unarchive: put the card back in the lane it was archived from |
 | `t` | everywhere | manage tags |
-| `f` | board, lists | filter: `space` hides or shows an owner's PRs everywhere |
+| `f` | board, lists | filter: `space` hides or shows an owner's or a repository's PRs everywhere, `enter` `l` `h` expand or collapse an owner |
 | `r` | everywhere | refresh now |
 | `o` | board, detail | pick a link to open |
 | `O` | board, detail | open the PR in the browser |
@@ -160,12 +160,16 @@ renamed or transferred repository falls back to its owner. `lanes` reads the fil
 restart it after editing by hand.
 
 The filter screen (`f`) lists your own account first, then every org you belong to and every owner
-with an open PR or a stored exclusion, most PRs first. An org with no open PRs is listed too, so you
-can hide it before it causes noise. Each row counts the owner's open PRs on Board and Review
-requests, hidden ones included. `space` checks or unchecks an owner, which applies straight away and
-saves the config. Opening the screen asks GitHub which account you are signed in as and which orgs
-you belong to; an org that enforces SAML SSO may be missing until you authorise `gh` for it. If
-either request fails, the error shows at the foot of the screen and the other rows still work.
+with an open PR or a stored choice, most PRs first. An org with no open PRs is listed too, so you can
+hide it before it causes noise. Under each owner are its repositories with an open PR or a stored
+choice, sorted by name; `enter`, `l` and `h` expand and collapse it. Each row counts its open PRs on
+Board and Review requests, hidden ones included. `space` checks or unchecks the selected row, which
+applies straight away and saves the config. A repository's check always wins over its owner's, and
+an owner whose repositories are mixed shows as `[~]` and starts expanded. Checking or unchecking an
+owner sets all its repositories to match, so the config keeps only the exceptions. Opening the
+screen asks GitHub which account you are signed in as and which orgs you belong to; an org that
+enforces SAML SSO may be missing until you authorise `gh` for it. If either request fails, the error
+shows at the foot of the screen and the other rows still work.
 
 Deleting a tag moves its PRs to Untagged.
 

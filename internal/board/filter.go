@@ -51,7 +51,7 @@ func ToggleOwner(f domain.Filter, owner string) domain.Filter {
 	repos := maps.Clone(f.Repositories)
 	maps.DeleteFunc(repos, func(repo string, _ domain.RepoChoice) bool { return strings.EqualFold(ownerOf(repo), owner) })
 	f.Repositories = repos
-	return f
+	return pruned(f)
 }
 
 // ToggleRepository flips the check of the repository named owner/name. Its
@@ -71,6 +71,17 @@ func ToggleRepository(f domain.Filter, nameWithOwner string) domain.Filter {
 		}
 		repos[nameWithOwner] = choice
 	}
+	f.Repositories = repos
+	return pruned(f)
+}
+
+// pruned drops every repository choice that matches its owner default, such
+// as one left behind by a hand edit, so the filter holds only exceptions.
+func pruned(f domain.Filter) domain.Filter {
+	repos := maps.Clone(f.Repositories)
+	maps.DeleteFunc(repos, func(repo string, choice domain.RepoChoice) bool {
+		return (choice == domain.RepoExcluded) == OwnerExcluded(f, ownerOf(repo))
+	})
 	f.Repositories = repos
 	return f
 }
@@ -147,8 +158,8 @@ func Owners(viewer string, prs []domain.PullRequest, f domain.Filter) []Owner {
 	for _, repo := range slices.Sorted(maps.Keys(f.Repositories)) {
 		addRepo(repo, 0)
 	}
-	for _, o := range owners {
-		slices.SortStableFunc(o.Repositories, func(a, b Repository) int {
+	for i := range owners {
+		slices.SortStableFunc(owners[i].Repositories, func(a, b Repository) int {
 			return strings.Compare(strings.ToLower(a.Name()), strings.ToLower(b.Name()))
 		})
 	}

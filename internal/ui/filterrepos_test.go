@@ -186,6 +186,7 @@ func TestTogglingAnOwnerClearsTheChoicesUnderIt(t *testing.T) {
     Octo-Org/Sample-Repo: included
     octo-org/tools-repo: excluded
     other-org/side-repo: excluded
+    user-a/other-repo: included
 `, viewerReply(t))
 	h.waitForFirstRow("user-a")
 	h.waitForRow("~", "octo-org", 4)

@@ -115,6 +115,7 @@ func (fs filterScreen) update(msg tea.KeyPressMsg, owners []board.Owner) (*filte
 		fs = fs.withExpanded(row.owner.Login, false)
 		fs.cursor = slices.IndexFunc(rows, func(r filterRow) bool { return r.repo == nil && r.owner.Login == row.owner.Login })
 	case row.repo != nil:
+		// A repository has nothing to expand.
 	case key.Matches(msg, fs.keys.Fold):
 		fs = fs.withExpanded(row.owner.Login, !fs.isExpanded(row.owner.Login))
 	case key.Matches(msg, fs.keys.Expand):

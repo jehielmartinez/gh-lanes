@@ -103,14 +103,14 @@ func (m Model) viewerFetched(msg viewerMsg) Model {
 		fs.viewerErr = msg.err
 		m.filterScreen = &fs
 	}
-	return m
+	return m.rebuild()
 }
 
 // filterScreenKey hands a key press to the filter screen, and applies and
 // saves the toggle it asks for.
 func (m Model) filterScreenKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	var owner string
-	m.filterScreen, owner = m.filterScreen.update(msg, m.owners())
+	m.filterScreen, owner = m.filterScreen.update(msg, m.owners)
 	if owner == "" {
 		return m, nil
 	}
@@ -118,10 +118,10 @@ func (m Model) filterScreenKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m.rebuild().saveConfig()
 }
 
-// owners are the filter screen's rows. Their counts cover the open pull
+// ownerRows are the filter screen's rows. Their counts cover the open pull
 // requests of Board and Review requests as the searches returned them, so
 // they include what the filter hides.
-func (m Model) owners() []board.Owner {
+func (m Model) ownerRows() []board.Owner {
 	open := slices.DeleteFunc(slices.Clone(m.prs), domain.PullRequest.Finished)
 	return board.Owners(m.viewer, slices.Concat(open, m.requested), m.filter)
 }

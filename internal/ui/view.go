@@ -52,7 +52,7 @@ func (m Model) View() tea.View {
 		screen = m.overlay(screen, m.tagManager.view(m.theme, m.help, m.lanes))
 	}
 	if m.filterScreen != nil {
-		screen = m.overlay(screen, m.filterScreen.view(m.theme, m.help, m.owners()))
+		screen = m.overlay(screen, m.filterScreen.view(m.theme, m.help, m.owners))
 	}
 	if m.picker != nil {
 		screen = m.overlay(screen, m.picker.view(m.theme, m.help))

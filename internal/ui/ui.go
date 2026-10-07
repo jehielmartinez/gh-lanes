@@ -152,6 +152,8 @@ type Model struct {
 	// viewer is the login lanes is authenticated as, empty until the filter
 	// screen has first loaded it.
 	viewer string
+	// owners are the filter screen's rows.
+	owners []board.Owner
 
 	// firstLane is the leftmost lane in view, and offsets the first card in
 	// view in each lane.
@@ -741,12 +743,13 @@ func (m Model) withCursor(lane, index int) Model {
 }
 
 // rebuild reassembles the lanes, the review requests and the archived tab,
-// leaving out what the filter hides. The focus and each lane's cursor and
+// leaving out what the filter hides, and the filter screen's rows. The focus and each lane's cursor and
 // scroll offset stay with their tag when tags are reordered, and the cursors
 // are kept inside the lanes.
 func (m Model) rebuild() Model {
 	m.reviews = m.reviews.withPRs(board.Unarchived(board.Visible(m.requested, m.filter), m.archived))
 	m.archive = m.archive.withPRs(board.Visible(m.archivePRs, m.filter))
+	m.owners = m.ownerRows()
 	cursorOf, offsetOf := map[string]int{}, map[string]int{}
 	for i, lane := range m.lanes {
 		if i < len(m.cursors) {

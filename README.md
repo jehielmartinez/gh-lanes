@@ -154,14 +154,15 @@ grouping: owner
 | `filter` | Optional. Hides PRs by owner and repository on Board, Review requests and Archived. Without it, everything is shown. |
 | `filter.excluded_owners` | Owners (orgs or users) whose repositories are hidden, including repositories `lanes` hasn't seen yet. |
 | `filter.repositories` | Per-repository choices, as `owner/name: included` or `owner/name: excluded`. A repository's choice always wins over its owner. |
-| `grouping` | Optional. Clusters the cards in each board lane under a header per group: `owner` groups them by owner, `repository` by `owner/name`. `none`, a missing key or any other value shows no groups. |
+| `grouping` | Optional. Clusters the cards in each board lane, and in the Review requests and Archived lists, under a header per group: `owner` groups them by owner, `repository` by `owner/name`. `none`, a missing key or any other value shows no groups. |
 
 Filter names match whatever their capitalisation. Hiding a PR keeps its lane, archive state and
 activity: when it is shown again, it is where you left it, marked if it changed meanwhile. A
 renamed or transferred repository falls back to its owner. `lanes` reads the filter on start, so
 restart it after editing by hand.
 
-Grouping only changes how a lane looks: each PR stays in its lane, and lane counts don't change.
+Grouping only changes how the cards look: each PR stays in its lane, and lane and tab counts
+don't change.
 Groups are ordered by their most recently updated PR, and names match whatever their
 capitalisation. The status bar says which grouping is on.
 

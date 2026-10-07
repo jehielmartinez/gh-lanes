@@ -114,7 +114,8 @@ type Model struct {
 	// filter hides pull requests from every tab. It applies after retention,
 	// assignments and the archived list are worked out, so it only hides.
 	filter domain.Filter
-	// grouping clusters each lane's cards into groups, after the filter.
+	// grouping clusters each lane's cards, and the review requests and
+	// archived lists, into groups, after the filter.
 	grouping domain.Grouping
 
 	// One state write is in flight at a time; a move made meanwhile queues
@@ -764,8 +765,8 @@ func (m Model) withCursor(lane, index int) Model {
 // reordered, each cursor stays on its pull request while the lane still holds
 // it, and the cursors are kept inside the lanes.
 func (m Model) rebuild() Model {
-	m.reviews = m.reviews.withPRs(board.Unarchived(board.Visible(m.requested, m.filter), m.archived))
-	m.archive = m.archive.withPRs(board.Visible(m.archivePRs, m.filter))
+	m.reviews = m.reviews.withPRs(board.Unarchived(board.Visible(m.requested, m.filter), m.archived), m.grouping)
+	m.archive = m.archive.withPRs(board.Visible(m.archivePRs, m.filter), m.grouping)
 	m.owners = m.ownerRows()
 	if m.filterScreen != nil {
 		fs := m.filterScreen.withOwners(m.owners)

@@ -46,9 +46,9 @@ type Owner struct {
 }
 
 // Owners lists the viewer's own account, the viewer's organizations, the
-// owner of every pull request in prs and every owner the filter names, each once whatever its
-// capitalisation. The viewer comes first, when known; the rest sort by pull
-// request count, most first, then by name.
+// owner of every pull request in prs and every owner the filter names, each
+// once whatever its capitalisation. The viewer comes first, when known; the
+// rest sort by pull request count, most first, then by name.
 func Owners(viewer string, organizations []string, prs []domain.PullRequest, f domain.Filter) []Owner {
 	var owners []Owner
 	index := map[string]int{}

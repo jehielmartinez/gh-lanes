@@ -152,6 +152,6 @@ func (h listHelp) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		move,
 		{k.Links, k.Browser, k.UpdateBranch, k.RebaseBranch, k.Draft, k.Merge},
-		{k.Tags, k.Refresh, k.Help, k.Quit},
+		{k.Tags, k.Filter, k.Refresh, k.Help, k.Quit},
 	}
 }

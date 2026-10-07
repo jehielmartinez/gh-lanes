@@ -4,8 +4,8 @@ package ui
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"time"
 
@@ -114,6 +114,16 @@ type Model struct {
 	// filter hides pull requests from every tab. It applies after retention,
 	// assignments and the archived list are worked out, so it only hides.
 	filter domain.Filter
+	// grouping clusters each lane's cards, and the review requests and
+	// archived lists, into groups, after the filter.
+	grouping domain.Grouping
+	// titlePattern names the groups when grouping by title pattern.
+	titlePattern *regexp.Regexp
+	// groupingEdit and titlePatternEdit are what the grouping picker set and
+	// the config file may not hold yet. Every config write carries them until
+	// one succeeds; until then the file's own values are kept as written.
+	groupingEdit     *domain.Grouping
+	titlePatternEdit *string
 
 	// One state write is in flight at a time; a move made meanwhile queues
 	// another, so writes land in the order the moves were made.
@@ -145,12 +155,13 @@ type Model struct {
 	archiveLoaded   bool
 	archiveErr      error
 
-	lanes        []board.Lane
-	focus        int
-	cursors      []int
-	picker       *picker
-	tagManager   *tagManager
-	filterScreen *filterScreen
+	lanes          []board.Lane
+	focus          int
+	cursors        []int
+	picker         *picker
+	groupingPicker *groupingPicker
+	tagManager     *tagManager
+	filterScreen   *filterScreen
 	// viewer is the login lanes is authenticated as, empty until the filter
 	// screen has first loaded it.
 	viewer string
@@ -163,7 +174,7 @@ type Model struct {
 	// owners are the filter screen's rows.
 	owners []board.Owner
 
-	// firstLane is the leftmost lane in view, and offsets the first card in
+	// firstLane is the leftmost lane in view, and offsets the first row in
 	// view in each lane.
 	firstLane int
 	offsets   []int
@@ -321,8 +332,7 @@ func (m Model) loadStore() tea.Cmd {
 	dir := m.opts.ConfigDir
 	return func() tea.Msg {
 		cfg, err := store.LoadConfig(dir)
-		var intervalErr *store.RefreshIntervalError
-		if err != nil && !errors.As(err, &intervalErr) {
+		if !store.Usable(err) {
 			return storeLoadedMsg{config: cfg, err: err}
 		}
 		st, stateErr := store.LoadState(dir)
@@ -349,9 +359,10 @@ func (m Model) saveConfig() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.savingConfig = true
-	dir, tags, filter := m.opts.ConfigDir, m.tags, m.filter
+	dir := m.opts.ConfigDir
+	edit := store.ConfigEdit{Tags: m.tags, Filter: m.filter, Grouping: m.groupingEdit, TitlePattern: m.titlePatternEdit}
 	return m, func() tea.Msg {
-		if err := store.SaveConfig(dir, tags, filter); err != nil {
+		if err := store.SaveConfig(dir, edit); err != nil {
 			return configSavedMsg{err: err}
 		}
 		cfg, err := store.LoadConfig(dir)
@@ -390,9 +401,15 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.tagManager != nil {
 			return m.tagManagerUpdate(msg)
 		}
+		if m.groupingPicker != nil {
+			return m.groupingPickerUpdate(msg)
+		}
 	case tea.KeyPressMsg:
 		if m.tagManager != nil && m.tagManager.typing() && !key.Matches(msg, m.keys.Interrupt) {
 			return m.tagManagerUpdate(msg)
+		}
+		if m.groupingPicker != nil && m.groupingPicker.typing() && !key.Matches(msg, m.keys.Interrupt) {
+			return m.groupingPickerUpdate(msg)
 		}
 		if key.Matches(msg, m.keys.Quit) {
 			return m.quit()
@@ -401,6 +418,9 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.picker, cmd = m.picker.update(msg)
 			return m, cmd
+		}
+		if m.groupingPicker != nil {
+			return m.groupingPickerUpdate(msg)
 		}
 		if m.tagManager != nil {
 			return m.tagManagerUpdate(msg)
@@ -441,6 +461,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			return m.switchTab(-1)
 		case key.Matches(msg, m.keys.Filter):
 			return m.openFilterScreen()
+		case key.Matches(msg, m.keys.Grouping):
+			return m.openGroupingPicker(), nil
 		case key.Matches(msg, m.keys.Help):
 			m.help.ShowAll = !m.help.ShowAll
 			m.keys = m.keys.withFullHelp(m.help.ShowAll)
@@ -517,8 +539,7 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.prRefreshed(msg), nil
 	case storeLoadedMsg:
 		m.refreshInterval = msg.config.RefreshInterval
-		var intervalErr *store.RefreshIntervalError
-		if errors.As(msg.err, &intervalErr) {
+		if store.Usable(msg.err) {
 			m.configErr = msg.err
 		} else {
 			m.storeErr = msg.err
@@ -530,6 +551,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 			m.archived = msg.state.Archived
 			m.snapshots = msg.state.Snapshots
 			m.filter = msg.config.Filter
+			m.grouping = msg.config.Grouping
+			m.titlePattern = msg.config.TitlePattern
 		}
 		if m.tab == tabArchived {
 			return m.rebuild().fetchArchived()
@@ -537,6 +560,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.rebuild(), nil
 	case moveMsg:
 		return m.move(msg.prID, msg.tagID)
+	case groupingChosenMsg:
+		return m.chooseGrouping(msg.grouping)
 	case stateSavedMsg:
 		m.saving = false
 		m.saveErr = msg.err
@@ -568,15 +593,20 @@ func (m Model) configSaved(msg configSavedMsg) Model {
 	if msg.err != nil {
 		return m
 	}
-	var intervalErr *store.RefreshIntervalError
-	if msg.loadErr != nil && !errors.As(msg.loadErr, &intervalErr) {
+	if !store.Usable(msg.loadErr) {
 		m.configSaveErr = msg.loadErr
 		return m
 	}
 	m.configErr = msg.loadErr
+	m.groupingEdit, m.titlePatternEdit = nil, nil
 	m.tags = msg.config.Tags
 	m.filter = msg.config.Filter
+	m.grouping = msg.config.Grouping
+	m.titlePattern = msg.config.TitlePattern
 	m.refreshInterval = msg.config.RefreshInterval
+	if m.groupingPicker != nil {
+		m.groupingPicker = m.groupingPicker.withSettings(m.grouping, m.titlePattern)
+	}
 	return m.rebuild()
 }
 
@@ -675,7 +705,7 @@ func (m Model) boardKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // dialogOpen reports whether a picker, the tag manager, the filter screen or
 // a dialog has the keys.
 func (m Model) dialogOpen() bool {
-	return m.picker != nil || m.tagManager != nil || m.filterScreen != nil || m.confirm != nil || m.mergeDialog != nil
+	return m.picker != nil || m.groupingPicker != nil || m.tagManager != nil || m.filterScreen != nil || m.confirm != nil || m.mergeDialog != nil
 }
 
 func (m Model) selected() (domain.PullRequest, bool) {
@@ -757,20 +787,24 @@ func (m Model) withCursor(lane, index int) Model {
 // rebuild reassembles the lanes, the review requests and the archived tab,
 // leaving out what the filter hides, and the filter screen's rows. The focus
 // and each lane's cursor and scroll offset stay with their tag when tags are
-// reordered, and the cursors are kept inside the lanes.
+// reordered, each cursor stays on its pull request while the lane still holds
+// it, and the cursors are kept inside the lanes.
 func (m Model) rebuild() Model {
-	m.reviews = m.reviews.withPRs(board.Unarchived(board.Visible(m.requested, m.filter), m.archived))
-	m.archive = m.archive.withPRs(board.Visible(m.archivePRs, m.filter))
+	m.reviews = m.reviews.withPRs(board.Unarchived(board.Visible(m.requested, m.filter), m.archived), m.grouping, m.titlePattern)
+	m.archive = m.archive.withPRs(board.Visible(m.archivePRs, m.filter), m.grouping, m.titlePattern)
 	m.owners = m.ownerRows()
 	if m.filterScreen != nil {
 		fs := m.filterScreen.withOwners(m.owners)
 		m.filterScreen = &fs
 	}
-	cursorOf, offsetOf := map[string]int{}, map[string]int{}
+	cursorOf, offsetOf, selectedOf := map[string]int{}, map[string]int{}, map[string]string{}
 	for i, lane := range m.lanes {
 		if i < len(m.cursors) {
 			cursorOf[lane.Tag.ID] = m.cursors[i]
 			offsetOf[lane.Tag.ID] = m.offsets[i]
+			if m.cursors[i] < len(lane.PullRequests) {
+				selectedOf[lane.Tag.ID] = lane.PullRequests[m.cursors[i]].ID
+			}
 		}
 	}
 	focused, hadFocus := "", m.focus < len(m.lanes)
@@ -778,11 +812,14 @@ func (m Model) rebuild() Model {
 		focused = m.lanes[m.focus].Tag.ID
 	}
 
-	m.lanes = board.Assemble(board.Visible(m.prs, m.filter), m.tags, m.assignments, m.archived)
+	m.lanes = board.Grouped(board.Assemble(board.Visible(m.prs, m.filter), m.tags, m.assignments, m.archived), m.grouping, m.titlePattern)
 	cursors := make([]int, len(m.lanes))
 	offsets := make([]int, len(m.lanes))
 	for i, lane := range m.lanes {
 		cursors[i] = max(0, min(cursorOf[lane.Tag.ID], len(lane.PullRequests)-1))
+		if card := slices.IndexFunc(lane.PullRequests, func(pr domain.PullRequest) bool { return pr.ID == selectedOf[lane.Tag.ID] }); card >= 0 {
+			cursors[i] = card
+		}
 		offsets[i] = offsetOf[lane.Tag.ID]
 		if hadFocus && lane.Tag.ID == focused {
 			m.focus = i

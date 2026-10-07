@@ -1,0 +1,57 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjU="
+      },
+      "nodes": [
+        {
+          "id": "PR_node_g1",
+          "number": 1,
+          "title": "SUP-1234 fix login",
+          "updatedAt": "2026-03-04T10:00:00Z",
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo"
+          }
+        },
+        {
+          "id": "PR_node_g2",
+          "number": 2,
+          "title": "Add a health check",
+          "updatedAt": "2026-03-04T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "user-a/sample-repo"
+          }
+        },
+        {
+          "id": "PR_node_g3",
+          "number": 3,
+          "title": "Tidy the build script",
+          "updatedAt": "2026-03-03T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "user-a/moved-repo"
+          }
+        },
+        {
+          "id": "PR_node_g4",
+          "number": 4,
+          "title": "Rename the config loader",
+          "updatedAt": "2026-03-02T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "Octo-Org/sample-repo"
+          }
+        },
+        {
+          "id": "PR_node_g5",
+          "number": 5,
+          "title": "Document the release steps",
+          "updatedAt": "2026-03-01T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "user-a/other-repo"
+          }
+        }
+      ]
+    }
+  }
+}

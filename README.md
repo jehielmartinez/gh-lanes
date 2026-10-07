@@ -84,6 +84,7 @@ always current.
 | `x` | archived | unarchive: put the card back in the lane it was archived from |
 | `t` | everywhere | manage tags |
 | `f` | board, lists | filter: `space` hides or shows an owner's or a repository's PRs everywhere, `enter` `l` `h` expand or collapse an owner, `a` loads all of an owner's repositories |
+| `g` | board, lists | grouping: pick None, Owner, Repository or Title pattern for every tab at once; `e` on Title pattern edits the pattern |
 | `r` | everywhere | refresh now |
 | `o` | board, detail | pick a link to open |
 | `O` | board, detail | open the PR in the browser |
@@ -112,8 +113,8 @@ link to open it in your browser. Hold Shift while dragging to select text.
 
 The directory holds two files:
 
-- **The config file** (YAML) is yours to edit. It holds the refresh interval, your tags and the filter. The
-  tag manager (`t`) and the filter screen (`f`) write it too, and `lanes` reads it again on every start.
+- **The config file** (YAML) is yours to edit. It holds the refresh interval, your tags, the filter and the grouping. The
+  tag manager (`t`), the filter screen (`f`) and the grouping picker (`g`) write it too, and `lanes` reads it again on every start.
 - **The state file** (JSON) is written by the app. It holds which PR is in which lane, the
   archived PRs, and what you last saw of each PR. Don't edit it by hand.
 
@@ -139,6 +140,7 @@ filter:
   repositories:
     octo-org/sample-repo: included
     user-a/noisy-repo: excluded
+grouping: owner
 ```
 
 | Field | Meaning |
@@ -153,11 +155,25 @@ filter:
 | `filter` | Optional. Hides PRs by owner and repository on Board, Review requests and Archived. Without it, everything is shown. |
 | `filter.excluded_owners` | Owners (orgs or users) whose repositories are hidden, including repositories `lanes` hasn't seen yet. |
 | `filter.repositories` | Per-repository choices, as `owner/name: included` or `owner/name: excluded`. A repository's choice always wins over its owner. |
+| `grouping` | Optional. Clusters the cards in each board lane, and in the Review requests and Archived lists, under a header per group: `owner` groups them by owner, `repository` by `owner/name`, `title_pattern` by what `title_pattern` matches in the title. `none`, a missing key or any other value shows no groups. |
+| `title_pattern` | Optional. The regular expression ([Go RE2 syntax](https://github.com/google/re2/wiki/Syntax)) that `title_pattern` grouping matches against PR titles. The default, `[A-Z][A-Z0-9]+-\d+`, matches Jira-style keys like `SUP-1234`. Quote it in single quotes, as in `title_pattern: '#\d+'`. |
 
 Filter names match whatever their capitalisation. Hiding a PR keeps its lane, archive state and
 activity: when it is shown again, it is where you left it, marked if it changed meanwhile. A
 renamed or transferred repository falls back to its owner. `lanes` reads the filter on start, so
 restart it after editing by hand.
+
+Grouping only changes how the cards look: each PR stays in its lane, and lane and tab counts
+don't change.
+Groups are ordered by their most recently updated PR, and names match whatever their
+capitalisation. The status bar says which grouping is on.
+
+With `title_pattern` grouping, the first match in a title names the PR's group, so
+`SUP-\d+|#\d+` puts `SUP-12 fixes #7` under `SUP-12`. PRs whose title doesn't match go in a
+**No match** group, always last. Add `(?i)` to the start of a pattern to match whatever the
+capitalisation. If the pattern doesn't compile, `lanes` uses the default, says why in the status
+bar and leaves the file as it is for you to fix, or to replace from the grouping picker (`g`,
+then `e` on Title pattern), which won't save a pattern that doesn't compile.
 
 The filter screen (`f`) lists your own account first, then every org you belong to and every owner
 with an open PR or a stored choice, most PRs first. An org with no open PRs is listed too, so you can

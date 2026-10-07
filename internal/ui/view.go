@@ -57,6 +57,9 @@ func (m Model) View() tea.View {
 	if m.picker != nil {
 		screen = m.overlay(screen, m.picker.view(m.theme, m.help))
 	}
+	if m.groupingPicker != nil {
+		screen = m.overlay(screen, m.groupingPicker.view(m.theme, m.help))
+	}
 	if m.mergeDialog != nil {
 		screen = m.overlay(screen, m.mergeDialogView())
 	}
@@ -119,18 +122,37 @@ func (m Model) laneHeader(lane board.Lane, focused bool) string {
 	return name + " " + lipgloss.NewStyle().Foreground(m.theme.muted).Render(fmt.Sprint(len(lane.PullRequests)))
 }
 
-// laneView draws a lane's header and the cards in view from offset.
+// laneView draws a lane's header and its rows in view from row offset.
 func (m Model) laneView(lane board.Lane, focused bool, cursor, offset int) string {
 	width := m.laneWidth()
 	rows := []string{m.laneHeader(lane, focused)}
 	if lane.Untagged() && m.loaded && !board.HasOpen(m.lanes) {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.theme.muted).Render("No open pull requests."))
 	}
-	last := min(len(lane.PullRequests), offset+m.cardsInView())
-	for i := offset; i < last; i++ {
-		rows = append(rows, m.cardView(lane.PullRequests[i], width, focused && i == cursor, lane.Dimmed(lane.PullRequests[i])))
+	for _, r := range inView(laneRows(lane), offset, m.laneSpace()) {
+		if r.card == noCard {
+			rows = append(rows, m.groupHeader(lane.Groups[r.group], width))
+			continue
+		}
+		pr := lane.PullRequests[r.card]
+		rows = append(rows, m.cardView(pr, width, focused && r.card == cursor, lane.Dimmed(pr)))
 	}
 	return lipgloss.NewStyle().Width(width).MarginRight(laneGap).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+}
+
+// noMatchName heads the group of cards whose title the title pattern doesn't
+// match.
+const noMatchName = "No match"
+
+// groupHeader is a group's name and card count, as in "octo-org (3)".
+func (m Model) groupHeader(g board.Group, width int) string {
+	size := fmt.Sprintf(" (%d)", g.Size)
+	name := g.Name
+	if g.NoMatch {
+		name = noMatchName
+	}
+	name = truncate(oneLine(name), max(width-lipgloss.Width(size), 1))
+	return lipgloss.NewStyle().Foreground(m.theme.muted).Bold(true).Render(name + size)
 }
 
 func laneColor(t theme, lane board.Lane) color.Color {
@@ -272,6 +294,9 @@ func (m Model) statusView() string {
 		}
 		parts = append(parts, updated)
 	}
+	if m.grouping != domain.GroupingNone {
+		parts = append(parts, muted.Render("grouped by "+groupingName(m.grouping)))
+	}
 	if m.loadingLinks() {
 		parts = append(parts, m.spinner.View()+" "+muted.Render("Loading links…"))
 	}
@@ -301,6 +326,11 @@ func (m Model) statusView() string {
 		parts = append(parts, errStyle.Render(oneLine(m.configErr.Error())))
 	}
 	return strings.Join(parts, muted.Render(statusSeparator))
+}
+
+// groupingName is how the status bar names a grouping.
+func groupingName(g domain.Grouping) string {
+	return strings.ToLower(groupingLabel(g))
 }
 
 // ago says how long ago something happened, to the second under a minute.

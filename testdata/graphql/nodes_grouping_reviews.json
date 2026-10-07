@@ -1,0 +1,109 @@
+{
+  "data": {
+    "nodes": [
+      {
+        "id": "PR_node_r3",
+        "number": 13,
+        "title": "Fix the flaky login test",
+        "url": "https://github.com/octo-org/sample-repo/pull/13",
+        "isDraft": false,
+        "state": "OPEN",
+        "createdAt": "2026-02-01T10:00:00Z",
+        "updatedAt": "2026-03-03T09:00:00Z",
+        "mergedAt": null,
+        "closedAt": null,
+        "author": {
+          "login": "user-b"
+        },
+        "baseRefName": "main",
+        "headRefName": "feature-13",
+        "mergeable": "UNKNOWN",
+        "mergeStateStatus": "UNKNOWN",
+        "reviewDecision": "APPROVED",
+        "viewerCanUpdate": true,
+        "autoMergeRequest": null,
+        "repository": {
+          "nameWithOwner": "octo-org/sample-repo",
+          "mergeCommitAllowed": true,
+          "squashMergeAllowed": true,
+          "rebaseMergeAllowed": false,
+          "autoMergeAllowed": false,
+          "deleteBranchOnMerge": true
+        },
+        "comments": {
+          "totalCount": 0
+        },
+        "reviews": {
+          "totalCount": 1
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "id": "C_node_13",
+                "statusCheckRollup": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "PR_node_r4",
+        "number": 14,
+        "title": "Bump the linter",
+        "url": "https://github.com/user-b/tools-repo/pull/14",
+        "isDraft": false,
+        "state": "OPEN",
+        "createdAt": "2026-02-01T10:00:00Z",
+        "updatedAt": "2026-03-02T09:00:00Z",
+        "mergedAt": null,
+        "closedAt": null,
+        "author": {
+          "login": "user-b"
+        },
+        "baseRefName": "main",
+        "headRefName": "feature-14",
+        "mergeable": "UNKNOWN",
+        "mergeStateStatus": "UNKNOWN",
+        "reviewDecision": "APPROVED",
+        "viewerCanUpdate": true,
+        "autoMergeRequest": null,
+        "repository": {
+          "nameWithOwner": "user-b/tools-repo",
+          "mergeCommitAllowed": true,
+          "squashMergeAllowed": true,
+          "rebaseMergeAllowed": false,
+          "autoMergeAllowed": false,
+          "deleteBranchOnMerge": true
+        },
+        "comments": {
+          "totalCount": 0
+        },
+        "reviews": {
+          "totalCount": 1
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "id": "C_node_14",
+                "statusCheckRollup": null
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-03-05T13:00:00Z"
+    }
+  }
+}

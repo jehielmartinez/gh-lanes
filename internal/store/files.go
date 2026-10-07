@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -48,6 +49,13 @@ type Config struct {
 	// Filter hides repositories' pull requests. A config without one hides
 	// nothing.
 	Filter domain.Filter
+	// Grouping clusters cards into groups. A config without one, or with a
+	// value this build doesn't know, groups nothing.
+	Grouping domain.Grouping
+	// TitlePattern is matched against titles when grouping by title pattern.
+	// It is never nil: a config without one, or with one that doesn't
+	// compile, has the default.
+	TitlePattern *regexp.Regexp
 }
 
 // State is what lanes records on its own about the pull requests it shows.
@@ -69,6 +77,12 @@ type configFile struct {
 	Tags            []tagEntry `yaml:"tags"`
 	// Filter is a pointer so a file without one is saved without one.
 	Filter *filterEntry `yaml:"filter,omitempty"`
+	// Grouping is kept as written, so saving never rewrites a value this
+	// build doesn't know.
+	Grouping string `yaml:"grouping,omitempty"`
+	// TitlePattern is kept as written too, so a pattern that doesn't compile
+	// is still there to fix by hand.
+	TitlePattern string `yaml:"title_pattern,omitempty"`
 }
 
 type filterEntry struct {
@@ -111,11 +125,11 @@ type snapshotEntry struct {
 // LoadConfig reads the config file in dir. On first run, when there is no
 // file yet, it writes one with the default tags and returns that. A setting
 // the file leaves out means the default. Whenever it returns an error the
-// config still carries a usable refresh interval; a *RefreshIntervalError
-// leaves the rest of the config intact, any other error means the file
-// couldn't be used.
+// config still carries a usable refresh interval and title pattern; an error
+// Usable accepts leaves the rest of the config intact, any other error means
+// the file couldn't be used.
 func LoadConfig(dir string) (Config, error) {
-	failed := Config{RefreshInterval: DefaultRefreshInterval}
+	failed := Config{RefreshInterval: DefaultRefreshInterval, TitlePattern: defaultTitlePattern}
 	path := filepath.Join(dir, ConfigFile)
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -139,8 +153,27 @@ func LoadConfig(dir string) (Config, error) {
 	if err != nil {
 		return failed, fmt.Errorf("read config %s: %w", path, err)
 	}
-	interval, err := parseRefreshInterval(file.RefreshInterval)
-	return Config{Tags: tags, RefreshInterval: interval, Filter: filter}, err
+	interval, intervalErr := parseRefreshInterval(file.RefreshInterval)
+	pattern, patternErr := parseTitlePattern(file.TitlePattern)
+	cfg := Config{Tags: tags, RefreshInterval: interval, Filter: filter, Grouping: groupingFromFile(file.Grouping), TitlePattern: pattern}
+	return cfg, errors.Join(intervalErr, patternErr)
+}
+
+// groupingToFile is how the file spells g. None is spelled out, so a saved
+// choice of None reads as one.
+func groupingToFile(g domain.Grouping) string {
+	if g == domain.GroupingNone {
+		return "none"
+	}
+	return string(g)
+}
+
+func groupingFromFile(value string) domain.Grouping {
+	switch g := domain.Grouping(value); g {
+	case domain.GroupingOwner, domain.GroupingRepository, domain.GroupingTitlePattern:
+		return g
+	}
+	return domain.GroupingNone
 }
 
 func filterFromFile(entry *filterEntry) (domain.Filter, error) {
@@ -188,12 +221,12 @@ func writeDefaultConfig(path string) (Config, error) {
 	}
 	raw, err := yaml.Marshal(file)
 	if err != nil {
-		return Config{RefreshInterval: DefaultRefreshInterval}, fmt.Errorf("encode default config: %w", err)
+		return Config{RefreshInterval: DefaultRefreshInterval, TitlePattern: defaultTitlePattern}, fmt.Errorf("encode default config: %w", err)
 	}
 	if err := writeAtomic(path, raw); err != nil {
-		return Config{RefreshInterval: DefaultRefreshInterval}, fmt.Errorf("write default config: %w", err)
+		return Config{RefreshInterval: DefaultRefreshInterval, TitlePattern: defaultTitlePattern}, fmt.Errorf("write default config: %w", err)
 	}
-	return Config{Tags: append([]domain.Tag(nil), defaultTags...), RefreshInterval: DefaultRefreshInterval}, nil
+	return Config{Tags: append([]domain.Tag(nil), defaultTags...), RefreshInterval: DefaultRefreshInterval, TitlePattern: defaultTitlePattern}, nil
 }
 
 func tagsFromFile(entries []tagEntry) ([]domain.Tag, error) {
@@ -214,11 +247,23 @@ func tagsFromFile(entries []tagEntry) ([]domain.Tag, error) {
 	return tags, nil
 }
 
-// SaveConfig replaces the tags and the filter in the config file in dir,
-// atomically, and keeps every other setting as the file has it. A filter that
-// hides nothing is left out of the file. It refuses to touch a file it can't
-// read, so a hand edit it doesn't understand is never overwritten.
-func SaveConfig(dir string, tags []domain.Tag, filter domain.Filter) error {
+// ConfigEdit is what SaveConfig writes. Tags and Filter always replace the
+// file's. Grouping and TitlePattern replace the file's only when set, so a
+// setting the user never changed is kept as written, even one that doesn't
+// read back.
+type ConfigEdit struct {
+	Tags         []domain.Tag
+	Filter       domain.Filter
+	Grouping     *domain.Grouping
+	TitlePattern *string
+}
+
+// SaveConfig writes edit to the config file in dir, atomically, and keeps
+// every other setting as the file has it. A filter that hides nothing is left
+// out of the file. It refuses to touch a file it can't read, so a hand edit it
+// doesn't understand is never overwritten, and to save a title pattern that
+// doesn't compile.
+func SaveConfig(dir string, edit ConfigEdit) error {
 	path := filepath.Join(dir, ConfigFile)
 	file := configFile{Version: configVersion}
 	raw, err := os.ReadFile(path)
@@ -234,14 +279,23 @@ func SaveConfig(dir string, tags []domain.Tag, filter domain.Filter) error {
 			return fmt.Errorf("read config %s: unsupported version %d (want %d)", path, file.Version, configVersion)
 		}
 	}
-	file.Tags = make([]tagEntry, len(tags))
-	for i, t := range tags {
+	if edit.TitlePattern != nil {
+		if _, err := domain.CompileTitlePattern(*edit.TitlePattern); err != nil {
+			return fmt.Errorf("save title_pattern: %w", err)
+		}
+		file.TitlePattern = *edit.TitlePattern
+	}
+	if edit.Grouping != nil {
+		file.Grouping = groupingToFile(*edit.Grouping)
+	}
+	file.Tags = make([]tagEntry, len(edit.Tags))
+	for i, t := range edit.Tags {
 		file.Tags[i] = tagEntry(t)
 	}
 	if _, err := tagsFromFile(file.Tags); err != nil {
 		return fmt.Errorf("save tags: %w", err)
 	}
-	file.Filter = filterToFile(filter)
+	file.Filter = filterToFile(edit.Filter)
 	out, err := yaml.Marshal(file)
 	if err != nil {
 		return fmt.Errorf("encode config: %w", err)

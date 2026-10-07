@@ -19,6 +19,7 @@ type keyMap struct {
 	MoveTo    key.Binding
 	Tags      key.Binding
 	Filter    key.Binding
+	Grouping  key.Binding
 	Open      key.Binding
 	Archive   key.Binding
 	Unarchive key.Binding
@@ -67,6 +68,7 @@ func newKeyMap() keyMap {
 		MoveTo:       key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "move to…")),
 		Tags:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tags")),
 		Filter:       key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "filter")),
+		Grouping:     key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "grouping")),
 		Open:         key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Archive:      key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "archive")),
 		Unarchive:    key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "unarchive")),
@@ -106,14 +108,14 @@ func (k keyMap) withFullHelp(showAll bool) keyMap {
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open, k.MoveTo, k.NextTab, k.Help, k.Quit}
+	return []key.Binding{k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open, k.MoveTo, k.Grouping, k.NextTab, k.Help, k.Quit}
 }
 
 // FullHelp lists every binding on the board.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.NextTab, k.PrevTab, k.LaneLeft, k.LaneRight, k.CardUp, k.CardDown, k.Open},
-		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Filter, k.Archive},
+		{k.MoveLeft, k.MoveRight, k.MoveTo, k.Tags, k.Filter, k.Grouping, k.Archive},
 		{k.Links, k.Browser, k.UpdateBranch, k.RebaseBranch, k.Draft, k.Merge},
 		{k.Refresh, k.Help, k.Quit},
 	}
@@ -164,6 +166,17 @@ func (k pickerKeys) ShortHelp() []key.Binding {
 
 func (k pickerKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
+}
+
+// groupingPickerKeys are the grouping picker's bindings besides a picker's.
+type groupingPickerKeys struct {
+	Edit key.Binding
+}
+
+func newGroupingPickerKeys() groupingPickerKeys {
+	return groupingPickerKeys{
+		Edit: key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit pattern")),
+	}
 }
 
 // tagManagerKeys are the bindings in the tag manager's list.

@@ -1,0 +1,21 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjY="
+      },
+      "nodes": [
+        {
+          "id": "PR_node_t7",
+          "number": 37,
+          "title": "\u001b]0;pwned\u0007OPS\u001b[2J-7\u009b31m fix the banner",
+          "updatedAt": "2026-03-01T09:00:00Z",
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo"
+          }
+        }
+      ]
+    }
+  }
+}

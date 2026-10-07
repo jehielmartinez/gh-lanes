@@ -2,6 +2,7 @@ package ui
 
 import (
 	"math"
+	"regexp"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -15,12 +16,16 @@ import (
 // than this is harder to read, not easier.
 const listWidth = 2 * maxLaneWidth
 
-// cardList is one column of cards, most recently updated first, with a
-// selection and a scroll offset: the review requests and archived tabs.
+// cardList is one column of cards, most recently updated first or clustered
+// into the groups of its grouping, with a selection and a scroll offset: the
+// review requests and archived tabs.
 type cardList struct {
-	prs    []domain.PullRequest
-	cursor int
-	offset int
+	prs          []domain.PullRequest
+	grouping     domain.Grouping
+	titlePattern *regexp.Regexp
+	groups       []board.Group
+	cursor       int
+	offset       int
 }
 
 func (l cardList) selected() (domain.PullRequest, bool) {
@@ -35,11 +40,13 @@ func (l cardList) withCursor(index int) cardList {
 	return l
 }
 
-// withPRs replaces the cards, most recently updated first, keeping the
+// withPRs replaces the cards, the grouping and the title pattern, keeping the
 // selection on the pull request it was on.
-func (l cardList) withPRs(prs []domain.PullRequest) cardList {
+func (l cardList) withPRs(prs []domain.PullRequest, grouping domain.Grouping, titlePattern *regexp.Regexp) cardList {
 	selected, hadSelection := l.selected()
-	l.prs = board.ByUpdated(prs)
+	l.grouping = grouping
+	l.titlePattern = titlePattern
+	l.prs, l.groups = board.GroupCards(board.ByUpdated(prs), grouping, titlePattern)
 	l = l.withCursor(l.cursor)
 	if !hadSelection {
 		return l
@@ -56,16 +63,16 @@ func (l cardList) withPRs(prs []domain.PullRequest) cardList {
 func (l cardList) withCopy(pr domain.PullRequest) cardList {
 	for _, have := range l.prs {
 		if have.ID == pr.ID {
-			return l.withPRs(replaced(l.prs, pr))
+			return l.withPRs(replaced(l.prs, pr), l.grouping, l.titlePattern)
 		}
 	}
 	return l
 }
 
-// scrolled moves the offset just far enough to show the selection, size
-// cards at a time.
-func (l cardList) scrolled(size int) cardList {
-	l.offset = window(l.offset, l.cursor, size, len(l.prs))
+// scrolled moves the offset just far enough to show the selection in space
+// lines.
+func (l cardList) scrolled(space int) cardList {
+	l.offset = scrollTo(l.rows(), l.offset, l.cursor, space)
 	return l
 }
 
@@ -123,45 +130,42 @@ func (m Model) listColumnWidth() int {
 	return max(minLaneWidth, min(listWidth, m.width))
 }
 
-// listCardsInView is how many cards of a list show at once; always at least
-// one.
-func (m Model) listCardsInView() int {
+// listSpace is the lines a card list has for its rows.
+func (m Model) listSpace() int {
 	if m.height == 0 {
 		return math.MaxInt32
 	}
-	return max(1, m.boardHeight()/cardHeight)
+	return m.boardHeight()
 }
 
-// listView draws the cards of l in view from its scroll offset, or note
+// listView draws the rows of l in view from its scroll offset, or note
 // when there are none.
 func (m Model) listView(l cardList, note string) string {
 	if note != "" {
 		return lipgloss.NewStyle().Foreground(m.theme.muted).Render(note)
 	}
 	width := m.listColumnWidth()
-	var rows []string
-	last := min(len(l.prs), l.offset+m.listCardsInView())
-	for i := l.offset; i < last; i++ {
-		rows = append(rows, m.cardView(l.prs[i], width, i == l.cursor, false))
+	var lines []string
+	for _, r := range inView(l.rows(), l.offset, m.listSpace()) {
+		if r.card == noCard {
+			lines = append(lines, m.groupHeader(l.groups[r.group], width))
+			continue
+		}
+		lines = append(lines, m.cardView(l.prs[r.card], width, r.card == l.cursor, false))
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
 // listCardAt is the index of the card in l drawn at screen cell x, y.
 func (m Model) listCardAt(l cardList, x, y int) (int, bool) {
 	y -= tabBarLines
-	if x < 0 || x >= m.listColumnWidth() || y < 0 {
+	if x < 0 || x >= m.listColumnWidth() {
 		return 0, false
 	}
 	if height := m.boardHeight(); height > 0 && y >= height {
 		return 0, false
 	}
-	row := y / cardHeight
-	card := l.offset + row
-	if row >= m.listCardsInView() || card >= len(l.prs) {
-		return 0, false
-	}
-	return card, true
+	return cardAtLine(l.rows(), l.offset, m.listSpace(), y)
 }
 
 // clickList selects the card under a left click, and opens it on a double
@@ -177,7 +181,7 @@ func (m Model) clickList(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	return m.clickedCard(l.prs[card])
 }
 
-// listWheeled scrolls the list by one card, taking the selection along so it
+// listWheeled scrolls the list by one row, taking the selection along so it
 // stays in view.
 func (m Model) listWheeled(msg tea.MouseWheelMsg) Model {
 	l := m.list(m.tab)
@@ -185,7 +189,7 @@ func (m Model) listWheeled(msg tea.MouseWheelMsg) Model {
 	if _, ok := m.listCardAt(l, msg.X, msg.Y); !ok || delta == 0 {
 		return m
 	}
-	size := m.listCardsInView()
-	l.offset = max(0, min(l.offset+delta, len(l.prs)-size))
-	return m.withList(m.tab, l.withCursor(max(l.offset, min(l.cursor, l.offset+size-1))))
+	var cursor int
+	l.offset, cursor = wheel(l.rows(), l.offset, l.cursor, m.listSpace(), delta)
+	return m.withList(m.tab, l.withCursor(cursor))
 }

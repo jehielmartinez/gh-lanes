@@ -18,6 +18,9 @@ type Lane struct {
 	// Tag is the lane's tag. The Untagged lane has a tag with an empty ID.
 	Tag          domain.Tag
 	PullRequests []domain.PullRequest
+	// Groups split PullRequests, in order, into the groups of the board's
+	// grouping. It is nil when the grouping is None.
+	Groups []Group
 }
 
 // Untagged reports whether this is the Untagged lane.

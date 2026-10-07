@@ -67,3 +67,53 @@ func (c *Client) ViewerOrganizations(ctx context.Context) ([]string, error) {
 		after = &orgs.PageInfo.EndCursor
 	}
 }
+
+// ownerRepositoriesPageSize is the most repositories GitHub returns in one
+// page.
+const ownerRepositoriesPageSize = 100
+
+// repositoryOwner covers both users and organizations, so one query serves
+// every owner the filter screen lists. ownerAffiliations defaults to OWNER and
+// COLLABORATOR, which for a user would add other owners' repositories.
+const ownerRepositoriesQuery = `query OwnerRepositories($login: String!, $first: Int!, $after: String) {
+  repositoryOwner(login: $login) {
+    repositories(first: $first, after: $after, ownerAffiliations: [OWNER], orderBy: {field: NAME, direction: ASC}) {
+      pageInfo { hasNextPage endCursor }
+      nodes { nameWithOwner }
+    }
+  }
+}`
+
+type ownerRepositoriesResponse struct {
+	RepositoryOwner *struct {
+		Repositories struct {
+			PageInfo pageInfo
+			Nodes    []struct{ NameWithOwner string }
+		}
+	}
+}
+
+// OwnerRepositories returns every repository of the user or organization
+// named login, as owner/name, that the viewer can see.
+func (c *Client) OwnerRepositories(ctx context.Context, login string) ([]string, error) {
+	var repos []string
+	var after *string
+	for {
+		var resp ownerRepositoriesResponse
+		vars := map[string]any{"login": login, "first": ownerRepositoriesPageSize, "after": after}
+		if err := c.do(ctx, ownerRepositoriesQuery, vars, &resp); err != nil {
+			return nil, fmt.Errorf("load %s's repositories: %w", login, err)
+		}
+		if resp.RepositoryOwner == nil {
+			return nil, fmt.Errorf("load %s's repositories: no such account on GitHub", login)
+		}
+		page := resp.RepositoryOwner.Repositories
+		for _, n := range page.Nodes {
+			repos = append(repos, n.NameWithOwner)
+		}
+		if !page.PageInfo.HasNextPage || page.PageInfo.EndCursor == "" {
+			return repos, nil
+		}
+		after = &page.PageInfo.EndCursor
+	}
+}

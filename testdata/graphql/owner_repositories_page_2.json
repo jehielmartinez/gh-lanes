@@ -1,0 +1,16 @@
+{
+  "data": {
+    "repositoryOwner": {
+      "repositories": {
+        "pageInfo": { "hasNextPage": false, "endCursor": "Y3Vyc29yOjEw" },
+        "nodes": [
+          { "nameWithOwner": "octo-org/kappa-repo" },
+          { "nameWithOwner": "octo-org/lambda-repo" },
+          { "nameWithOwner": "octo-org/omega-repo" },
+          { "nameWithOwner": "octo-org/tools-repo" },
+          { "nameWithOwner": "octo-org/zeta-repo" }
+        ]
+      }
+    }
+  }
+}

@@ -213,7 +213,9 @@ type filterKeys struct {
 	Fold     key.Binding
 	Expand   key.Binding
 	Collapse key.Binding
-	Close    key.Binding
+	// Load loads every repository of the selected row's owner.
+	Load  key.Binding
+	Close key.Binding
 }
 
 func newFilterKeys() filterKeys {
@@ -224,12 +226,13 @@ func newFilterKeys() filterKeys {
 		Fold:     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter/l/h", "expand/collapse")),
 		Expand:   key.NewBinding(key.WithKeys("l", "right")),
 		Collapse: key.NewBinding(key.WithKeys("h", "left")),
+		Load:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "load all repos")),
 		Close:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 	}
 }
 
 func (k filterKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Toggle, k.Fold, k.Close}
+	return []key.Binding{k.Up, k.Down, k.Toggle, k.Fold, k.Load, k.Close}
 }
 
 func (k filterKeys) FullHelp() [][]key.Binding {

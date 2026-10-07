@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/exp/teatest/v2"
+
+	"github.com/jehielmartinez/gh-lanes/internal/github/githubtest"
 )
 
 // Cards are four lines inside a border, so a terminal 9 rows tall, plus the
@@ -232,4 +234,84 @@ func (h *harness) clickText(text string) {
 		h.t.Fatalf("%q is not on screen", text)
 	}
 	h.click(x, y)
+}
+
+func TestClickingACardInAScrolledLaneSelectsThatCard(t *testing.T) {
+	h := startBoard(t, withTermSize(defaultTermWidth, twoCardsHeight))
+
+	h.press("j")
+	h.press("j")
+	h.waitForScreen("the lane scrolled one card", func(s string) bool {
+		return strings.Contains(s, "#1234") && !strings.Contains(s, "#42")
+	})
+	h.clickText("#7")
+	h.press("L")
+	h.waitForAssignments(map[string]string{olderPR: "in-progress"})
+}
+
+// The long review list holds six requests, newest first: #31 to #36 of
+// octo-org/sample-repo.
+func startLongReviewList(t *testing.T, opts ...harnessOption) *harness {
+	t.Helper()
+	transport := githubtest.New()
+	transport.ReplyFixture(t, "SearchPullRequests", fixture("search_board.json"))
+	replyReviewRequests(t, transport, "search_merge.json")
+	h := newHarness(t, transport, opts...)
+	h.waitForText("Review requests 6")
+	h.press("tab")
+	h.waitForText("octo-org/sample-repo#31")
+	return h
+}
+
+func TestLongReviewListScrollsToKeepTheSelectedCardVisible(t *testing.T) {
+	h := startLongReviewList(t, withTermSize(defaultTermWidth, twoCardsHeight))
+
+	screen := h.screen.plain()
+	if !onScreen(screen, "octo-org/sample-repo#32") || onScreen(screen, "octo-org/sample-repo#33") {
+		t.Fatalf("only the first two cards should fit:\n%s", screen)
+	}
+
+	h.press("j")
+	h.press("j")
+	screen = h.waitForScreen("the list scrolled one card", func(s string) bool {
+		return onScreen(s, "octo-org/sample-repo#33") && !onScreen(s, "octo-org/sample-repo#31")
+	})
+
+	h.press("k")
+	h.press("k")
+	h.waitForScreen("the first card back", func(s string) bool {
+		return onScreen(s, "octo-org/sample-repo#31") && !onScreen(s, "octo-org/sample-repo#33")
+	})
+}
+
+func TestClickingACardInAScrolledReviewListSelectsThatCard(t *testing.T) {
+	h := startLongReviewList(t, withTermSize(defaultTermWidth, twoCardsHeight))
+
+	h.press("j")
+	h.press("j")
+	h.waitForScreen("the list scrolled one card", func(s string) bool {
+		return onScreen(s, "octo-org/sample-repo#33") && !onScreen(s, "octo-org/sample-repo#31")
+	})
+	h.clickText("octo-org/sample-repo#32")
+	h.press("enter")
+	reqs := h.waitForDetailRequests(1)
+	if got := reqs[0].Variables["id"]; got != "PR_node_pending" {
+		t.Errorf("detail fetched for %v, want the clicked review request", got)
+	}
+}
+
+func TestWheelScrollsTheReviewListAndTakesTheSelectionAlong(t *testing.T) {
+	h := startLongReviewList(t, withTermSize(defaultTermWidth, twoCardsHeight))
+	x, y, _ := locate(h.screen.plain(), "octo-org/sample-repo#31")
+
+	h.wheel(x, y, true)
+	h.wheel(x, y, true)
+	h.waitForScreen("the list scrolled two cards", func(s string) bool {
+		return onScreen(s, "octo-org/sample-repo#34") && !onScreen(s, "octo-org/sample-repo#32")
+	})
+	h.press("enter")
+	reqs := h.waitForDetailRequests(1)
+	if got := reqs[0].Variables["id"]; got != "PR_node_auto" {
+		t.Errorf("detail fetched for %v, want the first card left in view", got)
+	}
 }

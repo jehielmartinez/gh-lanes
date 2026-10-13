@@ -14,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jehielmartinez/gh-lanes/internal/browser"
+	"github.com/jehielmartinez/gh-lanes/internal/clipboard"
 	"github.com/jehielmartinez/gh-lanes/internal/github"
 	"github.com/jehielmartinez/gh-lanes/internal/store"
 	"github.com/jehielmartinez/gh-lanes/internal/ui"
@@ -54,7 +55,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	app := ui.New(ui.Options{GitHub: client, ConfigDir: dir, Now: time.Now, After: time.After, Open: browser.Open})
+	app := ui.New(ui.Options{GitHub: client, ConfigDir: dir, Now: time.Now, After: time.After, Open: browser.Open, Copy: clipboard.Copy})
 	if _, err := tea.NewProgram(app).Run(); err != nil {
 		fmt.Fprintf(stderr, "lanes: %v\n", err)
 		return 1

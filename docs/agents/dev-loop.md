@@ -44,6 +44,7 @@ The spec defines one seam, and every behaviour is tested through it:
 - a temporary config directory, seeded and read back to assert on the config YAML and state JSON
 - a controllable clock with a fixed timezone, for refresh ticks, relative ages and local-time formatting
 - a fake URL opener, for link clicks and `O`, asserting on the URL it received
+- a fake clipboard, for `y`, asserting on the URL it received and able to fail so the OSC 52 fallback runs
 
 ## Overrides
 

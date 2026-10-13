@@ -68,6 +68,9 @@ type Options struct {
 	// Open opens a URL in the browser. It is only ever given http and https
 	// URLs.
 	Open func(url string) error
+	// Copy puts text on the system clipboard. When it fails, the text is sent
+	// to the terminal clipboard instead.
+	Copy func(text string) error
 }
 
 // Model is the root model of the app.
@@ -451,6 +454,9 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if key.Matches(msg, m.keys.Browser) {
 			return m.openPullRequest()
 		}
+		if key.Matches(msg, m.keys.Copy) {
+			return m.copyPullRequest()
+		}
 		if m.detail != nil {
 			return m.detailKey(msg)
 		}
@@ -533,6 +539,8 @@ func (m Model) update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.err != nil {
 			m.linkErr = &linkFailure{action: openFailed, err: msg.err}
 		}
+	case copiedMsg:
+		return m.copied(msg)
 	case actionDoneMsg:
 		return m.actionDone(msg)
 	case prRefreshedMsg:

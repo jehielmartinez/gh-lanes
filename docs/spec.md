@@ -213,6 +213,8 @@ means leaving the terminal and clicking through the web UI for each PR.
     mouse support is on.
 70. As a developer, I want a key to open the PR itself in the browser, so that I can go to GitHub
     when I need the full UI.
+70a. As a developer, I want a key to copy the highlighted PR's URL, so that I can paste it into
+    chat, tickets or notes without opening the browser.
 
 ### Actions
 
@@ -398,6 +400,7 @@ comments. Any connection reporting more pages is paged through. `UNKNOWN` mergea
 | Ready for review | `markPullRequestReadyForReview` | Drafts only. |
 | Convert to draft | `convertPullRequestToDraft` | Non-drafts only, confirms. |
 | Open in browser / open link | none | OS opener (`open` on macOS, `xdg-open` on Linux). |
+| Copy link | none | The PR's URL only. OS clipboard tool first, OSC 52 as the fallback. |
 
 Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 
@@ -428,6 +431,11 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
   use a lightweight custom one.
 - Before opening, a URL is checked to have an `http` or `https` scheme, and is passed to the OS
   opener as one argument, never through a shell. PR content is untrusted input.
+- `y` copies the PR's own URL, never a link from its content. It goes to the OS clipboard tool on
+  stdin, never as an argument and never through a shell: `pbcopy` on macOS; on Linux `wl-copy`
+  under Wayland, then `xclip`, then `xsel`. The status bar says "Copied <url>". With no tool, or if the tool fails, the
+  URL is sent to the terminal clipboard with OSC 52 instead, and the status bar says "Sent <url> to
+  terminal clipboard", since the terminal never confirms it. `y` does nothing in the link picker.
 
 ### Keybindings
 
@@ -447,6 +455,7 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 | `r` | global | refresh now |
 | `o` | board, lists, modal | link picker |
 | `O` | board, lists, modal | open PR in browser |
+| `y` | board, lists, modal | copy PR URL |
 | `u` / `U` | board, modal | update branch (merge / rebase) |
 | `M` | board, modal | merge dialog |
 | `d` | board, modal | toggle draft ↔ ready |

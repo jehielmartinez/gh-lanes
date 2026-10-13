@@ -213,3 +213,33 @@ func (m Model) openPullRequest() (Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+// copiedMsg is the system clipboard's verdict on a copied URL.
+type copiedMsg struct {
+	url string
+	err error
+}
+
+// copyPullRequest copies the URL of the modal's pull request, or the selected
+// card's on the tab in view, off the UI thread.
+func (m Model) copyPullRequest() (Model, tea.Cmd) {
+	pr, ok := m.actionTarget()
+	if !ok {
+		return m, nil
+	}
+	copyText, url := m.opts.Copy, pr.URL
+	return m, func() tea.Msg { return copiedMsg{url: url, err: copyText(url)} }
+}
+
+// copied reports the copy, falling back to the terminal clipboard when the
+// system one failed.
+func (m Model) copied(msg copiedMsg) (Model, tea.Cmd) {
+	if msg.err == nil {
+		m.toast = toast{text: "Copied " + msg.url, until: m.now.Add(toastDuration)}
+		return m, nil
+	}
+	// The terminal never says whether OSC 52 landed, so this can't claim it
+	// was copied.
+	m.toast = toast{text: "Sent " + msg.url + " to terminal clipboard", until: m.now.Add(toastDuration)}
+	return m, tea.SetClipboard(msg.url)
+}

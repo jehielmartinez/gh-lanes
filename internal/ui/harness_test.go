@@ -52,8 +52,8 @@ func isReviewSearch(r githubtest.Request) bool {
 var fixedZone = time.FixedZone("UTC-5", -5*60*60)
 
 // harness is the one test seam: the real root model under teatest, the fake
-// GraphQL transport, a temporary config directory, a controllable clock and
-// a fake URL opener.
+// GraphQL transport, a temporary config directory, a controllable clock, a
+// fake URL opener and a fake clipboard.
 type harness struct {
 	t         *testing.T
 	tm        *teatest.TestModel
@@ -62,6 +62,7 @@ type harness struct {
 	clock     *clock
 	screen    *screen
 	opener    *opener
+	clipboard *clipboard
 }
 
 type harnessOption func(*harnessConfig)
@@ -72,11 +73,18 @@ type harnessConfig struct {
 	config        string
 	width, height int
 	openErr       error
+	copyErr       error
 }
 
 // withOpenError makes every attempt to open a URL fail with err.
 func withOpenError(err error) harnessOption {
 	return func(c *harnessConfig) { c.openErr = err }
+}
+
+// withCopyError makes every attempt to copy to the system clipboard fail
+// with err.
+func withCopyError(err error) harnessOption {
+	return func(c *harnessConfig) { c.copyErr = err }
 }
 
 // withTermSize starts the app in a terminal of the given size.
@@ -138,8 +146,9 @@ func newHarness(t *testing.T, transport *githubtest.Transport, opts ...harnessOp
 		clock:     &clock{now: time.Date(2026, 3, 5, 12, 0, 0, 0, fixedZone)},
 		screen:    &screen{},
 		opener:    &opener{err: cfg.openErr},
+		clipboard: &clipboard{err: cfg.copyErr},
 	}
-	root := ui.New(ui.Options{GitHub: client, ConfigDir: h.configDir, Now: h.clock.Now, After: h.clock.After, Open: h.opener.Open})
+	root := ui.New(ui.Options{GitHub: client, ConfigDir: h.configDir, Now: h.clock.Now, After: h.clock.After, Open: h.opener.Open, Copy: h.clipboard.Copy})
 	h.tm = teatest.NewTestModel(t, spy{inner: root, screen: h.screen}, teatest.WithInitialTermSize(cfg.width, cfg.height))
 	// Quitting the way a user does lets in-flight writes land before the
 	// config directory is removed.
@@ -540,5 +549,34 @@ func (h *harness) waitForOpened(want ...string) {
 	h.t.Helper()
 	h.waitFor(fmt.Sprintf("the opener to receive %q", want), func() bool {
 		return slices.Equal(h.opener.opened(), want)
+	})
+}
+
+// clipboard is the fake system clipboard: it records every text the app asks
+// to copy.
+type clipboard struct {
+	mu    sync.Mutex
+	texts []string
+	err   error
+}
+
+func (c *clipboard) Copy(text string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.texts = append(c.texts, text)
+	return c.err
+}
+
+func (c *clipboard) copied() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.texts...)
+}
+
+// waitForCopied waits until the app has asked to copy exactly want, in order.
+func (h *harness) waitForCopied(want ...string) {
+	h.t.Helper()
+	h.waitFor(fmt.Sprintf("the clipboard to receive %q", want), func() bool {
+		return slices.Equal(h.clipboard.copied(), want)
 	})
 }

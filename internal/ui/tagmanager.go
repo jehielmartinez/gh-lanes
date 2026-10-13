@@ -276,8 +276,7 @@ func (tm tagManager) listRows(t theme, lanes []board.Lane) []string {
 			marker, style = "› ", style.Bold(true).Foreground(t.accent)
 		}
 		swatch := lipgloss.NewStyle().Foreground(laneColor(t, lane)).Render("●")
-		name := style.Render(oneLine(lane.Tag.Name))
-		name += strings.Repeat(" ", nameWidth-lipgloss.Width(oneLine(lane.Tag.Name)))
+		name := padRight(style.Render(oneLine(lane.Tag.Name)), nameWidth)
 		row := marker + swatch + " " + name + "  " + lipgloss.NewStyle().Foreground(t.muted).Render(fmt.Sprint(len(lane.PullRequests)))
 		if lane.Tag.Terminal {
 			row += "  " + lipgloss.NewStyle().Foreground(t.muted).Render("terminal")

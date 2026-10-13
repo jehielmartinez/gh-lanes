@@ -1,0 +1,77 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+      },
+      "nodes": [
+        {
+          "id": "PR_node_requested_of_you",
+          "number": 44,
+          "title": "Cache the schema lookups",
+          "url": "https://github.com/octo-org/sample-repo/pull/44",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-05T14:00:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-b"
+          },
+          "baseRefName": "main",
+          "headRefName": "feature-44",
+          "mergeable": "MERGEABLE",
+          "mergeStateStatus": "BLOCKED",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "viewerCanUpdate": true,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": false,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 0
+          },
+          "reviews": {
+            "totalCount": 0
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "__typename": "User",
+                  "login": "user-a",
+                  "isViewer": true
+                }
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_node_44",
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4980,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

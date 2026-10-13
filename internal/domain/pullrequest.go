@@ -44,6 +44,8 @@ type PullRequest struct {
 	CommentCount  int
 	ReviewCount   int
 	LatestReviews []Review
+	// ReviewRequests are the reviewers asked for a review not yet submitted.
+	ReviewRequests []Identity
 
 	// Conversation is filled only by the detail query; the board's search
 	// leaves it empty.
@@ -144,21 +146,31 @@ const (
 )
 
 // Review is one review a reviewer submitted. Its Body is filled only by the
-// detail query.
+// detail query's conversation, and AuthorIsViewer only by the pull request's
+// latest reviews.
 type Review struct {
-	Author      string
-	State       string
-	Body        string
-	SubmittedAt time.Time
+	Author         string
+	AuthorIsViewer bool
+	State          ReviewState
+	Body           string
+	SubmittedAt    time.Time
 }
+
+// ReviewState is the state GitHub reports for a submitted review.
+type ReviewState string
 
 // The review states GitHub reports for a submitted review.
 const (
-	ReviewStateApproved         = "APPROVED"
-	ReviewStateChangesRequested = "CHANGES_REQUESTED"
-	ReviewStateCommented        = "COMMENTED"
-	ReviewStateDismissed        = "DISMISSED"
+	ReviewStateApproved         ReviewState = "APPROVED"
+	ReviewStateChangesRequested ReviewState = "CHANGES_REQUESTED"
+	ReviewStateCommented        ReviewState = "COMMENTED"
+	ReviewStateDismissed        ReviewState = "DISMISSED"
 )
+
+// TakesSide reports whether the review approves the merge or blocks it.
+func (s ReviewState) TakesSide() bool {
+	return s == ReviewStateApproved || s == ReviewStateChangesRequested
+}
 
 // MergeStatus is the one-glance answer to "can this merge as it stands?".
 type MergeStatus int

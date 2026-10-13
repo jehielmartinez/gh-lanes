@@ -266,7 +266,7 @@ func (m Model) detailContent(width int) (page, [sectionCount]int) {
 		return text(
 			wrap.Render(indented(1, m.mergeLine(pr))),
 			wrap.Render(indented(1, m.reviewLine(pr.ReviewDecision)+muted.Render(statusSeparator)+"Auto-merge "+m.autoMergeLine(pr.AutoMerge))),
-		)
+		).then(m.rollCallLines(pr, width))
 	})
 	add(sectionChecks, checkSummary(pr.Checks), func() page { return m.checkLines(pr.Checks, width) })
 	// The board's copy carries no conversation, so these wait for the
@@ -322,11 +322,15 @@ func (m Model) mergeLine(pr domain.PullRequest) string {
 
 func (m Model) reviewLine(decision domain.ReviewDecision) string {
 	style := func(c color.Color, s string) string { return lipgloss.NewStyle().Foreground(c).Render(s) }
+	verdict := func(state domain.ReviewState) string {
+		label, glyph, c := m.verdictLook(state)
+		return style(c, glyph) + " " + capitalized(label)
+	}
 	switch decision {
 	case domain.ReviewApproved:
-		return style(m.theme.success, "✓") + " Approved"
+		return verdict(domain.ReviewStateApproved)
 	case domain.ReviewChangesRequested:
-		return style(m.theme.failure, "✗") + " Changes requested"
+		return verdict(domain.ReviewStateChangesRequested)
 	case domain.ReviewRequired:
 		return style(m.theme.pending, "●") + " Review required"
 	}

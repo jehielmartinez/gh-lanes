@@ -97,7 +97,7 @@ func (c *Client) SearchPullRequests(ctx context.Context, query string) ([]domain
 	for range maxSearchPages {
 		var resp searchResponse
 		vars := map[string]any{"query": query, "first": searchPageSize, "after": after}
-		if err := c.do(ctx, searchPullRequestsQuery, vars, &resp); err != nil {
+		if err := tolerate(c.do(ctx, searchPullRequestsQuery, vars, &resp), hiddenReviewer); err != nil {
 			return nil, domain.RateLimit{}, fmt.Errorf("search pull requests: %w", err)
 		}
 		limit = resp.toDomain()
@@ -148,9 +148,8 @@ func (c *Client) PullRequestsByID(ctx context.Context, ids []string) ([]domain.P
 	var limit domain.RateLimit
 	for batch := range slices.Chunk(ids, nodesBatchSize) {
 		var resp nodesResponse
-		err := c.do(ctx, pullRequestsByIDQuery, map[string]any{"ids": batch}, &resp)
-		var gqlErr *api.GraphQLError
-		if err != nil && !(errors.As(err, &gqlErr) && gqlErr.Match("NOT_FOUND", "nodes.")) {
+		err := tolerate(c.do(ctx, pullRequestsByIDQuery, map[string]any{"ids": batch}, &resp), missingNode, hiddenReviewer)
+		if err != nil {
 			return nil, domain.RateLimit{}, fmt.Errorf("fetch pull requests by id: %w", err)
 		}
 		limit = latest(limit, resp.toDomain())
@@ -162,6 +161,33 @@ func (c *Client) PullRequestsByID(ctx context.Context, ids []string) ([]domain.P
 		limit = latest(limit, l)
 	}
 	return prs, limit, nil
+}
+
+// tolerate returns err, or nil when it is GraphQL errors that each pass one
+// of the checks, so the data that came with them is used.
+func tolerate(err error, ok ...func(api.GraphQLErrorItem) bool) error {
+	var gqlErr *api.GraphQLError
+	if !errors.As(err, &gqlErr) {
+		return err
+	}
+	for _, e := range gqlErr.Errors {
+		if !slices.ContainsFunc(ok, func(f func(api.GraphQLErrorItem) bool) bool { return f(e) }) {
+			return err
+		}
+	}
+	return nil
+}
+
+// missingNode is an ID in a nodes query that no longer resolves.
+func missingNode(e api.GraphQLErrorItem) bool {
+	return e.Type == "NOT_FOUND" && len(e.Path) > 0 && e.Path[0] == "nodes"
+}
+
+// hiddenReviewer is GitHub refusing to show who a review was requested of, as
+// it does for a team the login can't see; that reviewer comes back null and
+// the rest of the pull request is good.
+func hiddenReviewer(e api.GraphQLErrorItem) bool {
+	return (e.Type == "FORBIDDEN" || e.Type == "NOT_FOUND") && slices.Contains(e.Path, any("reviewRequests"))
 }
 
 // toDomain maps pull request nodes into domain values, paging through the
@@ -208,7 +234,7 @@ var ErrPullRequestNotFound = errors.New("pull request not found")
 // its whole conversation, along with the rate-limit budget left afterwards.
 func (c *Client) PullRequest(ctx context.Context, id string) (domain.PullRequest, domain.RateLimit, error) {
 	var resp pullRequestDetailResponse
-	if err := c.do(ctx, pullRequestDetailQuery, map[string]any{"id": id}, &resp); err != nil {
+	if err := tolerate(c.do(ctx, pullRequestDetailQuery, map[string]any{"id": id}, &resp), hiddenReviewer); err != nil {
 		return domain.PullRequest{}, domain.RateLimit{}, fmt.Errorf("load pull request: %w", err)
 	}
 	limit := resp.toDomain()

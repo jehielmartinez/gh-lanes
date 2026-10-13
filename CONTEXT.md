@@ -55,3 +55,25 @@ _Avoid_: Filter, key pattern
 
 **No match**:
 The group holding pull requests whose title doesn't match the title pattern. It always comes last.
+
+### Reviews
+
+**Review decision**:
+The overall review outcome the base branch's rules require: Approved, Changes requested, Review required, or none required. It belongs to the pull request, not to any one reviewer.
+_Avoid_: Review status, approval
+
+**Reviewer**:
+A user or team asked to review a pull request, or a user who has submitted a review on it. The pull request's author is never one of its reviewers.
+_Avoid_: Approver
+
+**Verdict**:
+A reviewer's latest submitted review state: approved, changes requested, commented or dismissed. Only approved and changes requested take a side; commented and dismissed don't.
+_Avoid_: Vote, review status
+
+**Awaiting review**:
+A reviewer whose review is requested and not yet submitted. A reviewer re-requested after a verdict is awaiting review, and that earlier verdict still stands until they submit a new one.
+_Avoid_: Pending reviewer, requested
+
+**Roll-call**:
+The list of a pull request's reviewers, one per reviewer, each with their verdict or that they're awaiting review.
+_Avoid_: Reviewer list, reviews

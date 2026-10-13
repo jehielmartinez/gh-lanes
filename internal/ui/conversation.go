@@ -40,7 +40,8 @@ func (m Model) conversationLines(timeline []domain.TimelineEntry, expandResolved
 		case e.Comment != nil:
 			p = p.then(m.gutter(m.commentLines(*e.Comment, "commented", 0, inner), m.theme.accent))
 		case e.Review != nil:
-			p = p.then(m.gutter(m.reviewLines(*e.Review, inner), m.reviewColor(e.Review.State)))
+			_, _, c := m.verdictLook(e.Review.State)
+			p = p.then(m.gutter(m.reviewLines(*e.Review, inner), c))
 		case e.Thread != nil:
 			p = p.then(m.gutter(m.threadLines(*e.Thread, expandResolved, inner), m.threadColor(*e.Thread)))
 		}
@@ -60,16 +61,6 @@ func (m Model) gutter(p page, c color.Color) page {
 		lines[i] = bar + l
 	}
 	return page{lines: lines, links: p.links.Indent(lipgloss.Width(entryGutter))}
-}
-
-func (m Model) reviewColor(state string) color.Color {
-	switch state {
-	case domain.ReviewStateApproved:
-		return m.theme.success
-	case domain.ReviewStateChangesRequested:
-		return m.theme.failure
-	}
-	return m.theme.muted
 }
 
 // threadColor marks open threads as needing attention and lets resolved ones
@@ -96,17 +87,9 @@ func (m Model) reviewLines(r domain.Review, width int) page {
 	return text(indentedWrap(0, header, width)).then(m.markdownLines(r.Body, 0, width))
 }
 
-func (m Model) reviewBadge(state string) string {
-	label, c := "Commented", m.theme.muted
-	switch state {
-	case domain.ReviewStateApproved:
-		label, c = "Approved", m.theme.success
-	case domain.ReviewStateChangesRequested:
-		label, c = "Changes requested", m.theme.failure
-	case domain.ReviewStateDismissed:
-		label = "Dismissed"
-	}
-	return lipgloss.NewStyle().Bold(true).Foreground(c).Render("[" + label + "]")
+func (m Model) reviewBadge(state domain.ReviewState) string {
+	label, _, c := m.verdictLook(state)
+	return lipgloss.NewStyle().Bold(true).Foreground(c).Render("[" + capitalized(label) + "]")
 }
 
 // threadLines draws a review thread: where it is, whether it is resolved, and

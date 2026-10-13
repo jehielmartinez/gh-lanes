@@ -177,6 +177,13 @@ means leaving the terminal and clicking through the web UI for each PR.
     "Behind `main`. Update branch available"), so that I don't have to decode GitHub's enums.
 53. As a developer, I want the review decision and auto-merge status shown, so that I know what's
     blocking a merge.
+53a. As a developer, I want a roll-call of reviewers under the review decision, one row per
+    reviewer with their verdict and its age, so that I see who is blocking, who I'm waiting on and
+    who approved. Changes requested come first, then awaiting review, approved, commented and
+    dismissed, most recent first within each; commented and dismissed rows are muted. A reviewer
+    re-requested after a verdict shows as awaiting review with that verdict alongside. Teams read
+    `@org/team`, my own row reads "you", and the PR's author is never listed. With nobody to list
+    and a review required, it says "No reviewers requested".
 54. As a developer, I want checks grouped by workflow with failures first, status icons and
     durations, so that I can see what broke right away.
 55. As a developer, I want a summary line like "12 passed · 1 failed · 2 running", so that I get the
@@ -383,11 +390,18 @@ Mutations are commands returning a result message, which triggers a single-PR re
 - Repository: name with owner, allowed merge methods, auto-merge allowed, delete-branch-on-merge.
 - Checks: the last commit's status check rollup, with check runs (name, status, conclusion, start
   and end times, details URL, workflow name) and status contexts.
-- Activity counts: comment and review totals and latest reviews, for snapshots.
+- Reviewers: latest reviews (author, state, time) and pending review requests (user or team),
+  each saying whether it is the viewer, for the Status roll-call.
+- Activity counts: comment and review totals, for snapshots.
 
 The detail query (on modal open) adds the body, comments, reviews, and review threads with their
-comments. Any connection reporting more pages is paged through. `UNKNOWN` mergeability is shown as
-"checking…" and never treated as a conflict.
+comments. Any connection reporting more pages is paged through, except latest reviews and review
+requests, which hold one entry per reviewer. `UNKNOWN` mergeability is shown as "checking…" and
+never treated as a conflict.
+
+GitHub may refuse to name a requested team the login can't see, returning that reviewer as null
+with an error. Errors inside `reviewRequests` are accepted and the rest of the response is used;
+the reviewer shows as "a team you can't see". Any other error fails the request as usual.
 
 ### Mutations
 

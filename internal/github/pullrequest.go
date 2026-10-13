@@ -9,8 +9,8 @@ import (
 // pullRequestFragment is the one selection of pull request fields, shared by
 // every query that returns pull requests.
 //
-// latestReviews holds one review per reviewer, so its first page is all of it
-// in practice and it is not paged.
+// latestReviews and reviewRequests hold one entry per reviewer, so their first
+// page is all of them in practice and they are not paged.
 const pullRequestFragment = `
 fragment PullRequestFields on PullRequest {
   id
@@ -43,7 +43,17 @@ fragment PullRequestFields on PullRequest {
   }
   comments { totalCount }
   reviews { totalCount }
-  latestReviews(first: 100) { nodes { author { login } state submittedAt } }
+  latestReviews(first: 100) { nodes { author { login ... on User { isViewer } } state submittedAt } }
+  reviewRequests(first: 100) {
+    nodes {
+      requestedReviewer {
+        __typename
+        ... on Actor { login }
+        ... on User { isViewer }
+        ... on Team { combinedSlug }
+      }
+    }
+  }
   commits(last: 1) {
     nodes {
       commit {
@@ -90,7 +100,8 @@ type pageInfo struct {
 }
 
 type login struct {
-	Login string
+	Login    string
+	IsViewer bool
 }
 
 type totalCount struct {
@@ -137,6 +148,18 @@ type pullRequestNode struct {
 			Author      *login
 			State       string
 			SubmittedAt time.Time
+		}
+	}
+	ReviewRequests struct {
+		// A node, or its reviewer, is null when GitHub won't show who was
+		// asked; see hiddenReviewer.
+		Nodes []*struct {
+			RequestedReviewer *struct {
+				Typename     string `json:"__typename"`
+				Login        string
+				IsViewer     bool
+				CombinedSlug string
+			}
 		}
 	}
 	Commits struct {
@@ -252,9 +275,21 @@ func (n pullRequestNode) toDomain() domain.PullRequest {
 	for _, r := range n.LatestReviews.Nodes {
 		pr.LatestReviews = append(pr.LatestReviews, domain.Review{
 			Author:      r.Author.name(),
+			ByViewer:    r.Author != nil && r.Author.IsViewer,
 			State:       r.State,
 			SubmittedAt: r.SubmittedAt,
 		})
+	}
+	for _, q := range n.ReviewRequests.Nodes {
+		var req domain.ReviewRequest
+		if q != nil && q.RequestedReviewer != nil {
+			r := q.RequestedReviewer
+			req = domain.ReviewRequest{Reviewer: r.Login, ForViewer: r.IsViewer}
+			if r.Typename == "Team" {
+				req = domain.ReviewRequest{Reviewer: r.CombinedSlug, Team: true}
+			}
+		}
+		pr.ReviewRequests = append(pr.ReviewRequests, req)
 	}
 	if rollup := n.rollup(); rollup != nil {
 		pr.Checks = rollup.Contexts.toDomain()

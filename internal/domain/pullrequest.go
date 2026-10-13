@@ -40,10 +40,11 @@ type PullRequest struct {
 	// the head branch up to date with the base branch right now.
 	ViewerCanUpdateBranch bool
 
-	Checks        []Check
-	CommentCount  int
-	ReviewCount   int
-	LatestReviews []Review
+	Checks         []Check
+	CommentCount   int
+	ReviewCount    int
+	LatestReviews  []Review
+	ReviewRequests []ReviewRequest
 
 	// Conversation is filled only by the detail query; the board's search
 	// leaves it empty.
@@ -144,9 +145,11 @@ const (
 )
 
 // Review is one review a reviewer submitted. Its Body is filled only by the
-// detail query.
+// detail query's conversation, and ByViewer only by the pull request's latest
+// reviews.
 type Review struct {
 	Author      string
+	ByViewer    bool
 	State       string
 	Body        string
 	SubmittedAt time.Time

@@ -1,0 +1,61 @@
+{
+  "data": {
+    "node": {
+      "id": "PR_node_optional",
+      "number": 43,
+      "title": "Tidy the changelog",
+      "url": "https://github.com/octo-org/sample-repo/pull/43",
+      "isDraft": false,
+      "state": "OPEN",
+      "createdAt": "2026-02-01T10:00:00Z",
+      "updatedAt": "2026-03-05T12:00:00Z",
+      "mergedAt": null,
+      "closedAt": null,
+      "author": {
+        "login": "user-a"
+      },
+      "baseRefName": "main",
+      "headRefName": "feature-43",
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BLOCKED",
+      "reviewDecision": null,
+      "viewerCanUpdate": true,
+      "autoMergeRequest": null,
+      "repository": {
+        "nameWithOwner": "octo-org/sample-repo",
+        "mergeCommitAllowed": true,
+        "squashMergeAllowed": true,
+        "rebaseMergeAllowed": false,
+        "autoMergeAllowed": false,
+        "deleteBranchOnMerge": true
+      },
+      "comments": {
+        "totalCount": 0
+      },
+      "reviews": {
+        "totalCount": 0
+      },
+      "latestReviews": {
+        "nodes": []
+      },
+      "reviewRequests": {
+        "nodes": []
+      },
+      "commits": {
+        "nodes": [
+          {
+            "commit": {
+              "id": "C_node_43",
+              "statusCheckRollup": null
+            }
+          }
+        ]
+      }
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4980,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

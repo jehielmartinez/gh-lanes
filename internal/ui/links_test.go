@@ -102,7 +102,10 @@ func TestClickingTextThatIsNotALinkOpensNothing(t *testing.T) {
 }
 
 func TestLinksStayClickableAfterScrolling(t *testing.T) {
-	h := newLinksHarness(t, 120, 30)
+	// Sections expand where every heading fits, then the terminal shrinks so
+	// the modal must scroll.
+	h := newLinksHarness(t, 120, 120)
+	h.resize(120, 30)
 
 	h.press("G")
 	h.waitForScreen("the header scrolled away", func(s string) bool {

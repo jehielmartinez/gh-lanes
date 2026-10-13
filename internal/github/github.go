@@ -183,12 +183,11 @@ func missingNode(e api.GraphQLErrorItem) bool {
 	return e.Type == "NOT_FOUND" && len(e.Path) > 0 && e.Path[0] == "nodes"
 }
 
-// hiddenReviewer is GitHub refusing to show who a review was requested of,
-// as it does for a team the login can't see. That reviewer comes back null
-// and the rest of the pull request is good, so one hidden team must not fail
-// the whole board.
+// hiddenReviewer is GitHub refusing to show who a review was requested of, as
+// it does for a team the login can't see; that reviewer comes back null and
+// the rest of the pull request is good.
 func hiddenReviewer(e api.GraphQLErrorItem) bool {
-	return slices.Contains(e.Path, any("reviewRequests"))
+	return (e.Type == "FORBIDDEN" || e.Type == "NOT_FOUND") && slices.Contains(e.Path, any("reviewRequests"))
 }
 
 // toDomain maps pull request nodes into domain values, paging through the

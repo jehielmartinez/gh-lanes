@@ -7,34 +7,27 @@ import (
 	"time"
 )
 
-// ReviewRequest is a review asked of a user or team and not yet submitted.
-type ReviewRequest struct {
-	// Reviewer is the user's login or the team's owner/slug. It is empty when
-	// GitHub won't say who it is, as it does for a team the login can't see.
-	Reviewer string
+// Identity is who a reviewer is: a user's login or a team's owner/slug, and
+// whether it is the login lanes runs as. Name is empty when GitHub won't say
+// who it is.
+type Identity struct {
+	Name     string
 	Team     bool
-	// ForViewer is set when the review is asked of the login lanes runs as.
-	ForViewer bool
+	IsViewer bool
 }
 
 // Reviewer is one row of a pull request's roll-call: someone asked to review
 // it, someone who has, or both.
 type Reviewer struct {
-	// Name is the user's login or the team's owner/slug, empty when GitHub
-	// won't say who it is.
-	Name     string
-	Team     bool
-	IsViewer bool
-	// Verdict is the state of the reviewer's latest review, empty if they
-	// haven't submitted one.
-	Verdict   string
+	Identity
+	// Verdict is empty if the reviewer hasn't submitted a review.
+	Verdict   ReviewState
 	VerdictAt time.Time
 	Awaiting  bool
 }
 
-// RollCall lists the pull request's reviewers, one per reviewer, leaving out
-// its author. Changes requested come first, then those awaiting review,
-// approvals, comments and dismissals, each most recent first.
+// RollCall lists the pull request's reviewers, one per reviewer and never its
+// author, those who decide the merge first and each group most recent first.
 func (pr PullRequest) RollCall() []Reviewer {
 	var rows []Reviewer
 	index := map[string]int{}
@@ -43,17 +36,20 @@ func (pr PullRequest) RollCall() []Reviewer {
 			continue
 		}
 		index[strings.ToLower(r.Author)] = len(rows)
-		rows = append(rows, Reviewer{Name: r.Author, IsViewer: r.ByViewer, Verdict: r.State, VerdictAt: r.SubmittedAt})
+		rows = append(rows, Reviewer{
+			Identity: Identity{Name: r.Author, IsViewer: r.AuthorIsViewer},
+			Verdict:  r.State, VerdictAt: r.SubmittedAt,
+		})
 	}
-	for _, q := range pr.ReviewRequests {
-		if pr.isAuthor(q.Reviewer) {
+	for _, who := range pr.ReviewRequests {
+		if pr.isAuthor(who.Name) {
 			continue
 		}
-		if i, ok := index[strings.ToLower(q.Reviewer)]; ok && q.Reviewer != "" && !q.Team {
+		if i, ok := index[strings.ToLower(who.Name)]; ok && who.Name != "" && !who.Team {
 			rows[i].Awaiting = true
 			continue
 		}
-		rows = append(rows, Reviewer{Name: q.Reviewer, Team: q.Team, IsViewer: q.ForViewer, Awaiting: true})
+		rows = append(rows, Reviewer{Identity: who, Awaiting: true})
 	}
 	slices.SortStableFunc(rows, func(a, b Reviewer) int {
 		return cmp.Or(
@@ -64,6 +60,12 @@ func (pr PullRequest) RollCall() []Reviewer {
 		)
 	})
 	return rows
+}
+
+// NobodyAskedToReview reports the stuck case: the base branch requires a
+// review and the pull request has no reviewers at all.
+func (pr PullRequest) NobodyAskedToReview() bool {
+	return pr.ReviewDecision == ReviewRequired && len(pr.RollCall()) == 0
 }
 
 // unnamed sorts someone GitHub won't name after everyone it will.
@@ -79,7 +81,7 @@ func (pr PullRequest) isAuthor(login string) bool {
 }
 
 // rank orders a row by what it means for the merge: a reviewer awaited sorts
-// as awaited whatever their earlier verdict, since that is who acts next.
+// as awaited whatever their earlier verdict, since they act next.
 func (r Reviewer) rank() int {
 	if r.Awaiting {
 		return 1
@@ -89,7 +91,7 @@ func (r Reviewer) rank() int {
 
 // verdictRank is a verdict's place in the roll-call, or -1 for a state that
 // isn't a submitted review, such as the viewer's own unsubmitted draft.
-func verdictRank(state string) int {
+func verdictRank(state ReviewState) int {
 	switch state {
 	case ReviewStateChangesRequested:
 		return 0

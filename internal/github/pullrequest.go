@@ -274,22 +274,22 @@ func (n pullRequestNode) toDomain() domain.PullRequest {
 	}
 	for _, r := range n.LatestReviews.Nodes {
 		pr.LatestReviews = append(pr.LatestReviews, domain.Review{
-			Author:      r.Author.name(),
-			ByViewer:    r.Author != nil && r.Author.IsViewer,
-			State:       r.State,
-			SubmittedAt: r.SubmittedAt,
+			Author:         r.Author.name(),
+			AuthorIsViewer: r.Author != nil && r.Author.IsViewer,
+			State:          domain.ReviewState(r.State),
+			SubmittedAt:    r.SubmittedAt,
 		})
 	}
 	for _, q := range n.ReviewRequests.Nodes {
-		var req domain.ReviewRequest
+		var who domain.Identity
 		if q != nil && q.RequestedReviewer != nil {
 			r := q.RequestedReviewer
-			req = domain.ReviewRequest{Reviewer: r.Login, ForViewer: r.IsViewer}
+			who = domain.Identity{Name: r.Login, IsViewer: r.IsViewer}
 			if r.Typename == "Team" {
-				req = domain.ReviewRequest{Reviewer: r.CombinedSlug, Team: true}
+				who = domain.Identity{Name: r.CombinedSlug, Team: true}
 			}
 		}
-		pr.ReviewRequests = append(pr.ReviewRequests, req)
+		pr.ReviewRequests = append(pr.ReviewRequests, who)
 	}
 	if rollup := n.rollup(); rollup != nil {
 		pr.Checks = rollup.Contexts.toDomain()

@@ -1,0 +1,282 @@
+{
+  "data": {
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+      },
+      "nodes": [
+        {
+          "id": "PR_node_roll_call",
+          "number": 41,
+          "title": "Teach the uploader to resume",
+          "url": "https://github.com/octo-org/sample-repo/pull/41",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-05T14:00:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-a"
+          },
+          "baseRefName": "main",
+          "headRefName": "feature-41",
+          "mergeable": "MERGEABLE",
+          "mergeStateStatus": "BLOCKED",
+          "reviewDecision": "CHANGES_REQUESTED",
+          "viewerCanUpdate": true,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": false,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 0
+          },
+          "reviews": {
+            "totalCount": 6
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "author": {
+                  "login": "user-b",
+                  "isViewer": false
+                },
+                "state": "CHANGES_REQUESTED",
+                "submittedAt": "2026-03-04T17:00:00Z"
+              },
+              {
+                "author": {
+                  "login": "user-c",
+                  "isViewer": false
+                },
+                "state": "APPROVED",
+                "submittedAt": "2026-03-05T14:00:00Z"
+              },
+              {
+                "author": {
+                  "login": "user-d",
+                  "isViewer": false
+                },
+                "state": "APPROVED",
+                "submittedAt": "2026-03-05T15:00:00Z"
+              },
+              {
+                "author": {
+                  "login": "user-a",
+                  "isViewer": false
+                },
+                "state": "COMMENTED",
+                "submittedAt": "2026-03-05T16:00:00Z"
+              },
+              {
+                "author": {
+                  "login": "copilot-reviewer"
+                },
+                "state": "COMMENTED",
+                "submittedAt": "2026-03-05T12:00:00Z"
+              },
+              {
+                "author": {
+                  "login": "user-e",
+                  "isViewer": false
+                },
+                "state": "DISMISSED",
+                "submittedAt": "2026-03-03T17:00:00Z"
+              }
+            ]
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "__typename": "User",
+                  "login": "user-c",
+                  "isViewer": false
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "__typename": "User",
+                  "login": "user-f",
+                  "isViewer": false
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "__typename": "Team",
+                  "combinedSlug": "octo-org/infra"
+                }
+              },
+              {
+                "requestedReviewer": null
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_node_41",
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "PR_node_nobody",
+          "number": 42,
+          "title": "Document the retry budget",
+          "url": "https://github.com/octo-org/sample-repo/pull/42",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-05T13:00:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-a"
+          },
+          "baseRefName": "main",
+          "headRefName": "feature-42",
+          "mergeable": "MERGEABLE",
+          "mergeStateStatus": "BLOCKED",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "viewerCanUpdate": true,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": false,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 0
+          },
+          "reviews": {
+            "totalCount": 0
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_node_42",
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "PR_node_optional",
+          "number": 43,
+          "title": "Tidy the changelog",
+          "url": "https://github.com/octo-org/sample-repo/pull/43",
+          "isDraft": false,
+          "state": "OPEN",
+          "createdAt": "2026-02-01T10:00:00Z",
+          "updatedAt": "2026-03-05T12:00:00Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "author": {
+            "login": "user-a"
+          },
+          "baseRefName": "main",
+          "headRefName": "feature-43",
+          "mergeable": "MERGEABLE",
+          "mergeStateStatus": "BLOCKED",
+          "reviewDecision": null,
+          "viewerCanUpdate": true,
+          "autoMergeRequest": null,
+          "repository": {
+            "nameWithOwner": "octo-org/sample-repo",
+            "mergeCommitAllowed": true,
+            "squashMergeAllowed": true,
+            "rebaseMergeAllowed": false,
+            "autoMergeAllowed": false,
+            "deleteBranchOnMerge": true
+          },
+          "comments": {
+            "totalCount": 0
+          },
+          "reviews": {
+            "totalCount": 0
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "id": "C_node_43",
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4980,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  },
+  "errors": [
+    {
+      "type": "FORBIDDEN",
+      "path": [
+        "search",
+        "nodes",
+        0,
+        "reviewRequests",
+        "nodes",
+        3,
+        "requestedReviewer"
+      ],
+      "message": "Resource not accessible by integration",
+      "locations": [
+        {
+          "line": 1,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "type": "FORBIDDEN",
+      "path": [
+        "search",
+        "nodes",
+        0,
+        "repository"
+      ],
+      "message": "Something went wrong",
+      "locations": [
+        {
+          "line": 1,
+          "column": 1
+        }
+      ]
+    }
+  ]
+}

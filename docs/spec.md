@@ -180,10 +180,11 @@ means leaving the terminal and clicking through the web UI for each PR.
 53a. As a developer, I want a roll-call of reviewers under the review decision, one row per
     reviewer with their verdict and its age, so that I see who is blocking, who I'm waiting on and
     who approved. Changes requested come first, then awaiting review, approved, commented and
-    dismissed, most recent first within each; commented and dismissed rows are muted. A reviewer
-    re-requested after a verdict shows as awaiting review with that verdict alongside. Teams read
-    `@org/team`, my own row reads "you", and the PR's author is never listed. With nobody to list
-    and a review required, it says "No reviewers requested".
+    dismissed, most recent first within each. GitHub gives no time for a review request, so
+    reviewers awaited without an earlier verdict follow, by name. Commented and dismissed rows are
+    muted. A reviewer re-requested after a verdict shows as awaiting review with that verdict
+    alongside. Teams read `@org/team`, my own row reads "you", and the PR's author is never listed.
+    With nobody to list and a review required, it says "No reviewers requested".
 54. As a developer, I want checks grouped by workflow with failures first, status icons and
     durations, so that I can see what broke right away.
 55. As a developer, I want a summary line like "12 passed · 1 failed · 2 running", so that I get the
@@ -401,7 +402,9 @@ never treated as a conflict.
 
 GitHub may refuse to name a requested team the login can't see, returning that reviewer as null
 with an error. Errors inside `reviewRequests` are accepted and the rest of the response is used;
-the reviewer shows as "a team you can't see". Any other error fails the request as usual.
+the reviewer shows as a muted "a reviewer you can't see", since a null reviewer can also be a
+deleted account. Only `FORBIDDEN` and `NOT_FOUND` errors there are accepted; any other error fails
+the request as usual.
 
 ### Mutations
 

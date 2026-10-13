@@ -170,7 +170,7 @@ func (c *Client) conversation(ctx context.Context, id string, n conversationNode
 		}
 		conv.Reviews = append(conv.Reviews, domain.Review{
 			Author:      r.Author.name(),
-			State:       r.State,
+			State:       domain.ReviewState(r.State),
 			Body:        r.Body,
 			SubmittedAt: r.SubmittedAt,
 		})

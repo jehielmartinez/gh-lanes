@@ -10,80 +10,82 @@ import (
 )
 
 // rollCallLines are the Status section's rows of reviewers, under the review
-// decision. With nobody to list they name only the stuck case: a review the
-// base branch requires that nobody was asked for.
+// decision.
 func (m Model) rollCallLines(pr domain.PullRequest, width int) page {
-	rows := pr.RollCall()
-	if len(rows) == 0 {
-		if pr.ReviewDecision == domain.ReviewRequired {
-			return text(indented(2, m.muted("No reviewers requested")))
-		}
-		return page{}
+	if pr.NobodyAskedToReview() {
+		return text(indented(2, m.muted("No reviewers requested")))
 	}
+	rows := pr.RollCall()
 	nameWidth := 0
 	for _, r := range rows {
-		nameWidth = max(nameWidth, lipgloss.Width(reviewerName(r)))
+		nameWidth = max(nameWidth, lipgloss.Width(reviewerName(r.Identity)))
 	}
 	nameWidth = min(nameWidth, max(width/2, 10))
-	verdictWidth := lipgloss.Width(verdictLabel(domain.ReviewStateChangesRequested))
+	labelWidth, _, _ := m.verdictLook(domain.ReviewStateChangesRequested)
 	var p page
 	for _, r := range rows {
-		name := truncate(reviewerName(r), nameWidth)
-		label, age := verdictLabel(r.Verdict), relative(m.now.Sub(r.VerdictAt))
+		label, glyph, c := m.verdictLook(r.Verdict)
+		age := relative(m.now.Sub(r.VerdictAt))
 		if r.Awaiting {
-			label, age = "awaiting review", ""
 			if r.Verdict != "" {
-				age = "(" + verdictLabel(r.Verdict) + " " + relative(m.now.Sub(r.VerdictAt)) + ")"
+				age = "(" + label + " " + age + ")"
+			} else {
+				age = ""
 			}
+			label, glyph, c = "awaiting review", "●", m.theme.pending
 		}
-		columns := " " + name + strings.Repeat(" ", nameWidth-lipgloss.Width(name)) +
-			"  " + label + strings.Repeat(" ", verdictWidth-lipgloss.Width(label)) + "  "
-		icon, c, sided := m.reviewerIcon(r)
-		line := m.muted(icon + columns + age)
-		if sided {
-			line = lipgloss.NewStyle().Foreground(c).Render(icon) + columns + m.muted(age)
+		columns := " " + padRight(truncate(reviewerName(r.Identity), nameWidth), nameWidth) +
+			"  " + padRight(label, lipgloss.Width(labelWidth)) + "  "
+		line := lipgloss.NewStyle().Foreground(c).Render(glyph) + columns + m.muted(age)
+		// A reviewer GitHub won't name, or one whose verdict takes no side,
+		// recedes.
+		if r.Name == "" || (!r.Awaiting && !r.Verdict.TakesSide()) {
+			line = m.muted(glyph + columns + age)
 		}
 		p.lines = append(p.lines, lipgloss.NewStyle().MaxWidth(width).Render(indented(2, line)))
 	}
 	return p
 }
 
-func reviewerName(r domain.Reviewer) string {
+// reviewerName is how the roll-call names a reviewer. GitHub returns no name
+// for a team the login can't see, and also for a reviewer whose account is
+// gone, so it can't say which it was.
+func reviewerName(who domain.Identity) string {
 	switch {
-	case r.Name == "":
-		return "a team you can't see"
-	case r.IsViewer:
+	case who.Name == "":
+		return "a reviewer you can't see"
+	case who.IsViewer:
 		return "you"
-	case r.Team:
-		return "@" + oneLine(r.Name)
+	case who.Team:
+		return "@" + oneLine(who.Name)
 	}
-	return oneLine(r.Name)
+	return oneLine(who.Name)
 }
 
-func verdictLabel(state string) string {
+// verdictLook is how a review state reads and is marked wherever a review is
+// drawn: its lower-case label, glyph and colour.
+func (m Model) verdictLook(state domain.ReviewState) (label, glyph string, c color.Color) {
 	switch state {
 	case domain.ReviewStateApproved:
-		return "approved"
+		return "approved", "✓", m.theme.success
 	case domain.ReviewStateChangesRequested:
-		return "changes requested"
+		return "changes requested", "✗", m.theme.failure
 	case domain.ReviewStateDismissed:
-		return "dismissed"
+		return "dismissed", "–", m.theme.muted
 	}
-	return "commented"
+	return "commented", "○", m.theme.muted
 }
 
-// reviewerIcon is a row's glyph and colour. sided is false for a reviewer
-// whose verdict takes no side, whose whole row is muted.
-func (m Model) reviewerIcon(r domain.Reviewer) (icon string, c color.Color, sided bool) {
-	switch {
-	case r.Awaiting:
-		return "●", m.theme.pending, true
-	case r.Verdict == domain.ReviewStateChangesRequested:
-		return "✗", m.theme.failure, true
-	case r.Verdict == domain.ReviewStateApproved:
-		return "✓", m.theme.success, true
-	case r.Verdict == domain.ReviewStateDismissed:
-		return "–", m.theme.muted, false
+// padRight pads s with spaces to width cells.
+func padRight(s string, width int) string {
+	return s + strings.Repeat(" ", max(width-lipgloss.Width(s), 0))
+}
+
+// capitalized is s with its first letter upper-cased, for a label that starts
+// a line or badge.
+func capitalized(s string) string {
+	if s == "" {
+		return s
 	}
-	return "○", m.theme.muted, false
+	return strings.ToUpper(s[:1]) + s[1:]
 }

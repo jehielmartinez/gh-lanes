@@ -88,6 +88,7 @@ always current.
 | `r` | everywhere | refresh now |
 | `o` | board, detail | pick a link to open |
 | `O` | board, detail | open the PR in the browser |
+| `y` | board, lists, detail | copy the PR's URL (falls back to the terminal clipboard over SSH or without `pbcopy`, `wl-copy`, `xclip` or `xsel`) |
 | `u` / `U` | board, detail | update the branch by merge / by rebase |
 | `M` | board, detail | merge dialog |
 | `d` | board, detail | toggle draft and ready for review |

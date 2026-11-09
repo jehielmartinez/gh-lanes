@@ -25,8 +25,9 @@ func (m Model) descriptionLines(conv domain.Conversation, width int) page {
 
 // conversationLines is the body of the modal's Conversation section: one
 // timeline of comments, reviews and review threads, oldest first, each behind
-// a bar in its own colour so one entry reads apart from the next.
-func (m Model) conversationLines(timeline []domain.TimelineEntry, expandResolved bool, width int) page {
+// a bar in its own colour so one entry reads apart from the next. A review's
+// threads sit under it, behind its bar.
+func (m Model) conversationLines(timeline []domain.TimelineEntry, f folding, width int) page {
 	if len(timeline) == 0 {
 		return text(indented(1, m.muted("No comments yet.")))
 	}
@@ -41,9 +42,9 @@ func (m Model) conversationLines(timeline []domain.TimelineEntry, expandResolved
 			p = p.then(m.gutter(m.commentLines(*e.Comment, "commented", 0, inner), m.theme.accent))
 		case e.Review != nil:
 			_, _, c := m.verdictLook(e.Review.State)
-			p = p.then(m.gutter(m.reviewLines(*e.Review, inner), c))
+			p = p.then(m.gutter(m.reviewLines(*e.Review, e.Threads, f, inner), c))
 		case e.Thread != nil:
-			p = p.then(m.gutter(m.threadLines(*e.Thread, expandResolved, inner), m.threadColor(*e.Thread)))
+			p = p.then(m.gutter(m.threadLines(*e.Thread, 0, f, inner), m.threadColor(*e.Thread)))
 		}
 	}
 	return p
@@ -60,7 +61,7 @@ func (m Model) gutter(p page, c color.Color) page {
 	for i, l := range p.lines {
 		lines[i] = bar + l
 	}
-	return page{lines: lines, links: p.links.Indent(lipgloss.Width(entryGutter))}
+	return page{lines: lines, links: p.links.Indent(lipgloss.Width(entryGutter)), folds: p.folds}
 }
 
 // threadColor marks open threads as needing attention and lets resolved ones
@@ -81,44 +82,110 @@ func (m Model) commentLines(c domain.Comment, verb string, depth, width int) pag
 	return text(indentedWrap(depth, header, width)).then(m.markdownLines(c.Body, depth, width))
 }
 
-func (m Model) reviewLines(r domain.Review, width int) page {
-	header := m.bold(authorName(r.Author)) + " " + m.reviewBadge(r.State) +
-		m.muted(statusSeparator+m.timestamp(r.SubmittedAt))
-	return text(indentedWrap(0, header, width)).then(m.markdownLines(r.Body, 0, width))
+// reviewLines draws a review: its verdict, who gave it and when, then what
+// they wrote and the threads they opened with it, a blank line apart. A
+// review with anything beneath its heading folds, and folded it says what it
+// hides.
+func (m Model) reviewLines(r domain.Review, threads []*domain.Thread, f folding, width int) page {
+	_, glyph, c := m.verdictLook(r.State)
+	var body page
+	if strings.TrimSpace(r.Body) != "" {
+		body = m.markdownLines(r.Body, 1, width)
+	}
+	key := reviewFold(r.ID)
+	folds := r.ID != "" && (len(body.lines) > 0 || len(threads) > 0)
+	open := !folds || f.isOpen(key, true)
+
+	verb := reviewVerb(r.State)
+	who := m.bold(authorName(r.Author)) + " " + verb
+	if r.State.TakesSide() {
+		who = m.bold(authorName(r.Author)) + " " + lipgloss.NewStyle().Foreground(c).Render(verb)
+	}
+	if folds && f.highlight == key {
+		who = highlightIf(true, authorName(r.Author)+" "+verb)
+	}
+	header := lipgloss.NewStyle().Foreground(c).Render(glyph) + " " + who + m.muted(statusSeparator+m.timestamp(r.SubmittedAt))
+	if r.State == domain.ReviewStateDismissed {
+		header += m.muted(statusSeparator + "dismissed")
+	}
+	if !open {
+		var hidden []string
+		if n := len(body.lines); n > 0 {
+			hidden = append(hidden, plural(n, "line"))
+		}
+		if n := len(threads); n > 0 {
+			hidden = append(hidden, plural(n, "thread"))
+		}
+		header += m.muted(statusSeparator + "▸ " + strings.Join(hidden, statusSeparator))
+	}
+	p := text(indentedWrap(0, header, width))
+	if folds {
+		p.folds = []foldable{{key: key, open: open}}
+	}
+	if !open {
+		return p
+	}
+	p = p.then(body)
+	for i, t := range threads {
+		if i > 0 || len(body.lines) > 0 {
+			p = p.then(text(""))
+		}
+		p = p.then(m.threadLines(*t, 1, f, width))
+	}
+	return p
 }
 
-func (m Model) reviewBadge(state domain.ReviewState) string {
-	label, _, c := m.verdictLook(state)
-	return lipgloss.NewStyle().Bold(true).Foreground(c).Render("[" + capitalized(label) + "]")
+// reviewVerb is what a reviewer did, as a review's heading says it.
+func reviewVerb(state domain.ReviewState) string {
+	switch state {
+	case domain.ReviewStateApproved:
+		return "approved"
+	case domain.ReviewStateChangesRequested:
+		return "requested changes"
+	}
+	return "reviewed"
 }
 
-// threadLines draws a review thread: where it is, whether it is resolved, and
-// its comments beneath, a blank line apart, unless it is resolved and
-// resolved threads are collapsed.
-func (m Model) threadLines(t domain.Thread, expandResolved bool, width int) page {
-	collapsed := t.Resolved && !expandResolved
+// threadLines draws a review thread at an indent depth: where it is, whether
+// it is resolved, and its comments beneath, a blank line apart, unless it is
+// folded. A resolved thread starts folded unless resolved threads are
+// expanded.
+func (m Model) threadLines(t domain.Thread, depth int, f folding, width int) page {
+	key := threadFold(t.ID)
+	open := f.isOpen(key, !t.Resolved || f.expandResolved)
 	marker, state := "▾", lipgloss.NewStyle().Foreground(m.theme.pending).Render("Unresolved")
 	if t.Resolved {
 		state = lipgloss.NewStyle().Foreground(m.theme.success).Render("Resolved")
 	}
-	if collapsed {
+	if !open {
 		marker = "▸"
 	}
-	header := m.muted(marker) + " " + m.bold(oneLine(t.Location())) + m.muted(statusSeparator) + state
-	if collapsed {
-		header += m.muted(statusSeparator + plural(len(t.Comments), "comment") + statusSeparator + m.keys.Modal.ExpandResolved.Help().Key + " to expand")
-	} else {
-		header += m.muted(statusSeparator + m.timestamp(t.StartedAt()))
-		if t.Resolved {
-			header += m.muted(statusSeparator + m.keys.Modal.ExpandResolved.Help().Key + " to collapse")
-		}
+	where := m.bold(oneLine(t.Location()))
+	if f.highlight == key {
+		where = highlightIf(true, oneLine(t.Location()))
 	}
-	p := text(indentedWrap(0, header, width))
-	if collapsed {
+	header := m.muted(marker) + " " + where + m.muted(statusSeparator) + state
+	if open {
+		header += m.muted(statusSeparator + m.timestamp(t.StartedAt()))
+	} else {
+		header += m.muted(statusSeparator + plural(len(t.Comments), "comment"))
+	}
+	// The e hint names what e will do to this thread, so it goes once the
+	// viewer has folded or unfolded the thread themselves.
+	if t.Resolved && !f.chosen(key) {
+		verb := "expand"
+		if open {
+			verb = "collapse"
+		}
+		header += m.muted(statusSeparator + m.keys.Modal.ExpandResolved.Help().Key + " to " + verb)
+	}
+	p := text(indentedWrap(depth, header, width))
+	p.folds = []foldable{{key: key, open: open}}
+	if !open {
 		return p
 	}
 	for _, c := range t.Comments {
-		p = p.then(text(""), m.commentLines(c, "", 1, width))
+		p = p.then(text(""), m.commentLines(c, "", depth+1, width))
 	}
 	return p
 }
@@ -214,10 +281,17 @@ func indentedWrap(depth int, s string, width int) string {
 	return indent + strings.ReplaceAll(wrapped, "\n", "\n"+indent)
 }
 
+// copilotReviewer is the login GitHub gives Copilot's code review, which its
+// own pages show as "Copilot".
+const copilotReviewer = "copilot-pull-request-reviewer"
+
 // authorName is a login, or "ghost" for a deleted account, as GitHub shows it.
 func authorName(login string) string {
-	if login == "" {
+	switch login {
+	case "":
 		return "ghost"
+	case copilotReviewer:
+		return "Copilot"
 	}
 	return oneLine(login)
 }

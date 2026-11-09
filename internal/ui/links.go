@@ -16,6 +16,8 @@ import (
 type page struct {
 	lines []string
 	links links.Map
+	// folds are the headings on the page that fold, in the order drawn.
+	folds []foldable
 }
 
 // text is a page of plain text; each string may hold several lines.
@@ -31,6 +33,12 @@ func text(blocks ...string) page {
 func (p page) then(more ...page) page {
 	for _, q := range more {
 		p.links = append(p.links[:len(p.links):len(p.links)], q.links.Shift(len(p.lines))...)
+		folds := p.folds[:len(p.folds):len(p.folds)]
+		for _, f := range q.folds {
+			f.line += len(p.lines)
+			folds = append(folds, f)
+		}
+		p.folds = folds
 		p.lines = append(p.lines[:len(p.lines):len(p.lines)], q.lines...)
 	}
 	return p
@@ -166,7 +174,8 @@ func linkSource(l links.Link) string {
 	return where + statusSeparator + authorName(l.Author)
 }
 
-// clickDetail opens the link under a left click in the modal.
+// clickDetail opens the link under a left click in the modal, or folds the
+// heading clicked and highlights it.
 func (m Model) clickDetail(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	if msg.Button != tea.MouseLeft {
 		return m, nil
@@ -183,9 +192,10 @@ func (m Model) clickDetail(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 	if url, ok := m.detail.links.At(line, col); ok {
 		return m.open(url)
 	}
-	for s, at := range m.detail.headers {
-		if at == line {
-			d := m.detail.toggle(section(s))
+	for _, f := range m.detail.foldables {
+		if f.line == line {
+			d := m.detail.fold(f)
+			d.highlight = f.key
 			m.detail = &d
 			return m, nil
 		}

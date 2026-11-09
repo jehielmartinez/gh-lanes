@@ -30,7 +30,7 @@ fragment CommentFields on IssueCommentConnection {
 const reviewFragment = `
 fragment ReviewFields on PullRequestReviewConnection {
   pageInfo { hasNextPage endCursor }
-  nodes { author { login } state body submittedAt }
+  nodes { id author { login } state body submittedAt }
 }`
 
 // threadFragment needs threadCommentFragment alongside it.
@@ -50,7 +50,7 @@ fragment ReviewThreadFields on PullRequestReviewThreadConnection {
 const threadCommentFragment = `
 fragment ThreadCommentFields on PullRequestReviewCommentConnection {
   pageInfo { hasNextPage endCursor }
-  nodes { author { login } body createdAt }
+  nodes { author { login } body createdAt pullRequestReview { id } }
 }`
 
 const pullRequestCommentsQuery = `query PullRequestComments($id: ID!, $after: String) {
@@ -94,9 +94,13 @@ type commentNode struct {
 	Author    *login
 	Body      string
 	CreatedAt time.Time
+	// PullRequestReview is the review a thread comment was submitted with.
+	// Issue comments have none.
+	PullRequestReview *struct{ ID string }
 }
 
 type reviewNode struct {
+	ID          string
 	Author      *login
 	State       string
 	Body        string
@@ -169,6 +173,7 @@ func (c *Client) conversation(ctx context.Context, id string, n conversationNode
 			continue
 		}
 		conv.Reviews = append(conv.Reviews, domain.Review{
+			ID:          r.ID,
 			Author:      r.Author.name(),
 			State:       domain.ReviewState(r.State),
 			Body:        r.Body,
@@ -182,7 +187,12 @@ func (c *Client) conversation(ctx context.Context, id string, n conversationNode
 			return domain.Conversation{}, domain.RateLimit{}, fmt.Errorf("review thread comments: %w", err)
 		}
 		keep(l)
-		thread := domain.Thread{Path: t.Path, Line: t.Line, Resolved: t.IsResolved}
+		thread := domain.Thread{ID: t.ID, Path: t.Path, Line: t.Line, Resolved: t.IsResolved}
+		// The review a thread's first comment came with is the one that
+		// opened it.
+		if len(threadComments) > 0 && threadComments[0].PullRequestReview != nil {
+			thread.ReviewID = threadComments[0].PullRequestReview.ID
+		}
 		// line is null once the code the thread was on has changed.
 		if thread.Line == 0 {
 			thread.Line = t.OriginalLine

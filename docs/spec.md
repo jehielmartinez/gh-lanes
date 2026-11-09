@@ -195,8 +195,27 @@ means leaving the terminal and clicking through the web UI for each PR.
     to read in a terminal.
 58. As a developer, I want comments, reviews and review threads in one timeline sorted by time, so
     that I can follow the conversation in order.
+58a. As a developer, I want each review to lead with its verdict, like "✗ user-b requested
+    changes", "✓ user-c approved" or "○ user-d reviewed", with the review's text and the threads it
+    opened beneath it, so that I read a review as one piece rather than scattered entries. A thread
+    whose review GitHub doesn't name stands on its own in the timeline. A review that only commented,
+    said nothing and opened no thread (GitHub makes one for each batch of replies) is left out.
 59. As a developer, I want review threads to show their `file:line` and resolved or unresolved
     state, with resolved threads collapsed, so that I can focus on what's open.
+59a. As a developer, I want to move a highlight between the modal's foldable headings (sections,
+    reviews and threads) with `tab` and `shift+tab`, and fold or unfold the highlighted one with
+    `enter`, so that I can tidy away what I've read without the mouse. The highlight scrolls into
+    view. Clicking a heading folds it and highlights it. A folded review says what it hides, like
+    "▸ 3 lines · 2 threads". Folds survive a refresh. `e` still folds or unfolds every resolved
+    thread at once, dropping any thread folded or unfolded by hand.
+59b. As a developer, I want Copilot's reviews to read cleanly, so that the reviews I get most often
+    aren't a wall of HTML. Copilot reads "Copilot", not its login. In any review, comment or
+    description, a `<details>` block shows its summary behind a fold marker and its contents only
+    when it is marked open, as GitHub draws it, so a closed one (Copilot's file table) stays folded
+    and can't be unfolded in lanes. Images show their alt text (Copilot's severity), HTML character
+    references are decoded unless they encode a control character, a GitHub alert like
+    `> [!NOTE]` shows its kind on its own line, and a `suggestion` block is labelled "Suggested
+    change" and shown as code, never as a diff.
 60. As a developer, I want every timestamp in my local timezone, as both an absolute date and a
     relative age, so that I don't do timezone math.
 61. As a developer, I want the modal's data to refresh while it's open, so that I see new comments
@@ -395,8 +414,9 @@ Mutations are commands returning a result message, which triggers a single-PR re
   each saying whether it is the viewer, for the Status roll-call.
 - Activity counts: comment and review totals, for snapshots.
 
-The detail query (on modal open) adds the body, comments, reviews, and review threads with their
-comments. Any connection reporting more pages is paged through, except latest reviews and review
+The detail query (on modal open) adds the body, comments, reviews (with their IDs), and review
+threads with their comments, each comment naming the review it was submitted with, so a thread can
+be placed under the review that opened it. Any connection reporting more pages is paged through, except latest reviews and review
 requests, which hold one entry per reviewer. `UNKNOWN` mergeability is shown as "checking…" and
 never treated as a conflict.
 
@@ -459,6 +479,10 @@ Actions are gated on `viewerCanUpdate`, repo merge settings and PR state.
 | Key | Where | Action |
 |---|---|---|
 | `tab` / `shift+tab` | global | switch Board → Review requests → Archived |
+| `tab` / `shift+tab` | modal | highlight the next/previous foldable heading |
+| `enter` | modal | fold or unfold the highlighted heading |
+| `1`–`4` | modal | fold or unfold a section |
+| `e` | modal | fold or unfold every resolved thread |
 | `h` `l` / `←` `→` | board | focus previous/next lane |
 | `j` `k` / `↓` `↑` | board, lists | select card |
 | `H` `L` / `<` `>` | board | move card one lane left/right |

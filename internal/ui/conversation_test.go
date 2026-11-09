@@ -92,24 +92,24 @@ func underlined(raw, text string) bool {
 
 func TestConversationIsOneTimelineSortedByTime(t *testing.T) {
 	h := newConversationHarness(t)
-
 	screen := h.waitForText("Mention the new tag.")
 	assertOrder(t, screen,
 		"Conversation",
 		"user-b commented · Mar 2, 2026 10:00 (3d ago)", "Looks close. One question about the cache.",
-		"user-b [Changes requested] · Mar 3, 2026 10:00 (2d ago)", "Please pin the digest.",
+		"✗ user-b requested changes · Mar 3, 2026 10:00 (2d ago)", "Please pin the digest.",
 		"▾ Dockerfile:3 · Unresolved · Mar 3, 2026 10:01 (2d ago)",
 		"user-b · Mar 3, 2026 10:01 (2d ago)", "Pin this to a digest.",
 		"user-a · Mar 4, 2026 11:00 (1d ago)", "Done in the next push.",
+		"○ user-c reviewed · Mar 3, 2026 10:03 (2d ago)",
 		"▸ scripts/build.sh:12 · Resolved · 2 comments",
 		"user-a commented · Mar 4, 2026 10:00 (1d ago)", "Rebased onto main.",
-		"user-c [Approved] · Mar 5, 2026 09:00 (3h ago)",
+		"✓ user-c approved · Mar 5, 2026 09:00 (3h ago)",
 		"▾ README.md:8 · Unresolved · Mar 5, 2026 09:05 (2h ago)",
 		"ghost · Mar 5, 2026 09:05 (2h ago)", "Mention the new tag.",
 	)
-	// user-c's empty COMMENTED review only carried thread comments.
-	if n := strings.Count(screen, "user-c"); n != 1 {
-		t.Errorf("want only user-c's approval in the timeline, found user-c %d times:\n%s", n, screen)
+	// user-a's empty review only carried a reply to a thread already shown.
+	if strings.Contains(screen, "user-a reviewed") {
+		t.Errorf("a review that only replied to a thread is in the timeline:\n%s", screen)
 	}
 }
 
@@ -127,7 +127,7 @@ func TestResolvedThreadsAreCollapsedUntilExpanded(t *testing.T) {
 	screen = h.waitForText("Fixed in the next push.")
 	assertOrder(t, screen,
 		"▾ scripts/build.sh:12 · Resolved · Mar 3, 2026 10:02 (2d ago)",
-		"user-b · Mar 3, 2026 10:02 (2d ago)", "Typo here: biuld.",
+		"user-c · Mar 3, 2026 10:02 (2d ago)", "Typo here: biuld.",
 		"user-a · Mar 4, 2026 10:30 (1d ago)", "Fixed in the next push.",
 	)
 
@@ -192,7 +192,7 @@ func TestConversationQueriesAskForNoCodeOrDiffs(t *testing.T) {
 			}
 		}
 		if r.Operation == "PullRequestDetail" {
-			assertContains(t, r.Query, "body", "reviewThreads", "isResolved", "originalLine")
+			assertContains(t, r.Query, "body", "reviewThreads", "isResolved", "originalLine", "pullRequestReview")
 		}
 	}
 }
@@ -213,8 +213,9 @@ func TestEachTimelineEntryIsDrawnBehindItsOwnBar(t *testing.T) {
 	assertContains(t, screen,
 		"┃ user-b commented",
 		"┃ Looks close. One question about the cache.",
-		"┃ user-b [Changes requested]",
-		"┃ ▾ Dockerfile:3 · Unresolved",
+		"┃ ✗ user-b requested changes",
+		"┃   ▾ Dockerfile:3 · Unresolved",
+		"┃ ▾ README.md:8 · Unresolved",
 	)
 	// Replies in a thread sit a blank barred line apart.
 	lines := strings.Split(screen, "\n")

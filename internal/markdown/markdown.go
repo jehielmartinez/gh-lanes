@@ -60,6 +60,14 @@ var (
 	listItem   = regexp.MustCompile(`^( *)([-*+]|\d{1,9}[.)])([ \t]+|$)(.*)$`)
 	tableRow   = regexp.MustCompile(`^ {0,3}\|`)
 	tableRule  = regexp.MustCompile(`^ {0,3}\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$`)
+	// detailsOpen starts a <details> block, as review bots write them.
+	detailsOpen = regexp.MustCompile(`(?i)^ {0,3}<details\b[^>]*>`)
+	detailsTag  = regexp.MustCompile(`(?i)<(/?)details\b[^>]*>`)
+	openAttr    = regexp.MustCompile(`(?i)\sopen\b`)
+	summaryTag  = regexp.MustCompile(`(?is)<summary\b[^>]*>(.*?)</summary>`)
+	// alert is the first line of a GitHub alert, a quote that starts with
+	// its kind, like "[!NOTE]".
+	alert = regexp.MustCompile(`(?i)^\s*\[!(note|tip|important|warning|caution)\]\s*$`)
 )
 
 // block is one rendered block. A list item follows the block before it
@@ -100,8 +108,21 @@ func renderBlocks(lines []string, width int) []Line {
 		case fenceOpen.MatchString(line):
 			flush()
 			var code []string
+			info := fenceInfo(line)
 			code, i = fenced(lines, i)
-			add(block{lines: codeBlock(code, width)})
+			rendered := codeBlock(code, width)
+			// A suggestion is code the reviewer proposes in place of the
+			// lines the thread is on; GitHub draws it as a diff, and lanes
+			// shows no diffs, so it is labelled and shown as code.
+			if info == "suggestion" {
+				rendered = append([]Line{{{Text: "Suggested change", Style: Muted}}}, rendered...)
+			}
+			add(block{lines: rendered})
+		case detailsOpen.MatchString(line):
+			flush()
+			var details []Line
+			details, i = detailsBlock(lines, i, width)
+			add(block{lines: details})
 		case len(para) == 0 && indentOf(line) >= 4:
 			var code []string
 			for ; i < len(lines) && (indentOf(lines[i]) >= 4 || strings.TrimSpace(lines[i]) == ""); i++ {
@@ -128,6 +149,12 @@ func renderBlocks(lines []string, width int) []Line {
 			}
 			i--
 			bar := Span{Text: "│ ", Style: Muted}
+			// An alert's kind heads it on a line of its own.
+			if m := alert.FindStringSubmatch(inner[0]); m != nil {
+				title := Line{{Text: strings.ToUpper(m[1][:1]) + strings.ToLower(m[1][1:]), Style: Bold}}
+				add(block{lines: prefix(append([]Line{title}, renderBlocks(inner[1:], width-2)...), bar, bar)})
+				continue
+			}
 			add(block{lines: prefix(renderBlocks(inner, width-2), bar, bar)})
 		case listItem.MatchString(line):
 			flush()
@@ -186,6 +213,71 @@ func fenced(lines []string, start int) ([]string, int) {
 		code = append(code, trimLeadingSpaces(expandTabs(lines[i]), indent))
 	}
 	return code, len(lines)
+}
+
+// fenceInfo is the info string after a fence's opening marker, lower-cased.
+func fenceInfo(line string) string {
+	rest := strings.TrimLeft(strings.TrimSpace(line), "`~")
+	if f := strings.Fields(rest); len(f) > 0 {
+		return strings.ToLower(f[0])
+	}
+	return ""
+}
+
+// detailsBlock renders the <details> block opening at lines[start] and
+// returns the index of the line that closes it. Its summary is drawn as a
+// heading behind a fold marker. Its contents are drawn beneath only when it
+// is open, as GitHub draws it; a closed block stays folded, since lanes
+// can't unfold it and review bots put file lists there.
+func detailsBlock(lines []string, start, width int) ([]Line, int) {
+	open := openAttr.MatchString(detailsOpen.FindString(lines[start]))
+	var body strings.Builder
+	depth, end := 0, len(lines)-1
+	for i := start; i < len(lines); i++ {
+		line := lines[i]
+		if i == start {
+			line = line[len(detailsOpen.FindString(line)):]
+			depth = 1
+		}
+		cut := -1
+		for _, m := range detailsTag.FindAllStringSubmatchIndex(line, -1) {
+			if line[m[2]:m[3]] == "" {
+				depth++
+				continue
+			}
+			if depth--; depth == 0 {
+				cut = m[0]
+				break
+			}
+		}
+		if cut >= 0 {
+			body.WriteString(line[:cut])
+			end = i
+			break
+		}
+		body.WriteString(line + "\n")
+	}
+	content := body.String()
+	summary := "Details"
+	if m := summaryTag.FindStringSubmatchIndex(content); m != nil {
+		if s := strings.TrimSpace(content[m[2]:m[3]]); s != "" {
+			summary = s
+		}
+		content = content[:m[0]] + content[m[1]:]
+	}
+	marker := "▸ "
+	if open {
+		marker = "▾ "
+	}
+	heading := wrap(parseInline(strings.Join(strings.Fields(summary), " "), Bold, ""), width-2)
+	out := prefix(heading, Span{Text: marker, Style: Muted}, Span{Text: "  "})
+	if open {
+		inner := renderBlocks(strings.Split(content, "\n"), width-2)
+		if len(inner) > 0 {
+			out = append(out, prefix(inner, Span{Text: "  "}, Span{Text: "  "})...)
+		}
+	}
+	return out, end
 }
 
 // codeBlock draws code as it was written, indented by two columns and cut
@@ -252,7 +344,8 @@ func renderItem(marker string, body []string, width int) []Line {
 // continuing a paragraph above it.
 func startsBlock(line string) bool {
 	return fenceOpen.MatchString(line) || atxHeading.MatchString(line) || rule.MatchString(line) ||
-		quoteLine.MatchString(line) || listItem.MatchString(line) || tableRow.MatchString(line)
+		quoteLine.MatchString(line) || listItem.MatchString(line) || tableRow.MatchString(line) ||
+		detailsOpen.MatchString(line)
 }
 
 func nextNonBlank(lines []string, from int) int {

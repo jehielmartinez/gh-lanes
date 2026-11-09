@@ -106,3 +106,51 @@ func TestChecksArePagedThrough(t *testing.T) {
 		t.Errorf("after = %v, want the first page's end cursor", got)
 	}
 }
+
+// cardTitle returns the title line of the card for ref, trimmed.
+func cardTitle(t *testing.T, screen, ref string) string {
+	t.Helper()
+	return strings.TrimSpace(cardLine(t, screen, ref, 2))
+}
+
+func TestCardsMarkDraftsAndReadyPullRequests(t *testing.T) {
+	h := newActionsHarness(t, nil)
+	screen := h.screen.plain()
+
+	for ref, want := range map[string]string{
+		draftRef:  "◌ Sketch the export flow",
+		readyRef:  "◉ Tidy the retry loop",
+		lockedRef: "◉ Pin the toolchain",
+	} {
+		if got := cardTitle(t, screen, ref); !strings.HasPrefix(got, want) {
+			t.Errorf("%s title line = %q, want it to start %q", ref, got, want)
+		}
+	}
+}
+
+func TestMarkingADraftReadySwapsItsIcon(t *testing.T) {
+	h := newActionsHarness(t, func(tr *githubtest.Transport) {
+		tr.Reply(markReadyOp, githubtest.Response{Body: []byte(mutationOK[markReadyOp])})
+		tr.ReplyFixture(t, "PullRequestsByID", fixture("nodes_marked_ready.json"))
+	})
+
+	h.press("d")
+	h.waitForScreen("the draft's icon to turn ready", func(s string) bool {
+		return strings.HasPrefix(cardTitle(t, s, draftRef), "◉ ")
+	})
+}
+
+func TestFinishedCardsCarryNoDraftIcon(t *testing.T) {
+	transport := boardTransport(t)
+	transport.ReplyFixture(t, "PullRequestsByID", fixture("nodes_tracked.json"))
+	h := startWithState(t, transport,
+		`{"version":1,"assignments":{"PR_node_older":"testing","PR_node_merged":"demo","PR_node_closed":"done"}}`,
+		"Done 1")
+
+	screen := h.screen.plain()
+	for _, ref := range []string{"octo-org/sample-repo#20", "user-a/other-repo#21"} {
+		if got := cardTitle(t, screen, ref); strings.ContainsAny(got, "◌◉") {
+			t.Errorf("%s is merged or closed but its title line is %q", ref, got)
+		}
+	}
+}

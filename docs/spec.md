@@ -93,6 +93,10 @@ means leaving the terminal and clicking through the web UI for each PR.
     that I can see the shape of my work at a glance.
 23. As a developer, I want each card to show the repo and number, the title, check status, review
     decision, mergeability and age, so that I can triage without opening it.
+23a. As a developer, I want an icon before an open card's title saying whether it's a draft (`◌`,
+    muted) or ready for review (`◉`, green), so that I can tell drafts apart at a glance. The icons
+    differ in shape as well as colour. Merged and closed cards have none, since their last line
+    already gives their state.
 24. As a developer, I want cards sorted by most recently updated within a lane, so that active work
     is on top.
 25. As a developer, I want the board to scroll horizontally when lanes don't fit, keeping the

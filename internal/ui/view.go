@@ -193,7 +193,14 @@ func (m Model) cardView(pr domain.PullRequest, width int, selected, dimmed bool)
 	if m.err != nil || dimmed {
 		titleColor = m.theme.muted
 	}
-	title := lipgloss.NewStyle().Foreground(titleColor).Faint(dimmed).Render(truncate(oneLine(pr.Title), inner))
+	// An open card's title follows its draft or ready icon. A finished one
+	// has none, since its last line already says merged or closed.
+	icon := ""
+	if !pr.Finished() {
+		icon = m.draftIcon(pr, dimmed) + " "
+	}
+	title := icon + lipgloss.NewStyle().Foreground(titleColor).Faint(dimmed).
+		Render(truncate(oneLine(pr.Title), max(inner-lipgloss.Width(icon), 1)))
 	// The selected card gets a heavier border as well as a colour, so the
 	// selection still shows on a terminal without colour.
 	border, borderColor := lipgloss.RoundedBorder(), m.theme.border
@@ -226,6 +233,20 @@ func (m Model) cardStateLine(pr domain.PullRequest, width int, dimmed bool) stri
 	age := lipgloss.NewStyle().Foreground(m.theme.muted).Faint(dimmed).Render(shortAge(m.now.Sub(pr.UpdatedAt)))
 	gap := max(width-lipgloss.Width(badge)-lipgloss.Width(age), 1)
 	return badge + strings.Repeat(" ", gap) + age
+}
+
+// draftIcon is drawn before an open card's title: a hollow dotted circle for
+// a draft, a filled one for a pull request ready for review. They differ in
+// shape as well as colour, so they read on a terminal without colour.
+func (m Model) draftIcon(pr domain.PullRequest, dimmed bool) string {
+	icon, c := "◉", m.theme.success
+	if pr.IsDraft {
+		icon, c = "◌", m.theme.muted
+	}
+	if dimmed {
+		c = m.theme.muted
+	}
+	return lipgloss.NewStyle().Foreground(c).Faint(dimmed).Render(icon)
 }
 
 // markerView is the activity marker drawn on a card's first line, before its

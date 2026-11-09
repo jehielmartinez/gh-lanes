@@ -18,7 +18,7 @@ func TestBoardShowsMyOpenPRsAsCardsInUntaggedLane(t *testing.T) {
 	assertContains(t, screen,
 		"Untagged 3",
 		"user-a/other-repo#42",
-		"Add retry with exponential back…",
+		"◉ Add retry with exponential ba…",
 		"octo-org/sample-repo#7",
 		"Fix typo in README",
 		"octo-org/a-very-long-sample-repository-name#1234",

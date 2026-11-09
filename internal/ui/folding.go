@@ -3,13 +3,14 @@ package ui
 import (
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
 )
 
-// foldable is a heading in the modal that folds: a section, a review or a
-// review thread.
+// foldable is a heading in the modal that folds: a section, a review, a
+// review thread, or a <details> block in markdown.
 type foldable struct {
 	key string
 	// line is the content line the heading is drawn on.
@@ -23,6 +24,10 @@ type foldable struct {
 func sectionFold(s section) string { return "section:" + s.key() }
 func reviewFold(id string) string  { return "review:" + id }
 func threadFold(id string) string  { return "thread:" + id }
+
+// detailsFold keys the nth <details> block in the markdown of host: a
+// review's fold key, a comment's, or the description.
+func detailsFold(host string, n int) string { return host + "/details:" + strconv.Itoa(n) }
 
 // folding is how the viewer has left the modal's reviews and threads.
 type folding struct {

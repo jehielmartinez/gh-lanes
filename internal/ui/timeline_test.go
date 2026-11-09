@@ -224,6 +224,39 @@ func TestEncodedControlCharactersStayText(t *testing.T) {
 	}
 }
 
+// In the Copilot fixture the foldable headings run: the four sections, the
+// review, its open "2 open issues" block, its closed "What changed in this
+// PR" block, then the Dockerfile thread.
+
+func TestTabReachesDetailsBlocksAndEnterFoldsThem(t *testing.T) {
+	h := newCopilotHarness(t)
+	h.waitForText("Review effort: Balanced")
+
+	h.tabTo(7)
+	h.waitForHighlight("What changed in this PR")
+	h.press("enter")
+	screen := h.waitForText("Pins the base image by digest.")
+	assertContains(t, screen, "▾ What changed in this PR", "Moves the base image to alpine and pins it by digest.")
+
+	h.press("shift+tab")
+	h.waitForHighlight("2 open issues")
+	h.press("enter")
+	screen = h.waitForScreen("the open issues to fold", func(s string) bool {
+		return strings.Contains(s, "▸ 2 open issues") && !strings.Contains(s, "Refresh the cache key")
+	})
+	// Folding one block leaves the other as the viewer left it.
+	assertContains(t, screen, "Pins the base image by digest.")
+}
+
+func TestClickingADetailsSummaryFoldsIt(t *testing.T) {
+	h := newCopilotHarness(t)
+	h.waitForText("Review effort: Balanced")
+
+	h.clickText("What changed in this PR")
+	h.waitForText("Pins the base image by digest.")
+	h.waitForHighlight("What changed in this PR")
+}
+
 func TestCopilotIssueLinksAreClickable(t *testing.T) {
 	h := newCopilotHarness(t)
 	h.waitForText("Refresh the cache key when the digest changes")

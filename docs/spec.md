@@ -203,16 +203,15 @@ means leaving the terminal and clicking through the web UI for each PR.
 59. As a developer, I want review threads to show their `file:line` and resolved or unresolved
     state, with resolved threads collapsed, so that I can focus on what's open.
 59a. As a developer, I want to move a highlight between the modal's foldable headings (sections,
-    reviews and threads) with `tab` and `shift+tab`, and fold or unfold the highlighted one with
+    reviews, threads and `<details>` blocks) with `tab` and `shift+tab`, and fold or unfold the highlighted one with
     `enter`, so that I can tidy away what I've read without the mouse. The highlight scrolls into
     view. Clicking a heading folds it and highlights it. A folded review says what it hides, like
     "▸ 3 lines · 2 threads". Folds survive a refresh. `e` still folds or unfolds every resolved
     thread at once, dropping any thread folded or unfolded by hand.
 59b. As a developer, I want Copilot's reviews to read cleanly, so that the reviews I get most often
     aren't a wall of HTML. Copilot reads "Copilot", not its login. In any review, comment or
-    description, a `<details>` block shows its summary behind a fold marker and its contents only
-    when it is marked open, as GitHub draws it, so a closed one (Copilot's file table) stays folded
-    and can't be unfolded in lanes. Images show their alt text (Copilot's severity), HTML character
+    description, a `<details>` block shows its summary behind a fold marker and starts unfolded only
+    when it is marked open, as GitHub draws it; its summary is a foldable heading like any other. Images show their alt text (Copilot's severity), HTML character
     references are decoded unless they encode a control character, a GitHub alert like
     `> [!NOTE]` shows its kind on its own line, and a `suggestion` block is labelled "Suggested
     change" and shown as code, never as a diff.

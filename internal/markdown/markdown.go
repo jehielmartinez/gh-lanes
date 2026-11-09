@@ -32,6 +32,11 @@ type Span struct {
 	Style Style
 	// URL is the link the text belongs to, empty for plain text.
 	URL string
+	// Fold marks the fold marker of a <details> block, numbering the blocks
+	// from 1 in the order they start in the source; 0 for any other span.
+	Fold int
+	// Open is whether the block Fold marks is drawn unfolded.
+	Open bool
 }
 
 // Line is one rendered line, no wider than the width it was rendered at.
@@ -40,11 +45,31 @@ type Line []Span
 // minWidth keeps layout possible on an absurdly narrow screen.
 const minWidth = 8
 
-// Render lays out markdown source at width columns.
+// Render lays out markdown source at width columns, each <details> block
+// open or folded as its source says.
 func Render(src string, width int) []Line {
+	return RenderFolded(src, width, nil)
+}
+
+// RenderFolded lays out markdown source at width columns, asking open
+// whether each <details> block is unfolded: it gets the block's number, as
+// Span.Fold gives it, and whether the source marks it open. A nil open keeps
+// every block as the source says.
+func RenderFolded(src string, width int, open func(fold int, def bool) bool) []Line {
 	src = strings.ReplaceAll(src, "\r\n", "\n")
 	src = htmlComment.ReplaceAllString(src, "")
-	return renderBlocks(strings.Split(src, "\n"), max(width, minWidth))
+	if open == nil {
+		open = func(_ int, def bool) bool { return def }
+	}
+	r := &renderer{open: open}
+	return r.blocks(strings.Split(src, "\n"), max(width, minWidth))
+}
+
+// renderer carries what one Render call shares across nested blocks: the
+// fold choices, and how many <details> blocks have started so far.
+type renderer struct {
+	open    func(fold int, def bool) bool
+	details int
 }
 
 // htmlComment matches the HTML comments PR templates are full of, which
@@ -81,10 +106,10 @@ type block struct {
 	gap bool
 }
 
-// renderBlocks splits lines into blocks and renders each. It is one loop
+// blocks splits lines into blocks and renders each. It is one loop
 // over the lines because markdown's block rules are decided by what starts
 // the next line, and splitting that decision up would scatter it.
-func renderBlocks(lines []string, width int) []Line {
+func (r *renderer) blocks(lines []string, width int) []Line {
 	var blocks []block
 	var para []string
 	sawBlank, paraGap := false, false
@@ -121,7 +146,7 @@ func renderBlocks(lines []string, width int) []Line {
 		case detailsOpen.MatchString(line):
 			flush()
 			var details []Line
-			details, i = detailsBlock(lines, i, width)
+			details, i = r.detailsBlock(lines, i, width)
 			add(block{lines: details})
 		case len(para) == 0 && indentOf(line) >= 4:
 			var code []string
@@ -152,14 +177,14 @@ func renderBlocks(lines []string, width int) []Line {
 			// An alert's kind heads it on a line of its own.
 			if m := alert.FindStringSubmatch(inner[0]); m != nil {
 				title := Line{{Text: strings.ToUpper(m[1][:1]) + strings.ToLower(m[1][1:]), Style: Bold}}
-				add(block{lines: prefix(append([]Line{title}, renderBlocks(inner[1:], width-2)...), bar, bar)})
+				add(block{lines: prefix(append([]Line{title}, r.blocks(inner[1:], width-2)...), bar, bar)})
 				continue
 			}
-			add(block{lines: prefix(renderBlocks(inner, width-2), bar, bar)})
+			add(block{lines: prefix(r.blocks(inner, width-2), bar, bar)})
 		case listItem.MatchString(line):
 			flush()
 			var item []Line
-			item, i = listBlock(lines, i, width)
+			item, i = r.listBlock(lines, i, width)
 			add(block{lines: item, listItem: true})
 		case tableRow.MatchString(line):
 			flush()
@@ -226,11 +251,13 @@ func fenceInfo(line string) string {
 
 // detailsBlock renders the <details> block opening at lines[start] and
 // returns the index of the line that closes it. Its summary is drawn as a
-// heading behind a fold marker. Its contents are drawn beneath only when it
-// is open, as GitHub draws it; a closed block stays folded, since lanes
-// can't unfold it and review bots put file lists there.
-func detailsBlock(lines []string, start, width int) ([]Line, int) {
-	open := openAttr.MatchString(detailsOpen.FindString(lines[start]))
+// heading behind a fold marker, and its contents beneath only while it is
+// unfolded. It starts unfolded only if the source marks it open, as GitHub
+// draws it.
+func (r *renderer) detailsBlock(lines []string, start, width int) ([]Line, int) {
+	r.details++
+	fold := r.details
+	open := r.open(fold, openAttr.MatchString(detailsOpen.FindString(lines[start])))
 	var body strings.Builder
 	depth, end := 0, len(lines)-1
 	for i := start; i < len(lines); i++ {
@@ -270,12 +297,20 @@ func detailsBlock(lines []string, start, width int) ([]Line, int) {
 		marker = "▾ "
 	}
 	heading := wrap(parseInline(strings.Join(strings.Fields(summary), " "), Bold, ""), width-2)
-	out := prefix(heading, Span{Text: marker, Style: Muted}, Span{Text: "  "})
-	if open {
-		inner := renderBlocks(strings.Split(content, "\n"), width-2)
-		if len(inner) > 0 {
-			out = append(out, prefix(inner, Span{Text: "  "}, Span{Text: "  "})...)
+	out := prefix(heading, Span{Text: marker, Style: Muted, Fold: fold, Open: open}, Span{Text: "  "})
+	if !open {
+		// The blocks nested in a folded one still take their numbers, so
+		// the blocks after it keep theirs whether it is folded or not.
+		for _, m := range detailsTag.FindAllStringSubmatch(content, -1) {
+			if m[1] == "" {
+				r.details++
+			}
 		}
+		return out, end
+	}
+	inner := r.blocks(strings.Split(content, "\n"), width-2)
+	if len(inner) > 0 {
+		out = append(out, prefix(inner, Span{Text: "  "}, Span{Text: "  "})...)
 	}
 	return out, end
 }
@@ -293,7 +328,7 @@ func codeBlock(code []string, width int) []Line {
 
 // listBlock renders the list item starting at lines[start], with everything
 // indented beneath it, and returns the index of its last line.
-func listBlock(lines []string, start, width int) ([]Line, int) {
+func (r *renderer) listBlock(lines []string, start, width int) ([]Line, int) {
 	m := listItem.FindStringSubmatch(expandTabs(lines[start]))
 	indent, marker, gap, text := len(m[1]), m[2], m[3], m[4]
 	content := indent + len(marker) + max(len(gap), 1)
@@ -308,22 +343,22 @@ func listBlock(lines []string, start, width int) ([]Line, int) {
 		switch {
 		case blank:
 			if next := nextNonBlank(lines, i); next < 0 || indentOf(lines[next]) < content {
-				return renderItem(marker, body, width), end
+				return r.renderItem(marker, body, width), end
 			}
 			body = append(body, "")
 		case indentOf(line) >= content:
 			body = append(body, line[content:])
 		case startsBlock(line) || body[len(body)-1] == "":
-			return renderItem(marker, body, width), end
+			return r.renderItem(marker, body, width), end
 		default:
 			body = append(body, strings.TrimSpace(line))
 		}
 		end = i
 	}
-	return renderItem(marker, body, width), end
+	return r.renderItem(marker, body, width), end
 }
 
-func renderItem(marker string, body []string, width int) []Line {
+func (r *renderer) renderItem(marker string, body []string, width int) []Line {
 	body = slices.Clone(body)
 	bullet := marker
 	if strings.ContainsAny(marker, "-*+") {
@@ -337,7 +372,7 @@ func renderItem(marker string, body []string, width int) []Line {
 	}
 	gutter := len([]rune(bullet)) + 1
 	first := Span{Text: bullet + " ", Style: Muted}
-	return prefix(renderBlocks(body, width-gutter), first, Span{Text: strings.Repeat(" ", gutter)})
+	return prefix(r.blocks(body, width-gutter), first, Span{Text: strings.Repeat(" ", gutter)})
 }
 
 // startsBlock is whether a line opens a block of its own rather than

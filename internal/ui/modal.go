@@ -289,7 +289,7 @@ func (m Model) detailContent(width int) page {
 	}
 	conv := pr.Conversation
 	bodyWidth := width - indentStep
-	add(sectionDescription, descriptionSummary(conv.Body, bodyWidth), func() page { return m.descriptionLines(conv, width) })
+	add(sectionDescription, descriptionSummary(conv.Body, bodyWidth), func() page { return m.descriptionLines(conv, d.folding(), width) })
 	if !d.open[sectionDescription] {
 		if preview := descriptionPreview(conv.Body, bodyWidth-2); preview != "" {
 			content = content.then(text(indented(1, m.muted(preview))))

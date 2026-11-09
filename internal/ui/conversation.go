@@ -16,11 +16,11 @@ import (
 const indentStep = 2
 
 // descriptionLines is the body of the modal's Description section.
-func (m Model) descriptionLines(conv domain.Conversation, width int) page {
+func (m Model) descriptionLines(conv domain.Conversation, f folding, width int) page {
 	if strings.TrimSpace(conv.Body) == "" {
 		return text(indented(1, m.muted("No description provided.")))
 	}
-	return m.markdownLines(conv.Body, 1, width)
+	return m.markdownLines(conv.Body, "description", f, 1, width)
 }
 
 // conversationLines is the body of the modal's Conversation section: one
@@ -39,7 +39,7 @@ func (m Model) conversationLines(timeline []domain.TimelineEntry, f folding, wid
 		}
 		switch {
 		case e.Comment != nil:
-			p = p.then(m.gutter(m.commentLines(*e.Comment, "commented", 0, inner), m.theme.accent))
+			p = p.then(m.gutter(m.commentLines(*e.Comment, "commented", f, 0, inner), m.theme.accent))
 		case e.Review != nil:
 			_, _, c := m.verdictLook(e.Review.State)
 			p = p.then(m.gutter(m.reviewLines(*e.Review, e.Threads, f, inner), c))
@@ -73,13 +73,15 @@ func (m Model) threadColor(t domain.Thread) color.Color {
 	return m.theme.pending
 }
 
-func (m Model) commentLines(c domain.Comment, verb string, depth, width int) page {
+func (m Model) commentLines(c domain.Comment, verb string, f folding, depth, width int) page {
 	header := m.bold(authorName(c.Author))
 	if verb != "" {
 		header += " " + verb
 	}
 	header += m.muted(statusSeparator + m.timestamp(c.CreatedAt))
-	return text(indentedWrap(depth, header, width)).then(m.markdownLines(c.Body, depth, width))
+	// A comment carries no ID here, so who wrote it and when names it.
+	host := fmt.Sprintf("comment:%s@%d", c.Author, c.CreatedAt.UnixNano())
+	return text(indentedWrap(depth, header, width)).then(m.markdownLines(c.Body, host, f, depth, width))
 }
 
 // reviewLines draws a review: its verdict, who gave it and when, then what
@@ -90,7 +92,7 @@ func (m Model) reviewLines(r domain.Review, threads []*domain.Thread, f folding,
 	_, glyph, c := m.verdictLook(r.State)
 	var body page
 	if strings.TrimSpace(r.Body) != "" {
-		body = m.markdownLines(r.Body, 1, width)
+		body = m.markdownLines(r.Body, reviewFold(r.ID), f, 1, width)
 	}
 	key := reviewFold(r.ID)
 	folds := r.ID != "" && (len(body.lines) > 0 || len(threads) > 0)
@@ -185,22 +187,27 @@ func (m Model) threadLines(t domain.Thread, depth int, f folding, width int) pag
 		return p
 	}
 	for _, c := range t.Comments {
-		p = p.then(text(""), m.commentLines(c, "", depth+1, width))
+		p = p.then(text(""), m.commentLines(c, "", f, depth+1, width))
 	}
 	return p
 }
 
 // markdownLines renders markdown at an indent depth, recording where each
-// link lands. Only http and https links are drawn as links; anything else is
-// plain text, since it will never be opened.
-func (m Model) markdownLines(src string, depth, width int) page {
+// link lands and where each <details> heading is, as a foldable keyed under
+// host, the review, comment or description the markdown belongs to. Only
+// http and https links are drawn as links; anything else is plain text,
+// since it will never be opened.
+func (m Model) markdownLines(src, host string, f folding, depth, width int) page {
 	indent := strings.Repeat(" ", depth*indentStep)
+	foldKey := func(fold int) string { return detailsFold(host, fold) }
+	open := func(fold int, def bool) bool { return f.isOpen(foldKey(fold), def) }
 	var p page
-	for row, l := range markdown.Render(src, width-len(indent)) {
+	for row, l := range markdown.RenderFolded(src, width-len(indent), open) {
 		var b strings.Builder
 		b.WriteString(indent)
 		col := len(indent)
-		for _, sp := range l {
+		highlighted := false
+		for i, sp := range l {
 			w := lipgloss.Width(sp.Text)
 			if !links.Openable(sp.URL) {
 				sp.URL = ""
@@ -208,7 +215,24 @@ func (m Model) markdownLines(src string, depth, width int) page {
 			if sp.URL != "" {
 				p.links = addRegion(p.links, links.Region{Line: row, Start: col, End: col + w, URL: sp.URL})
 			}
-			b.WriteString(m.spanStyle(sp).Render(sp.Text))
+			switch {
+			case highlighted:
+			case sp.Fold != 0:
+				key := foldKey(sp.Fold)
+				p.folds = append(p.folds, foldable{key: key, line: row, open: sp.Open})
+				b.WriteString(m.spanStyle(sp).Render(sp.Text))
+				// A highlighted heading draws its summary as one label.
+				if key == f.highlight {
+					highlighted = true
+					var summary strings.Builder
+					for _, rest := range l[i+1:] {
+						summary.WriteString(rest.Text)
+					}
+					b.WriteString(highlightIf(true, summary.String()))
+				}
+			default:
+				b.WriteString(m.spanStyle(sp).Render(sp.Text))
+			}
 			col += w
 		}
 		p.lines = append(p.lines, b.String())

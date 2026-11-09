@@ -89,7 +89,7 @@ One of the detail modal's four collapsible parts: Status, Checks, Description an
 _Avoid_: Group (that names a cluster of cards), panel, tab
 
 **Fold**:
-To collapse a section, review or thread down to its heading, or to expand it again. A folded heading says what it hides.
+To collapse a section, review, thread or `<details>` block down to its heading, or to expand it again. A folded heading says what it hides.
 _Avoid_: Hide, minimise
 
 **Highlight**:

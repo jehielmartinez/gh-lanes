@@ -22,7 +22,8 @@
                 {
                   "author": null,
                   "body": "Mention the new tag.",
-                  "createdAt": "2026-03-05T14:05:00Z"
+                  "createdAt": "2026-03-05T14:05:00Z",
+                  "pullRequestReview": null
                 }
               ]
             }

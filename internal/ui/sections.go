@@ -67,8 +67,9 @@ func defaultSections(pr domain.PullRequest) sectionSet {
 
 // sectionHeader is a section's one-line heading: a ▾ or ▸ marker, its
 // title, a muted summary that stays useful while the section is closed, and
-// at the right edge a hint naming the key that toggles it.
-func (m Model) sectionHeader(s section, open bool, summary string, width int) string {
+// at the right edge a hint naming the key that toggles it. The title is
+// drawn highlighted when the highlight is on it.
+func (m Model) sectionHeader(s section, open, highlighted bool, summary string, width int) string {
 	marker, verb := "▸", "open"
 	if open {
 		marker, verb = "▾", "close"
@@ -77,10 +78,14 @@ func (m Model) sectionHeader(s section, open bool, summary string, width int) st
 	title := marker + " " + s.title()
 	// The summary gives way first, so the title and hint always show.
 	room := width - lipgloss.Width(title) - lipgloss.Width(hint) - 4
-	if room < 0 {
-		return lipgloss.NewStyle().MaxWidth(width).Render(m.muted(marker) + " " + m.sectionHeading(s.title()))
+	heading := m.sectionHeading(s.title())
+	if highlighted {
+		heading = highlightIf(true, s.title())
 	}
-	line := m.muted(marker) + " " + m.sectionHeading(s.title())
+	if room < 0 {
+		return lipgloss.NewStyle().MaxWidth(width).Render(m.muted(marker) + " " + heading)
+	}
+	line := m.muted(marker) + " " + heading
 	used := lipgloss.Width(title)
 	if summary != "" && room > 1 {
 		summary = truncate(summary, room)
@@ -131,13 +136,32 @@ func descriptionPreview(body string, width int) string {
 	return ""
 }
 
-// conversationSummary is the timeline's size and who spoke last.
+// conversationSummary is the timeline's size, threads under a review
+// included, and who spoke last.
 func (m Model) conversationSummary(timeline []domain.TimelineEntry) string {
-	if len(timeline) == 0 {
+	n := 0
+	var latest domain.TimelineEntry
+	for _, e := range timeline {
+		for _, item := range append([]domain.TimelineEntry{e}, threadEntries(e.Threads)...) {
+			n++
+			if !item.At.Before(latest.At) {
+				latest = item
+			}
+		}
+	}
+	if n == 0 {
 		return "0"
 	}
-	last := timeline[len(timeline)-1]
-	return strconv.Itoa(len(timeline)) + statusSeparator + "latest " + authorName(entryAuthor(last)) + " " + relative(m.now.Sub(last.At))
+	return strconv.Itoa(n) + statusSeparator + "latest " + authorName(entryAuthor(latest)) + " " + relative(m.now.Sub(latest.At))
+}
+
+// threadEntries are a review's threads as entries of their own.
+func threadEntries(threads []*domain.Thread) []domain.TimelineEntry {
+	entries := make([]domain.TimelineEntry, len(threads))
+	for i, t := range threads {
+		entries[i] = domain.TimelineEntry{At: t.StartedAt(), Thread: t}
+	}
+	return entries
 }
 
 func entryAuthor(e domain.TimelineEntry) string {

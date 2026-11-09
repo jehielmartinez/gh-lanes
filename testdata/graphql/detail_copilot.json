@@ -1,0 +1,124 @@
+{
+  "data": {
+    "node": {
+      "id": "PR_node_behind",
+      "number": 13,
+      "title": "Bump the base image",
+      "url": "https://github.com/user-a/other-repo/pull/13",
+      "isDraft": false,
+      "state": "OPEN",
+      "createdAt": "2026-02-01T10:00:00Z",
+      "updatedAt": "2026-03-05T16:40:00Z",
+      "mergedAt": null,
+      "closedAt": null,
+      "author": {
+        "login": "user-a"
+      },
+      "baseRefName": "main",
+      "headRefName": "feature-13",
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "reviewDecision": "REVIEW_REQUIRED",
+      "viewerCanUpdate": true,
+      "autoMergeRequest": null,
+      "repository": {
+        "nameWithOwner": "user-a/other-repo",
+        "mergeCommitAllowed": true,
+        "squashMergeAllowed": true,
+        "rebaseMergeAllowed": false,
+        "autoMergeAllowed": true,
+        "deleteBranchOnMerge": true
+      },
+      "comments": {
+        "totalCount": 0
+      },
+      "reviews": {
+        "totalCount": 1
+      },
+      "latestReviews": {
+        "nodes": [
+          {
+            "author": {
+              "login": "copilot-pull-request-reviewer"
+            },
+            "state": "COMMENTED",
+            "submittedAt": "2026-03-05T14:00:00Z"
+          }
+        ]
+      },
+      "commits": {
+        "nodes": [
+          {
+            "commit": {
+              "id": "C_node_behind",
+              "statusCheckRollup": null
+            }
+          }
+        ]
+      },
+      "body": "Moves the base image to alpine.",
+      "conversationComments": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": []
+      },
+      "conversationReviews": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "id": "PRR_copilot_1",
+            "author": {
+              "login": "copilot-pull-request-reviewer"
+            },
+            "state": "COMMENTED",
+            "body": "> [!NOTE]\n> Copilot was unable to run its full agentic suite in this review.\n\n<!-- ccr-overview-v2 -->\n\n### 🟡 Changes recommended\n\nPinning by digest can leave the cache step pointing at an image that no longer exists.\n\n<details open>\n<summary><strong>2 open issues</strong></summary>\n\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://example.com/icons/medium-dark.svg\"><img src=\"https://example.com/icons/medium-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Refresh the cache key when the digest changes](https://github.com/user-a/other-repo/pull/13#discussion_r1) · New\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://example.com/icons/low-dark.svg\"><img src=\"https://example.com/icons/low-light.png\" alt=\"Low severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [The build arguments aren&#39;t passed to the second stage](https://github.com/user-a/other-repo/pull/13#discussion_r2) · New\n</details>\n\n<details>\n<summary><strong>What changed in this PR</strong></summary>\n\nMoves the base image to alpine and pins it by digest.\n\n| File | Description |\n| ---- | ----------- |\n| `Dockerfile` | Pins the base image by digest. |\n</details>\n\n<sub>Review effort: Balanced</sub>\n\nEncoded escapes stay text: &#27;[2J &#x1b;]0;title&#7; done.",
+            "submittedAt": "2026-03-05T14:00:00Z"
+          }
+        ]
+      },
+      "reviewThreads": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": null
+        },
+        "nodes": [
+          {
+            "id": "RT_copilot_1",
+            "path": "Dockerfile",
+            "line": 3,
+            "originalLine": 3,
+            "isResolved": false,
+            "comments": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": [
+                {
+                  "author": {
+                    "login": "copilot-pull-request-reviewer"
+                  },
+                  "body": "The cache key ignores the digest, so a stale layer can be reused.\n```suggestion\nARG CACHE_KEY=${BASE_DIGEST}\n```",
+                  "createdAt": "2026-03-05T13:59:00Z",
+                  "pullRequestReview": {
+                    "id": "PRR_copilot_1"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4980,
+      "resetAt": "2026-03-05T18:00:00Z"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"html"
 	"regexp"
 	"strings"
 	"unicode"
@@ -16,6 +17,11 @@ var (
 	// any other angle-bracketed text is kept, since it is more often a type
 	// parameter or a placeholder than markup.
 	htmlTag = regexp.MustCompile(`(?i)^</?(details|summary|br|p|div|span|sub|sup|kbd|b|i|em|strong|img|picture|source)\b[^>]*>`)
+	altAttr = regexp.MustCompile(`(?i)\salt\s*=\s*"([^"]*)"`)
+	// entityRef is an HTML character reference; entity is one that starts
+	// the text.
+	entityRef = regexp.MustCompile(`&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});`)
+	entity    = regexp.MustCompile(`^` + entityRef.String())
 )
 
 // parseInline turns one paragraph's text into spans, adding style to all of
@@ -72,10 +78,22 @@ func inlineToken(s string, i int, style Style, url string) ([]Span, int, bool) {
 			return []Span{{Text: m[1], Style: style, URL: orURL(url, m[1])}}, len(m[0]), true
 		}
 		if m := htmlTag.FindStringSubmatch(rest); m != nil {
-			if strings.EqualFold(m[1], "br") {
+			switch {
+			case strings.EqualFold(m[1], "br"):
 				return []Span{{Text: " ", Style: style, URL: url}}, len(m[0]), true
+			case strings.EqualFold(m[1], "img"):
+				// An image shows its alt text, as a markdown image does.
+				if alt := altAttr.FindStringSubmatch(m[0]); alt != nil && strings.TrimSpace(alt[1]) != "" {
+					return []Span{{Text: decodeEntities(strings.TrimSpace(alt[1])), Style: style | Muted, URL: url}}, len(m[0]), true
+				}
 			}
 			return nil, len(m[0]), true
+		}
+	case c == '&':
+		if m := entity.FindString(rest); m != "" {
+			if text := decodeEntities(m); text != m {
+				return []Span{{Text: text, Style: style, URL: url}}, len(m), true
+			}
 		}
 	case c == 'h' && url == "" && (i == 0 || !isWordByte(s[i-1])):
 		if m := bareURL.FindString(rest); m != "" {
@@ -363,4 +381,20 @@ func lineWidthOf(l Line) int {
 		w += lipgloss.Width(sp.Text)
 	}
 	return w
+}
+
+// decodeEntities turns HTML character references into the characters they
+// name, as GitHub does, except any that would put a control character on
+// screen: PR text is untrusted, and its escapes were stripped before it got
+// here.
+func decodeEntities(s string) string {
+	return entityRef.ReplaceAllStringFunc(s, func(ref string) string {
+		text := html.UnescapeString(ref)
+		for _, r := range text {
+			if unicode.IsControl(r) {
+				return ref
+			}
+		}
+		return text
+	})
 }

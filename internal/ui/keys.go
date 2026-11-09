@@ -54,6 +54,12 @@ type modalKeys struct {
 	ExpandResolved key.Binding
 	// Section opens or closes the section its number names.
 	Section key.Binding
+	// HighlightNext and HighlightPrev move the highlight between the
+	// headings that fold: sections, reviews and threads.
+	HighlightNext key.Binding
+	HighlightPrev key.Binding
+	// Fold folds or unfolds the highlighted heading.
+	Fold key.Binding
 }
 
 func newKeyMap() keyMap {
@@ -94,6 +100,9 @@ func newKeyMap() keyMap {
 			Close:          key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 			ExpandResolved: key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "resolved threads")),
 			Section:        key.NewBinding(key.WithKeys(sectionKeys()...), key.WithHelp(sectionKeysHelp(), "sections")),
+			HighlightNext:  key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "highlight")),
+			HighlightPrev:  key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "highlight back")),
+			Fold:           key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "fold")),
 		},
 	}
 }
@@ -134,13 +143,14 @@ type modalHelp struct{ keys keyMap }
 
 func (h modalHelp) ShortHelp() []key.Binding {
 	m := h.keys.Modal
-	return []key.Binding{m.Up, m.Down, m.PageDown, m.Section, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit}
+	return []key.Binding{m.PageDown, m.HighlightNext, m.Fold, m.Section, m.ExpandResolved, h.keys.Links, h.keys.Browser, m.Close, h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit}
 }
 
 func (h modalHelp) FullHelp() [][]key.Binding {
 	m := h.keys.Modal
 	return [][]key.Binding{
-		{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.Section, m.ExpandResolved, h.keys.Links, h.keys.Browser, h.keys.Copy, m.Close},
+		{m.Up, m.Down, m.PageUp, m.PageDown, m.Top, m.Bottom, m.HighlightNext, m.HighlightPrev, m.Fold},
+		{m.Section, m.ExpandResolved, h.keys.Links, h.keys.Browser, h.keys.Copy, m.Close},
 		{h.keys.UpdateBranch, h.keys.RebaseBranch, h.keys.Draft, h.keys.Merge, h.keys.Refresh, h.keys.Quit},
 	}
 }

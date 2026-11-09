@@ -145,10 +145,11 @@ const (
 	ReviewRequired         ReviewDecision = "REVIEW_REQUIRED"
 )
 
-// Review is one review a reviewer submitted. Its Body is filled only by the
-// detail query's conversation, and AuthorIsViewer only by the pull request's
-// latest reviews.
+// Review is one review a reviewer submitted. Its ID and Body are filled only
+// by the detail query's conversation, and AuthorIsViewer only by the pull
+// request's latest reviews.
 type Review struct {
+	ID             string
 	Author         string
 	AuthorIsViewer bool
 	State          ReviewState

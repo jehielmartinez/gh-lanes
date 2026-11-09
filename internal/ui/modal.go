@@ -48,9 +48,16 @@ type detail struct {
 	// refresh never folds away what they are reading.
 	open    sectionSet
 	toggled bool
-	// headers is the content line each section's heading is drawn on, or -1
-	// when the section isn't drawn, so a click on a heading can toggle it.
-	headers [sectionCount]int
+	// folds is the viewer's own choice for each review and thread they
+	// folded or unfolded, keyed as foldables are. Anything else is drawn as
+	// its default.
+	folds map[string]bool
+	// highlight is the key of the heading the highlight is on, or empty.
+	highlight string
+	// foldables are the headings that fold, in the order drawn, with the
+	// content line each is on, so the highlight can move between them and a
+	// click on one can fold it.
+	foldables []foldable
 }
 
 type detailMsg struct {
@@ -151,7 +158,13 @@ func (m Model) detailKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Modal.Bottom):
 		d.viewport.GotoBottom()
 	case key.Matches(msg, m.keys.Modal.ExpandResolved):
-		d.expandResolved = !d.expandResolved
+		d = d.toggleResolved()
+	case key.Matches(msg, m.keys.Modal.HighlightNext):
+		d = d.moveHighlight(1)
+	case key.Matches(msg, m.keys.Modal.HighlightPrev):
+		d = d.moveHighlight(-1)
+	case key.Matches(msg, m.keys.Modal.Fold):
+		d = d.foldHighlighted()
 	case key.Matches(msg, m.keys.Modal.Section):
 		s, _ := sectionFromKey(msg.String())
 		d = d.toggle(s)
@@ -192,10 +205,10 @@ func (m Model) syncDetail() Model {
 	d := *m.detail
 	d.viewport.SetWidth(inner)
 	d.viewport.SetHeight(max(height-2-lipgloss.Height(m.detailStatus(inner)), 1))
-	content, headers := m.detailContent(inner)
+	content := m.detailContent(inner)
 	d.viewport.SetContent(strings.Join(content.lines, "\n"))
 	d.links = content.links
-	d.headers = headers
+	d.foldables = content.folds
 	m.detail = &d
 	return m
 }
@@ -235,9 +248,8 @@ func (m Model) detailStatus(width int) string {
 	return lipgloss.NewStyle().Width(width).Render(line)
 }
 
-// detailContent is everything the modal scrolls through, and the line each
-// section's heading landed on.
-func (m Model) detailContent(width int) (page, [sectionCount]int) {
+// detailContent is everything the modal scrolls through.
+func (m Model) detailContent(width int) page {
 	d := m.detail
 	pr := d.pr
 	muted := lipgloss.NewStyle().Foreground(m.theme.muted)
@@ -249,10 +261,11 @@ func (m Model) detailContent(width int) (page, [sectionCount]int) {
 		wrap.Render(muted.Render(authorName(pr.Author)+statusSeparator+pr.HeadRef+" → "+pr.BaseRef)),
 		wrap.Render(muted.Render("Created "+m.timestamp(pr.CreatedAt)+statusSeparator+"Updated "+m.timestamp(pr.UpdatedAt))),
 	)
-	headers := [sectionCount]int{-1, -1, -1, -1}
 	add := func(s section, summary string, body func() page) {
-		headers[s] = len(content.lines) + 1
-		content = content.then(text("", m.sectionHeader(s, d.open[s], summary, width)))
+		key := sectionFold(s)
+		heading := text("", m.sectionHeader(s, d.open[s], d.highlight == key, summary, width))
+		heading.folds = []foldable{{key: key, line: 1, open: d.open[s]}}
+		content = content.then(heading)
 		if d.open[s] {
 			content = content.then(body())
 		}
@@ -272,11 +285,11 @@ func (m Model) detailContent(width int) (page, [sectionCount]int) {
 	// The board's copy carries no conversation, so these wait for the
 	// detail query rather than claiming there is nothing to show.
 	if !d.fresh {
-		return content, headers
+		return content
 	}
 	conv := pr.Conversation
 	bodyWidth := width - indentStep
-	add(sectionDescription, descriptionSummary(conv.Body, bodyWidth), func() page { return m.descriptionLines(conv, width) })
+	add(sectionDescription, descriptionSummary(conv.Body, bodyWidth), func() page { return m.descriptionLines(conv, d.folding(), width) })
 	if !d.open[sectionDescription] {
 		if preview := descriptionPreview(conv.Body, bodyWidth-2); preview != "" {
 			content = content.then(text(indented(1, m.muted(preview))))
@@ -284,9 +297,9 @@ func (m Model) detailContent(width int) (page, [sectionCount]int) {
 	}
 	timeline := conv.Timeline()
 	add(sectionConversation, m.conversationSummary(timeline), func() page {
-		return m.conversationLines(timeline, d.expandResolved, width)
+		return m.conversationLines(timeline, d.folding(), width)
 	})
-	return content, headers
+	return content
 }
 
 func (m Model) stateBadge(pr domain.PullRequest) string {

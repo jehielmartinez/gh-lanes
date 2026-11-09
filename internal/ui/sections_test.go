@@ -67,7 +67,7 @@ func TestCollapsedSectionsSummariseWhatTheyHide(t *testing.T) {
 		"▸ Description  ",
 		"Summary",
 		"▸ Conversation  ",
-		"▸ Conversation  7 · latest ghost 2h ago",
+		"▸ Conversation  8 · latest ghost 2h ago",
 	)
 	h.press("1")
 	screen = h.waitForText("▸ Status")

@@ -77,3 +77,21 @@ _Avoid_: Pending reviewer, requested
 **Roll-call**:
 The list of a pull request's reviewers, one per reviewer, each with their verdict or that they're awaiting review.
 _Avoid_: Reviewer list, reviews
+
+**Thread**:
+Comments anchored to a line of a file. A thread sits under the review that opened it, or on its own in the timeline when GitHub doesn't say which review that was.
+_Avoid_: Inline comment, review comment
+
+### Detail modal
+
+**Section**:
+One of the detail modal's four collapsible parts: Status, Checks, Description and Conversation.
+_Avoid_: Group (that names a cluster of cards), panel, tab
+
+**Fold**:
+To collapse a section, review, thread or `<details>` block down to its heading, or to expand it again. A folded heading says what it hides.
+_Avoid_: Hide, minimise
+
+**Highlight**:
+The one heading in the detail modal that `enter` folds, moved between foldable headings with `tab` and `shift+tab`.
+_Avoid_: Focus, cursor, selection (that names the card picked on the board)

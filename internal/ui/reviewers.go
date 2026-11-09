@@ -59,7 +59,7 @@ func reviewerName(who domain.Identity) string {
 	case who.Team:
 		return "@" + oneLine(who.Name)
 	}
-	return oneLine(who.Name)
+	return authorName(who.Name)
 }
 
 // verdictLook is how a review state reads and is marked wherever a review is
